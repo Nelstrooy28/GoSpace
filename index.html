@@ -28,7 +28,10 @@
   <section id="title-overlay" class="title-overlay" aria-label="Main Menu">
     <div class="title-topbar">
       <div class="title-version badge-tag">MDL-X FLIGHT SIM // v3.0</div>
-      <button id="title-mute-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Audio">🔊 AUDIO ON</button>
+      <div class="title-audio-group">
+        <button id="title-music-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Ambient Space Synth Music">🎵 MUSIC: ON</button>
+        <button id="title-mute-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Sound Effects">🔊 SFX: ON</button>
+      </div>
     </div>
 
     <div class="title-stage">
@@ -108,7 +111,8 @@
       </div>
 
       <div class="topbar-utils">
-        <button id="mute-btn" class="btn-sci icon-btn" type="button" title="Toggle Audio">🔊</button>
+        <button id="music-toggle-btn" class="btn-sci audio-toggle-btn" type="button" title="Toggle Ambient Space Synth Music">🎵 Music</button>
+        <button id="mute-btn" class="btn-sci audio-toggle-btn" type="button" title="Toggle Sound Effects">🔊 SFX</button>
         <button id="toggle-hud-btn" class="btn-sci" type="button" title="Hide HUD [H]">[H]</button>
         <button id="menu-btn" class="btn-sci" type="button" aria-expanded="false">⚙️ Menu</button>
       </div>

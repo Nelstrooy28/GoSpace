@@ -3,6 +3,7 @@ import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
 import { activateSafeMode, getSensorCamMode, mountOrbit, mountShowcase, repairActiveHazard, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
+import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
 import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
 import { SUB_TABS, renderHud, renderLoadoutDock, renderMissionBriefing, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
@@ -36,6 +37,7 @@ function triggerWarpFlash() {
 function updateDebug(ev) {
   window.__MISSION_DEBUG__ = {
     stage, scenarioId: missionState.scenarioId, cmlLevel: ev.cmlLevel, titleOpen, hudHidden, muted: isMuted(),
+    musicMuted: isMusicMuted(), music: getMusicDebugState(),
     tutorialActive: isTutorialActive(),
     cleanroomActive: activeScene === 'hangar', meshCount: activeScene === 'hangar' ? getMeshCount() : 0,
     launchActive: activeScene === 'launch', launchTelemetry,
@@ -120,6 +122,8 @@ function mountLiveOrbit(vp, isVictory = false) {
     paused: briefingOpen && !isVictory,
     sensorCam: sensorCamOpen && !isVictory,
     onHazardEvent: (ev) => {
+      setHazardTension(ev.type === 'trigger');
+      if (window.__MISSION_DEBUG__) window.__MISSION_DEBUG__.music = getMusicDebugState();
       if (ev.type === 'trigger') {
         orbitWarp = ev.timeWarp ?? 1;
         spawnPopup(`🚨 ${ev.icon} ANOMALY DETECTED · WARP 1x`);
@@ -142,9 +146,32 @@ function applyChrome() {
   document.getElementById('hud-restore-btn').hidden = !hudHidden || titleOpen;
   document.getElementById('codex-menu').hidden = !codexOpen || titleOpen;
   document.getElementById('menu-btn').setAttribute('aria-expanded', String(codexOpen));
-  document.getElementById('mute-btn').textContent = isMuted() ? '🔇' : '🔊';
+  const sfxMuted = isMuted();
+  const musMuted = isMusicMuted();
+  const muteBtn = document.getElementById('mute-btn');
+  if (muteBtn) {
+    muteBtn.textContent = sfxMuted ? '🔇 SFX' : '🔊 SFX';
+    muteBtn.classList.toggle('is-muted', sfxMuted);
+    muteBtn.setAttribute('aria-pressed', String(!sfxMuted));
+  }
+  const musicBtn = document.getElementById('music-toggle-btn');
+  if (musicBtn) {
+    musicBtn.textContent = musMuted ? '🔇 Music' : '🎵 Music';
+    musicBtn.classList.toggle('is-muted', musMuted);
+    musicBtn.setAttribute('aria-pressed', String(!musMuted));
+  }
   const titleMute = document.getElementById('title-mute-btn');
-  if (titleMute) titleMute.textContent = isMuted() ? '🔇 AUDIO: OFF' : '🔊 AUDIO: ON';
+  if (titleMute) {
+    titleMute.textContent = sfxMuted ? '🔇 SFX: OFF' : '🔊 SFX: ON';
+    titleMute.classList.toggle('is-muted', sfxMuted);
+    titleMute.setAttribute('aria-pressed', String(!sfxMuted));
+  }
+  const titleMusic = document.getElementById('title-music-btn');
+  if (titleMusic) {
+    titleMusic.textContent = musMuted ? '🔇 MUSIC: OFF' : '🎵 MUSIC: ON';
+    titleMusic.classList.toggle('is-muted', musMuted);
+    titleMusic.setAttribute('aria-pressed', String(!musMuted));
+  }
 }
 
 function renderAll(rebuildScene = true, focusTag = null) {
@@ -202,6 +229,8 @@ function renderAll(rebuildScene = true, focusTag = null) {
 
   renderStageHud(stage, missionState, lastEval, getStageHudOpts());
   renderMissionBriefing(lastEval, stage, briefingOpen && !titleOpen && stage !== 'review');
+  if (titleOpen || stage !== 'orbit') setHazardTension(false);
+  setMood(titleOpen ? 'menu' : (stage === 'review' ? 'debrief' : stage));
   updateDebug(lastEval);
   notifyTutorialState();
 }
@@ -295,6 +324,7 @@ function init() {
     codexOpen = false;
     startInteractiveTutorial(tutorialCallbacks);
   });
+  document.getElementById('title-music-btn')?.addEventListener('click', () => { toggleMusicMuted(); applyChrome(); updateDebug(lastEval); });
   document.getElementById('title-mute-btn')?.addEventListener('click', () => { toggleMute(); applyChrome(); updateDebug(lastEval); });
   document.getElementById('contract-grid').addEventListener('click', (e) => {
     const card = e.target.closest('[data-start-scenario]');
@@ -312,6 +342,7 @@ function init() {
   document.getElementById('reopen-title-btn').addEventListener('click', () => { titleOpen = true; codexOpen = false; renderAll(true); });
   document.getElementById('sandbox-toggle').addEventListener('change', (e) => { missionState.sandboxMode = e.target.checked; renderAll(false); });
   document.getElementById('menu-btn').addEventListener('click', () => { codexOpen = !codexOpen; applyChrome(); });
+  document.getElementById('music-toggle-btn')?.addEventListener('click', () => { toggleMusicMuted(); applyChrome(); updateDebug(lastEval); });
   document.getElementById('mute-btn').addEventListener('click', () => { toggleMute(); applyChrome(); updateDebug(lastEval); });
   document.getElementById('toggle-hud-btn').addEventListener('click', () => { hudHidden = true; codexOpen = false; applyChrome(); updateDebug(lastEval); });
   document.getElementById('hud-restore-btn').addEventListener('click', () => { hudHidden = false; applyChrome(); updateDebug(lastEval); });
@@ -457,6 +488,7 @@ function init() {
     else if (d) { saved.splice(Number(d.dataset.delIdx), 1); writeJson(STORAGE_SAVED, saved); renderSavedModal(saved, lastEval); }
   });
   document.querySelectorAll('.close-modal').forEach((b) => b.addEventListener('click', () => document.getElementById(b.dataset.close).close()));
+  initMusic();
   renderAll(true);
 }
 init();

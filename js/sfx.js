@@ -1,15 +1,31 @@
 const MUTED_KEY = 'gospace_muted_v1';
 let ctx = null, muted = localStorage.getItem(MUTED_KEY) === '1', rumbleNodes = null, lastHoverAt = 0;
+let gestureUnlocked = false;
 
-function ensureCtx() {
-  if (muted) return null;
+export function getSharedAudioContext(fromGesture = false) {
+  if (fromGesture) gestureUnlocked = true;
+  if (!gestureUnlocked && !ctx) return null;
   if (!ctx) {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (AudioCtx) ctx = new AudioCtx();
   }
-  if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (ctx && ctx.state === 'suspended' && gestureUnlocked) {
+    ctx.resume().catch(() => {});
+  }
   return ctx;
 }
+
+function ensureCtx() {
+  if (muted) return null;
+  return getSharedAudioContext(false);
+}
+
+['pointerdown', 'keydown', 'touchstart'].forEach((evt) => {
+  window.addEventListener(evt, () => {
+    gestureUnlocked = true;
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+  }, { capture: true, passive: true, once: true });
+});
 
 function tone(freqStart, freqEnd, durSec, type = 'sine', vol = 0.08, delay = 0) {
   const c = ensureCtx(); if (!c) return;
@@ -37,6 +53,7 @@ export function setMuted(next) {
 export const toggleMute = () => setMuted(!muted);
 
 export function playHover() {
+  if (!gestureUnlocked && !ctx) return;
   const now = performance.now();
   if (now - lastHoverAt < 55) return;
   lastHoverAt = now;
