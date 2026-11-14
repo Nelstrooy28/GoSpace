@@ -1,23 +1,23 @@
 import { generateOrbitTrack } from './missionVizPropagator.js';
 
 export const OFFICIAL_RESOURCES = [
-  { id: 1, agency: 'NASA', title: 'Design and Develop Science Missions', url: 'https://www.nasa.gov/wp-content/uploads/2025/04/250323-design-and-develop-science-mission.pdf?emrc=a454cf' },
-  { id: 2, agency: 'NASA', title: 'Mission Design Lab (MDL)', url: 'https://etd.gsfc.nasa.gov/capabilities/integrated-design-center/mission-design-lab/' },
-  { id: 3, agency: 'JPL', title: 'Concept Maturity Levels (CMLs)', url: 'https://dataverse.jpl.nasa.gov/dataset.xhtml?persistentId=hdl:2014/44299' },
-  { id: 4, agency: 'NASA', title: 'NASA Mission Viz', url: 'https://nasa.github.io/mission-viz/' },
-  { id: 5, agency: 'NASA', title: 'A Learning Game About Telescopes', url: 'https://science.nasa.gov/mission/webb/game-build-it-yourself/' },
-  { id: 6, agency: 'NASA', title: 'Cubesat 101', url: 'https://www3.nasa.gov/sites/default/files/atoms/files/nasa_csli_cubesat_101_508.pdf' },
-  { id: 7, agency: 'CSA', title: 'CSA Digital Games and Activities', url: 'https://www.asc-csa.gc.ca/eng/youth-educators/digital-games-and-activities.asp' }
+  { id: 1, agency: 'SYSTEMS', title: 'Design and Develop Science Missions', url: 'https://www.nasa.gov/wp-content/uploads/2025/04/250323-design-and-develop-science-mission.pdf?emrc=a454cf' },
+  { id: 2, agency: 'DESIGN', title: 'Mission Design Telemetry & Lab Framework', url: 'https://etd.gsfc.nasa.gov/capabilities/integrated-design-center/mission-design-lab/' },
+  { id: 3, agency: 'MATURITY', title: 'Concept Maturity (CML 1–4) Framework', url: 'https://dataverse.jpl.nasa.gov/dataset.xhtml?persistentId=hdl:2014/44299' },
+  { id: 4, agency: 'ORBIT', title: 'Keplerian 3D Orbit Trajectory Spec', url: 'https://nasa.github.io/mission-viz/' },
+  { id: 5, agency: 'OPTICS', title: 'Space Observatory Wavelength Rules', url: 'https://science.nasa.gov/mission/webb/game-build-it-yourself/' },
+  { id: 6, agency: 'CUBESAT', title: 'CubeSat 101 Systems Guide', url: 'https://www3.nasa.gov/sites/default/files/atoms/files/nasa_csli_cubesat_101_508.pdf' },
+  { id: 7, agency: 'SCIENCE', title: 'Arctic & Earth Observation Activities', url: 'https://www.asc-csa.gc.ca/eng/youth-educators/digital-games-and-activities.asp' }
 ];
 
 export const SCENARIOS = [
   {
     id: 'wildfiresat-l1', level: 1, stars: '★☆☆', tag: 'Level 1 · CubeSat 101', badge: 'ARCTIC GUARDIAN', orbitIcon: '🛰️ SSO LEO 575km',
-    name: 'CSA WildFireSat & Arctic Thermal Monitor',
+    name: 'WildFireSat & Arctic Thermal Monitor',
     summary: 'Detect boreal wildfires & Arctic heat anomalies from Sun-Synchronous LEO using a compact CubeSat.',
     targetBand: 'ir', targetObjective: 'wildfire-ir', targetOrbit: 'sso-leo', targetLatency: 'realtime',
     budgetLimitM: 24, minLifetimeYr: 2, minScience: 75,
-    realMatch: { name: 'CSA WildFireSat & NASA FireSense', tag: 'CSA WILDFIRE FLEET', detail: 'Canadian Space Agency thermal IR wildfire monitoring constellation + NASA FireSense analytics.' }
+    realMatch: { name: 'WildFireSat', tag: 'WILDFIRE FLEET', detail: 'Thermal IR wildfire monitoring mission paired with rapid heat-anomaly orbital analytics.' }
   },
   {
     id: 'ocean-l2', level: 2, stars: '★★☆', tag: 'Level 2 · SmallSat', badge: 'OCEAN SENTINEL', orbitIcon: '🌍 Polar LEO 680km',
@@ -25,7 +25,7 @@ export const SCENARIOS = [
     summary: 'Measure phytoplankton, coastal turbidity, and sea-ice dynamics with UV-Visible hyperspectral radiometry.',
     targetBand: 'uv-vis', targetObjective: 'ocean-color', targetOrbit: 'polar-leo', targetLatency: 'daily',
     budgetLimitM: 115, minLifetimeYr: 3, minScience: 80,
-    realMatch: { name: 'NASA PACE & CSA RADARSAT Constellation', tag: 'NASA OCEAN COLOR', detail: 'NASA Plankton, Aerosol, Cloud, ocean Ecosystem hyperspectral mission paired with CSA maritime monitoring.' }
+    realMatch: { name: 'PACE Climate Orbiter', tag: 'OCEAN COLOR MISSION', detail: 'Hyperspectral ocean-color & climate radiometry mission for plankton, aerosols, and coastal tracking.' }
   },
   {
     id: 'lunar-l3', level: 3, stars: '★★★', tag: 'Level 3 · Flagship / Lunar', badge: 'LUNAR PIONEER', orbitIcon: '🌙 Lunar Transfer',
@@ -33,7 +33,7 @@ export const SCENARIOS = [
     summary: 'Map shadowed lunar craters for water ice using cryogenic infrared spectroscopy and neutron detection.',
     targetBand: 'cryo-ir', targetObjective: 'lunar-volatiles', targetOrbit: 'lunar-transfer', targetLatency: 'archival',
     budgetLimitM: 500, minLifetimeYr: 5, minScience: 85,
-    realMatch: { name: 'NASA Lunar Trailblazer & JWST', tag: 'DEEP SPACE FLAGSHIP', detail: 'High-resolution volatiles and minerals mapper combined with JWST-class cryogenic thermal architecture.' }
+    realMatch: { name: 'Lunar Trailblazer & Webb Space Observatory', tag: 'DEEP SPACE FLAGSHIP', detail: 'High-resolution lunar volatiles mapper combined with observatory-class cryogenic infrared thermal architecture.' }
   }
 ];
 
@@ -65,9 +65,9 @@ export const CATALOG = {
     instruments: [
       { id: 'ir-bolometer', name: 'Un-cooled IR Microbolometer', band: 'ir', classes: ['cubesat', 'smallsat'], massKg: 2.4, powerW: 11, dataMbDay: 900, costM: 2.6, sci: 44, tip: 'Lightweight thermal wildfire sensor (WildFireSat class).' },
       { id: 'arctic-multispec', name: 'Dual-Band Arctic Radiometer', band: 'ir', classes: ['cubesat', 'smallsat'], massKg: 1.6, powerW: 7, dataMbDay: 600, costM: 1.9, sci: 34, tip: 'Adds mid-IR hotspot verification and cloud masking.' },
-      { id: 'oci-hyperspec', name: 'OCI UV-Vis Spectrometer', band: 'uv-vis', classes: ['smallsat', 'flagship'], massKg: 58, powerW: 95, dataMbDay: 14000, costM: 24, sci: 52, tip: 'Hyperspectral ocean radiometer modeled on NASA PACE.' },
+      { id: 'oci-hyperspec', name: 'OCI UV-Vis Spectrometer', band: 'uv-vis', classes: ['smallsat', 'flagship'], massKg: 58, powerW: 95, dataMbDay: 14000, costM: 24, sci: 52, tip: 'Hyperspectral ocean radiometer modeled on PACE Climate Orbiter.' },
       { id: 'sar-altimeter', name: 'Compact Coastal Altimeter', band: 'uv-vis', classes: ['smallsat', 'flagship'], massKg: 28, powerW: 48, dataMbDay: 4200, costM: 12, sci: 32, tip: 'All-weather sea-state & ice-edge support instrument.' },
-      { id: 'cryo-ir-mapper', name: 'Cryo-IR Volatiles Spectrometer', band: 'cryo-ir', classes: ['flagship'], massKg: 240, powerW: 310, dataMbDay: 22000, costM: 88, sci: 54, tip: 'JWST/Trailblazer-style cooled infrared mineral & ice mapper.' },
+      { id: 'cryo-ir-mapper', name: 'Cryo-IR Volatiles Spectrometer', band: 'cryo-ir', classes: ['flagship'], massKg: 240, powerW: 310, dataMbDay: 22000, costM: 88, sci: 54, tip: 'Observatory-class cooled infrared mineral & ice mapper.' },
       { id: 'neutron-spec', name: 'Lunar Neutron Spectrometer', band: 'cryo-ir', classes: ['smallsat', 'flagship'], massKg: 42, powerW: 45, dataMbDay: 2500, costM: 26, sci: 36, tip: 'Measures epithermal neutrons to confirm subsurface hydrogen.' }
     ],
     solarArrays: [
@@ -89,7 +89,7 @@ export const CATALOG = {
   launch: {
     vehicles: [
       { id: 'electron', name: 'Rocket Lab Electron', maxPayloadKg: 300, deepSpaceCapable: false, costM: 7.5, tip: 'Dedicated small launcher to Sun-Sync & Polar LEO.' },
-      { id: 'falcon9-csli', name: 'Falcon 9 CSLI Rideshare', maxPayloadKg: 950, deepSpaceCapable: false, costM: 18.0, tip: 'NASA CubeSat Launch Initiative & SmallSat rideshare.' },
+      { id: 'falcon9-csli', name: 'Falcon 9 Rideshare', maxPayloadKg: 950, deepSpaceCapable: false, costM: 18.0, tip: 'Medium-lift orbital rideshare for CubeSats & SmallSats.' },
       { id: 'falcon-heavy', name: 'Falcon Heavy / Vulcan Heavy', maxPayloadKg: 4500, deepSpaceCapable: true, costM: 98.0, tip: 'Required mass & C3 energy for HEO and Lunar transfer.' }
     ],
     orbits: [
@@ -106,9 +106,9 @@ export const CATALOG = {
       { id: 'ka-optical', name: 'Ka-Band + Optical Terminal', massKg: 24, powerW: 85, mbps: 320, costM: 14.5, deepSpace: true, tip: 'High-bandwidth downlink built for SmallSat & Lunar range.' }
     ],
     stations: [
-      { id: 'inuvik', name: 'CSA Inuvik Satellite Station', passMinDay: 52, costM: 1.4, realtimeCapable: true, deepSpace: false, tip: 'High-latitude Canadian Arctic station ideal for polar/SSO passes.' },
-      { id: 'nsn', name: 'NASA Near Space Network (NSN)', passMinDay: 78, costM: 4.5, realtimeCapable: true, deepSpace: false, tip: 'Global commercial + NASA ground network for LEO/Polar missions.' },
-      { id: 'dsn', name: 'NASA Deep Space Network (DSN)', passMinDay: 110, costM: 26.0, realtimeCapable: false, deepSpace: true, tip: '70m dishes at Goldstone, Madrid & Canberra for HEO/Lunar links.' }
+      { id: 'inuvik', name: 'Arctic Polar Station', passMinDay: 52, costM: 1.4, realtimeCapable: true, deepSpace: false, tip: 'High-latitude Arctic station ideal for polar and sun-sync passes.' },
+      { id: 'nsn', name: 'Global Near-Space Network', passMinDay: 78, costM: 4.5, realtimeCapable: true, deepSpace: false, tip: 'Global ground station network for LEO and polar missions.' },
+      { id: 'dsn', name: 'Deep-Space Dish Array', passMinDay: 110, costM: 26.0, realtimeCapable: false, deepSpace: true, tip: '70m deep-space dishes across three longitudes for HEO/Lunar links.' }
     ]
   }
 };
@@ -186,7 +186,7 @@ export function evaluateMissionDesign(state) {
 
   const warnings = [];
   const warn = (id, segment, text) => warnings.push({ id, segment, severity: 'error', text });
-  if (!allPopulated) warn('incomplete', 'System', 'Populate all 4 NASA segments (including at least 1 instrument).');
+  if (!allPopulated) warn('incomplete', 'System', 'Populate all 4 Mission Segments (including at least 1 instrument).');
   if (!state.sandboxMode && usedM > sc.budgetLimitM) warn('budget', 'Cost', `Cost $${usedM}M exceeds $${sc.budgetLimitM}M mission cap.`);
   if (bus && payloadMassKg > bus.payloadCapKg) warn('bus-cap', 'Space', `Subsystem/payload (${payloadMassKg.toFixed(1)} kg) exceeds ${bus.name} limit (${bus.payloadCapKg} kg).`);
   if (!state.sandboxMode && veh && totalMassKg > veh.maxPayloadKg) warn('lv-cap', 'Launch', `Total mass (${totalMassKg} kg) exceeds ${veh.name} (${veh.maxPayloadKg} kg).`);
@@ -199,7 +199,7 @@ export function evaluateMissionDesign(state) {
     if (bus && !i.classes.includes(bus.busClass)) warn(`inst-bus-${i.id}`, 'Space', `${i.name} incompatible with ${bus.name} (Webb rule).`);
   });
   if ((band?.id === 'cryo-ir' || insts.some((i) => i.band === 'cryo-ir')) && !therm?.cryoCapable) warn('cryo', 'Space', 'Cryogenic IR requires Active Cryocooler + Star Trackers.');
-  if (orbit.deepSpace && (!gs?.deepSpace || !veh?.deepSpaceCapable)) warn('deepspace', 'Launch', `${orbit.name} requires a heavy launcher and NASA DSN.`);
+  if (orbit.deepSpace && (!gs?.deepSpace || !veh?.deepSpaceCapable)) warn('deepspace', 'Launch', `${orbit.name} requires a heavy launcher and Deep-Space Dish Array.`);
   if (lat?.id === 'realtime' && gs && !gs.realtimeCapable) warn('latency', 'Ground', `${gs.name} cannot support <30 min real-time wildfire alerts.`);
 
   const cmlLevel = !allPopulated ? 1 : (warnings.length === 0 ? 4 : (warnings.length <= 2 ? 3 : 2));

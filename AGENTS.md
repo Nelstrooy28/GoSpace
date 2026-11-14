@@ -9,8 +9,8 @@
 ## File Structure (< 250 lines per file)
 - `index.html` — Import map, full-screen 3D viewport & floating glassmorphic game HUD overlays
 - `styles.css` — Deep-space glassmorphic game HUD, collapsible drawers, launch CTA & animations
-- `js/missionVizPropagator.js` — NASA Mission Viz Keplerian 2D-ellipse-to-3D orbit propagator & JSON export
-- `js/catalog.js` — NASA/CSA scenarios, buses, rockets, orbits, instruments & `evaluateMissionDesign()`
+- `js/missionVizPropagator.js` — Keplerian 2D-ellipse-to-3D orbit propagator & 3D trajectory JSON export
+- `js/catalog.js` — Mission scenarios, buses, rockets, orbits, instruments & `evaluateMissionDesign()`
 - `js/main.js` — Single-player 4-stage state machine (Hangar -> Launchpad -> Orbit -> Debrief)
 - `js/sceneCleanroom.js` — Interactive 3D Hangar procedural spacecraft assembly & OrbitControls
 - `js/sceneLaunch.js` — Procedural 3D Launchpad, multi-stage rocket liftoff, sky-to-space ascent & fairing jettison

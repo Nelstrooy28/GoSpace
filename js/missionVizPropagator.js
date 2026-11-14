@@ -1,4 +1,4 @@
-// NASA Mission Viz-inspired Keplerian 2D-ellipse-to-3D orbit propagator & JSON export
+// Keplerian 2D-ellipse-to-3D orbit propagator & 3D trajectory JSON export
 const MU_EARTH = 398600.4418; // km^3 / s^2
 const R_EARTH = 6371; // km
 const DEG2RAD = Math.PI / 180;
@@ -121,7 +121,7 @@ export function exportMissionVizJSON(missionState, evaluation) {
   const orbitEl = evaluation.orbitElements;
   const track = generateOrbitTrack(orbitEl, 96);
   const payload = {
-    schema: 'nasa-mission-viz-compatible-v1',
+    schema: 'gospace-trajectory-v1',
     app: 'GoSpace',
     exportedAt: new Date().toISOString(),
     scenarioId: missionState.scenarioId,
@@ -155,7 +155,7 @@ export function exportMissionVizJSON(missionState, evaluation) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'gospace-mission-viz.json';
+    a.download = 'gospace-trajectory.json';
     document.body.appendChild(a);
     a.click();
     a.remove();

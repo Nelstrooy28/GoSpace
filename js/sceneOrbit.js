@@ -5,9 +5,9 @@ import { playDownlinkPing, playSafeMode, playWarning } from './sfx.js';
 
 const EARTH_R = 2.0, KM_TO_SCENE = EARTH_R / 6371;
 const STATIONS = [
-  { id: 'inuvik', name: 'CSA Inuvik', lat: 68.36, lon: -133.72 },
-  { id: 'nsn', name: 'NASA NSN', lat: 37.94, lon: -75.46 },
-  { id: 'dsn', name: 'NASA DSN', lat: 35.43, lon: -116.89 }
+  { id: 'inuvik', name: 'Arctic Polar Station', lat: 68.36, lon: -133.72 },
+  { id: 'nsn', name: 'Global Near-Space Network', lat: 37.94, lon: -75.46 },
+  { id: 'dsn', name: 'Deep-Space Dish Array', lat: 35.43, lon: -116.89 }
 ];
 
 let renderer = null, scene = null, camera = null, controls = null, resizeObserver = null;

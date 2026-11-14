@@ -155,15 +155,16 @@ export function renderStageHud(stage, state, ev, opts) {
   const starCount = (cmlLevel === 4 || sandboxMode) && metrics.scienceScore >= 85 && oScore >= 50 ? 3 : (cmlLevel >= 3 ? 2 : 1);
   const rank = starCount === 3 ? 'FLIGHT DIRECTOR' : (starCount === 2 ? 'SENIOR ENGINEER' : 'CADET');
   rev.innerHTML = `<div class="vp-card plate">
-    <div class="card-head"><span>MISSION COMPLETE</span><span class="badge-tag">${rank} · ${totalScore} PTS</span></div>
+    <div class="card-head"><span>FLIGHT READINESS DEBRIEF</span><span class="badge-tag">${rank} · ${totalScore} PTS</span></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
       <div><h2 style="margin:0">${esc(scenario.name)}</h2><div style="color:var(--muted);font-size:11.5px">${esc(orbitElements.name)} · Orbit Bonus +${oScore} pts</div></div>
       <div class="stars-reveal">${'★'.repeat(starCount)}${'☆'.repeat(3 - starCount)}</div>
     </div>
-    <div class="collectible-card"><span style="font-size:26px">🏆</span><div><div class="badge-tag" style="display:inline-block;margin-bottom:3px">UNLOCKED: ${esc(missionMatch.tag || 'NASA/CSA')}</div>
+    <div class="collectible-card"><span style="font-size:26px">🏆</span><div><div class="badge-tag" style="display:inline-block;margin-bottom:3px">REAL-WORLD SPACECRAFT MATCH · ${esc(missionMatch.tag || 'SPACECRAFT')}</div>
       <div style="font-weight:700">${esc(missionMatch.name)}</div><div style="font-size:11px;color:var(--muted)">${esc(missionMatch.detail)}</div></div></div>
-    <div class="vp-grid" style="margin:10px 0">${getGaugeRows(ev).map((g) => `<div class="vp-stat"><div style="font-size:10px;color:var(--muted)">${g.label}</div><div style="font-family:var(--font-hud);font-size:13px">${esc(g.val)}</div></div>`).join('')}</div>
-    <div class="btn-row"><button id="rev-next-btn" class="btn-sci active" type="button">🔄 Play Next Mission</button><button id="rev-back-btn" class="btn-sci" type="button">🛠️ Tweak Build</button><button id="rev-export-btn" class="btn-sci" type="button">📥 Export Mission Viz</button><button id="rev-save-btn" class="btn-sci" type="button">💾 Save</button></div></div>`;
+    <div style="font-family:var(--font-hud);font-size:10px;color:var(--cyan);margin-top:8px">MISSION DESIGN TELEMETRY</div>
+    <div class="vp-grid" style="margin:6px 0 10px">${getGaugeRows(ev).map((g) => `<div class="vp-stat"><div style="font-size:10px;color:var(--muted)">${g.label}</div><div style="font-family:var(--font-hud);font-size:13px">${esc(g.val)}</div></div>`).join('')}</div>
+    <div class="btn-row"><button id="rev-next-btn" class="btn-sci active" type="button">🔄 Play Next Mission</button><button id="rev-back-btn" class="btn-sci" type="button">🛠️ Tweak Build</button><button id="rev-export-btn" class="btn-sci" type="button">📥 Export 3D Trajectory JSON</button><button id="rev-save-btn" class="btn-sci" type="button">💾 Save</button></div></div>`;
 }
 
 export function updateLaunchOverlay(t) {
