@@ -2,7 +2,7 @@ import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign } from '.
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { activateSafeMode, mountOrbit, mountShowcase, scanAsteroid, seekOrbitToPass, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerOrbitStorm, unmountOrbit } from './sceneOrbit.js';
+import { activateSafeMode, mountOrbit, mountShowcase, repairActiveHazard, scanAsteroid, seekOrbitToPass, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
 import { isMuted, playEquip, playHover, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
 import { SUB_TABS, renderHud, renderLoadoutDock, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
@@ -106,15 +106,31 @@ function renderAll(rebuildScene = true, focusTag = null) {
     if (activeScene !== 'orbit' || rebuildScene) {
       unmountAll(); orbitTelemetry = null; orbitScore = 0;
       mountOrbit(vp, missionState, lastEval, (t) => {
-        orbitTelemetry = t; orbitScore = t.missionScore || 0; updateOrbitOverlay(t);
+        orbitTelemetry = t; orbitScore = t.missionScore || 0; orbitWarp = t.timeWarp ?? orbitWarp; updateOrbitOverlay(t);
         if (window.__MISSION_DEBUG__) { window.__MISSION_DEBUG__.orbitTelemetry = t; window.__MISSION_DEBUG__.orbitScore = orbitScore; }
         notifyTutorialState();
+      }, {
+        onHazardEvent: (ev) => {
+          if (ev.type === 'trigger') {
+            orbitWarp = ev.timeWarp ?? 1;
+            spawnPopup(`🚨 ${ev.icon} ANOMALY DETECTED · WARP 1x`);
+          } else if (ev.type === 'resolve') {
+            orbitScore += ev.bonus || 75;
+            spawnPopup('+75 FLIGHT DIRECTOR BONUS · SYSTEMS NOMINAL!');
+          } else if (ev.type === 'expire') {
+            spawnPopup(`💥 HULL IMPACT -${ev.hullLoss}% · MISSED REPAIR`);
+          }
+        }
       });
       activeScene = 'orbit'; setOrbitTimeWarp(orbitWarp); setOrbitCameraMode(orbitCam);
     }
   } else unmountAll();
 
-  renderStageHud(stage, missionState, lastEval, { autoRotate, exploded, meshCount: getMeshCount(), launchCam, orbitCam, orbitWarp, orbitScore });
+  renderStageHud(stage, missionState, lastEval, {
+    autoRotate, exploded, meshCount: getMeshCount(), launchCam, orbitCam, orbitWarp, orbitScore,
+    anomaliesResolved: orbitTelemetry?.anomaliesResolved || 0,
+    hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100
+  });
   updateDebug(lastEval);
   notifyTutorialState();
 }
@@ -131,6 +147,7 @@ const handleTransmit = () => {
 };
 const handleSafeMode = () => { const r = activateSafeMode(); orbitScore += r.points; spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`); };
 const handleScanAsteroid = () => { const r = scanAsteroid(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`); } };
+const handleRepairHazard = (key = null) => { repairActiveHazard(key); };
 
 function init() {
   let lastTitleHover = null;
@@ -279,9 +296,12 @@ function init() {
     else if (e.target.closest('#vp-reset-btn')) resetCamera();
     else if (e.target.closest('[data-lcam]')) { launchCam = e.target.closest('[data-lcam]').dataset.lcam; setLaunchCamera(launchCam); renderStageHud(stage, missionState, lastEval, { launchCam }); }
     else if (e.target.closest('#lch-skip-btn')) setStage('orbit');
-    else if (e.target.closest('[data-cam]')) { orbitCam = e.target.closest('[data-cam]').dataset.cam; setOrbitCameraMode(orbitCam); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore }); }
-    else if (e.target.closest('[data-warp]')) { orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp); setOrbitTimeWarp(orbitWarp); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore }); }
-    else if (e.target.closest('#orb-storm-btn')) triggerOrbitStorm();
+    else if (e.target.closest('[data-cam]')) { orbitCam = e.target.closest('[data-cam]').dataset.cam; setOrbitCameraMode(orbitCam); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore, hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100 }); }
+    else if (e.target.closest('[data-warp]')) { orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp); setOrbitTimeWarp(orbitWarp); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore, hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100 }); }
+    else if (e.target.closest('#orb-test-hazard-btn')) triggerTestHazard();
+  });
+  document.getElementById('hazard-alert-hud').addEventListener('click', (e) => {
+    if (e.target.closest('#hazard-repair-btn')) handleRepairHazard(null);
   });
   document.getElementById('center-action-hud').addEventListener('click', (e) => {
     if (e.target.closest('#lch-ignite-btn')) triggerIgnition();
@@ -308,6 +328,7 @@ function init() {
       else if (stage === 'orbit') { e.preventDefault(); handleTransmit(); }
     } else if (k === 'e' && stage === 'orbit' && !titleOpen) handleScanAsteroid();
     else if (k === 'q' && stage === 'orbit' && !titleOpen) handleSafeMode();
+    else if (['d', 'f', 't', 'r'].includes(k) && stage === 'orbit' && !titleOpen) handleRepairHazard(k);
   });
 
   document.getElementById('mel-toggle').addEventListener('click', () => { const d = document.getElementById('mel-drawer'); d.hidden = !d.hidden; codexOpen = false; applyChrome(); });

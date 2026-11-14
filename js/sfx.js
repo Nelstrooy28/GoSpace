@@ -66,6 +66,23 @@ export function playSafeMode() {
   tone(320, 880, 0.2, 'triangle', 0.07, 0);
 }
 
+export function playAlertKlaxon() {
+  tone(820, 520, 0.14, 'sawtooth', 0.08, 0);
+  tone(880, 560, 0.16, 'sawtooth', 0.08, 0.17);
+  tone(420, 860, 0.18, 'triangle', 0.055, 0.34);
+}
+
+export function playRepairSuccess() {
+  tone(523.25, 783.99, 0.11, 'triangle', 0.085, 0);
+  tone(783.99, 1046.5, 0.18, 'sine', 0.085, 0.09);
+  tone(1046.5, 1318.5, 0.24, 'triangle', 0.065, 0.19);
+}
+
+export function playHullSpark() {
+  tone(190, 55, 0.18, 'sawtooth', 0.11, 0);
+  tone(940, 260, 0.11, 'square', 0.06, 0.04);
+}
+
 export function playVictoryFanfare() {
   [[523.25, 0, 0.13], [659.25, 0.11, 0.13], [783.99, 0.22, 0.15], [1046.5, 0.34, 0.35]].forEach(([f, d, dur]) => {
     tone(f, f * 1.01, dur, 'triangle', 0.08, d);

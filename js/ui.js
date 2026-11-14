@@ -197,6 +197,8 @@ export function renderStageHud(stage, state, ev, opts) {
   const rev = document.getElementById('review-overlay'), loadout = document.getElementById('hangar-loadout');
   loadout.hidden = stage !== 'hangar'; rev.hidden = stage !== 'review';
 
+  const hBox = document.getElementById('hazard-alert-hud');
+  if (hBox && stage !== 'orbit') { hBox.hidden = true; hBox.innerHTML = ''; }
   if (stage === 'hangar') {
     hud.innerHTML = `<div class="stage-card plate">
       <div class="card-head"><span>HANGAR CAMERA</span><span class="badge-tag">${opts.meshCount} PARTS</span></div>
@@ -242,7 +244,11 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.orbitWarp === 25 ? 'is-on' : ''}" data-warp="25" type="button">25x</button>
         <button class="btn-sci ${opts.orbitWarp === 100 ? 'is-on' : ''}" data-warp="100" type="button">100x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
-        <button id="orb-storm-btn" class="btn-sci" type="button">⚡ Flare</button>
+        <button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Test Hazard</button>
+      </div>
+      <div class="hull-meter-row">
+        <div class="hull-meter-head"><span>HULL INTEGRITY</span><span id="orb-hull-pct">${opts.hullIntegrity ?? 100}%</span></div>
+        <div class="hull-meter-track"><div id="orb-hull-fill" class="hull-meter-fill" style="width:${opts.hullIntegrity ?? 100}%"></div></div>
       </div>
       <div id="orbit-telem" class="telem-mono">Propagating Keplerian track...</div></div>`;
     actions.innerHTML = `<button id="orb-transmit-btn" class="action-prompt is-cyan" type="button" hidden>📡 [SPACE] TRANSMIT SCIENCE (+50)</button>
@@ -252,19 +258,20 @@ export function renderStageHud(stage, state, ev, opts) {
   }
   hud.innerHTML = ''; actions.innerHTML = '';
   const { scenario, orbitElements, metrics, missionMatch, cmlLevel, sandboxMode } = ev;
-  const oScore = opts.orbitScore || 0, totalScore = metrics.scienceScore * 10 + oScore + (cmlLevel === 4 ? 250 : 0);
+  const oScore = opts.orbitScore || 0, resolvedCount = opts.anomaliesResolved || 0, hullFinal = opts.hullIntegrity ?? 100;
+  const totalScore = metrics.scienceScore * 10 + oScore + (cmlLevel === 4 ? 250 : 0);
   const starCount = (cmlLevel === 4 || sandboxMode) && metrics.scienceScore >= 85 && oScore >= 50 ? 3 : (cmlLevel >= 3 ? 2 : 1);
   const rank = starCount === 3 ? 'FLIGHT DIRECTOR' : (starCount === 2 ? 'SENIOR ENGINEER' : 'CADET');
   rev.innerHTML = `<div class="vp-card plate">
     <div class="card-head"><span>FLIGHT READINESS DEBRIEF</span><span class="badge-tag">${rank} · ${totalScore} PTS</span></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
-      <div><h2 style="margin:0;font-size:20px">${esc(scenario.name)}</h2><div style="color:var(--muted);font-size:14px">${esc(orbitElements.name)} · Orbit Bonus +${oScore} pts</div></div>
+      <div><h2 style="margin:0;font-size:20px">${esc(scenario.name)}</h2><div style="color:var(--muted);font-size:14px">${esc(orbitElements.name)} · Orbit Bonus +${oScore} pts · Anomalies Resolved: ${resolvedCount} · Hull ${hullFinal}%</div></div>
       <div class="stars-reveal">${'★'.repeat(starCount)}${'☆'.repeat(3 - starCount)}</div>
     </div>
     <div class="collectible-card"><span style="font-size:28px">🏆</span><div><div class="badge-tag" style="display:inline-block;margin-bottom:4px">REAL-WORLD SPACECRAFT MATCH · ${esc(missionMatch.tag || 'SPACECRAFT')}</div>
       <div style="font-weight:700;font-size:16px">${esc(missionMatch.name)}</div><div style="font-size:14px;color:var(--muted)">${esc(missionMatch.detail)}</div></div></div>
     <div style="font-family:var(--font-hud);font-size:14px;color:var(--cyan);margin-top:10px">MISSION DESIGN TELEMETRY</div>
-    <div class="vp-grid" style="margin:6px 0 12px">${getGaugeRows(ev).map((g) => `<div class="vp-stat"><div style="font-size:13.5px;color:var(--muted)">${g.label}</div><div style="font-family:var(--font-hud);font-size:16px">${esc(g.val)}</div></div>`).join('')}</div>
+    <div class="vp-grid" style="margin:6px 0 12px">${getGaugeRows(ev).map((g) => `<div class="vp-stat"><div style="font-size:13.5px;color:var(--muted)">${g.label}</div><div style="font-family:var(--font-hud);font-size:16px">${esc(g.val)}</div></div>`).join('')}<div class="vp-stat"><div style="font-size:13.5px;color:var(--muted)">Anomalies</div><div style="font-family:var(--font-hud);font-size:16px">${resolvedCount} Resolved · Hull ${hullFinal}%</div></div></div>
     <div class="btn-row"><button id="rev-next-btn" class="btn-sci active" type="button">🔄 Play Next Mission</button><button id="rev-back-btn" class="btn-sci" type="button">🛠️ Tweak Build</button><button id="rev-export-btn" class="btn-sci" type="button">📥 Export 3D Trajectory JSON</button><button id="rev-save-btn" class="btn-sci" type="button">💾 Save</button></div></div>`;
 }
 
@@ -280,7 +287,47 @@ export function updateOrbitOverlay(t) {
   const d = document.getElementById('orbit-telem');
   if (d && t) d.textContent = `ALT ${t.altitudeKm}km · ${t.speedKms}km/s · ${t.stormActive ? 'SOLAR FLARE!' : (t.inEclipse ? 'ECLIPSE' : 'SUNLIT')} | BATT ${t.batterySoc}% · ${t.nearestNeaId || 'NEA'}`;
   document.getElementById('orb-score-pill')?.replaceChildren(document.createTextNode(`SCORE ${t.missionScore}`));
-  document.getElementById('orb-storm-btn')?.classList.toggle('is-on', Boolean(t?.stormActive));
+  document.querySelectorAll('#stage-hud [data-warp]').forEach((b) => b.classList.toggle('is-on', Number(b.dataset.warp) === Number(t?.timeWarp)));
+  const hull = Math.max(0, Math.min(100, t?.hullIntegrity ?? 100));
+  const hullPct = document.getElementById('orb-hull-pct'); if (hullPct) hullPct.textContent = `${hull}%`;
+  const hullFill = document.getElementById('orb-hull-fill');
+  if (hullFill) {
+    hullFill.style.width = `${hull}%`;
+    hullFill.style.background = hull >= 70 ? '#10b981' : (hull >= 40 ? '#f59e0b' : '#ef4444');
+  }
+  const hazBox = document.getElementById('hazard-alert-hud');
+  const hs = t?.hazardState;
+  if (hazBox && hs) {
+    if (hs.activeHazard) {
+      const haz = hs.activeHazard;
+      hazBox.hidden = false;
+      hazBox.classList.remove('is-nominal');
+      if (hazBox.dataset.renderKind !== haz.kind) {
+        hazBox.dataset.renderKind = haz.kind;
+        hazBox.innerHTML = `<div class="hazard-head"><span>🚨 EMERGENCY TELEMETRY ALERT · ${haz.icon} ${esc(haz.title)}</span><span id="hazard-timer-pill" class="hazard-timer-pill">${haz.remainingSec.toFixed(1)}s</span></div>
+          <div class="hazard-desc">${esc(haz.detail)}</div>
+          <div class="hazard-synergy ${haz.hardwareProtected ? 'is-protected' : ''}">${esc(haz.hardwareNote)}</div>
+          <div class="hazard-bar-track"><div id="hazard-bar-fill" class="hazard-bar-fill" style="width:${haz.pct}%"></div></div>
+          <button id="hazard-repair-btn" class="hazard-repair-btn" type="button">🔧 EXECUTE REPAIR ${esc(haz.actionLabel)}</button>`;
+      } else {
+        const tp = document.getElementById('hazard-timer-pill');
+        if (tp) tp.textContent = `${haz.remainingSec.toFixed(1)}s`;
+        const bf = document.getElementById('hazard-bar-fill');
+        if (bf) bf.style.width = `${haz.pct}%`;
+      }
+    } else if (hs.resolvedBanner) {
+      hazBox.hidden = false;
+      hazBox.classList.add('is-nominal');
+      if (hazBox.dataset.renderKind !== 'nominal') {
+        hazBox.dataset.renderKind = 'nominal';
+        hazBox.innerHTML = `<div class="hazard-head" style="color:#a7f3d0"><span>✅ SYSTEMS NOMINAL — ANOMALY RESOLVED</span><span class="hazard-timer-pill" style="background:rgba(16,185,129,0.28);border-color:#34d399;color:#d1fae5">+75 PTS</span></div>
+          <div class="hazard-desc">Emergency repair telemetry confirmed nominal spacecraft bus health.</div>`;
+      }
+    } else {
+      hazBox.hidden = true;
+      hazBox.dataset.renderKind = '';
+    }
+  }
   const tx = document.getElementById('orb-transmit-btn'); if (tx) tx.hidden = !t?.inLineOfSight;
   const sm = document.getElementById('orb-safemode-btn'); if (sm) sm.hidden = !(t?.inEclipse || t?.stormActive) || Boolean(t?.safeModeActive);
 }
