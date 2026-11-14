@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoSpace — 3D Space Mission Architect</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230284c7'/><text x='16' y='21' font-size='14' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='white'>GS</text></svg>" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">GS</span>
+      <div>
+        <h1 class="brand-title">GoSpace</h1>
+        <p class="brand-sub">NASA/CSA 3D Mission Design Lab</p>
+      </div>
+    </div>
+
+    <div class="topbar-controls">
+      <label class="control-group">
+        <span class="control-label">Scenario</span>
+        <select id="scenario-select" aria-label="Select mission scenario"></select>
+      </label>
+
+      <div id="cml-badge" class="cml-badge cml-1" title="JPL Concept Maturity Level (CML 1 to CML 4)">
+        CML 1 · Concept Exploration
+      </div>
+
+      <label class="sandbox-toggle" title="Sandbox Mode waives budget & launcher mass caps for free experimentation">
+        <input type="checkbox" id="sandbox-toggle" />
+        <span>Sandbox Mode</span>
+      </label>
+
+      <button id="save-load-btn" class="btn btn-secondary" type="button">Save / Compare</button>
+      <button id="resources-btn" class="btn btn-secondary" type="button">NASA &amp; CSA Data (7)</button>
+      <button id="export-json-btn" class="btn btn-primary" type="button">Export Mission Viz JSON</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="panel panel-left" aria-label="NASA 4 Mission Segments">
+      <div class="segment-tabs" id="segment-tabs" role="tablist">
+        <button class="seg-tab active" data-segment="user" type="button" role="tab">1. User</button>
+        <button class="seg-tab" data-segment="space" type="button" role="tab">2. Space</button>
+        <button class="seg-tab" data-segment="launch" type="button" role="tab">3. Launch</button>
+        <button class="seg-tab" data-segment="ground" type="button" role="tab">4. Ground</button>
+      </div>
+      <div id="segment-content" class="segment-content"></div>
+    </aside>
+
+    <section class="center-column">
+      <div class="stage-bar" id="stage-switcher" role="navigation" aria-label="Mission Lifecycle Stages">
+        <button class="stage-btn active" data-stage="cleanroom" type="button">1. Cleanroom Point Design</button>
+        <button class="stage-btn" data-stage="orbit" type="button">2. Mission Viz Orbit Sim</button>
+        <button class="stage-btn" data-stage="review" type="button">3. Flight Review &amp; Real Mission Match</button>
+      </div>
+
+      <div id="viewport-container" class="viewport-container" data-stage="cleanroom"></div>
+
+      <section class="mel-drawer" id="mel-drawer">
+        <button class="mel-header" id="mel-toggle" type="button" aria-expanded="false">
+          <span>Master Equipment List (MEL)</span>
+          <span id="mel-summary-meta">0 items</span>
+        </button>
+        <div class="mel-body" id="mel-body" hidden></div>
+      </section>
+    </section>
+
+    <aside class="panel panel-right" aria-label="MDL Resource HUD and Warnings">
+      <div class="hud-section">
+        <div class="section-head">
+          <h2>6-Resource MDL Telemetry</h2>
+          <span id="scenario-badge" class="pill">Level 1</span>
+        </div>
+        <div id="resource-gauges" class="gauges-grid"></div>
+      </div>
+
+      <div class="hud-section">
+        <div class="section-head">
+          <h2>Trade-Study &amp; Compatibility</h2>
+          <span id="warning-count" class="pill">0 issues</span>
+        </div>
+        <ul id="warnings-list" class="warnings-list"></ul>
+      </div>
+    </aside>
+  </main>
+
+  <dialog id="resources-modal" class="modal">
+    <div class="modal-head">
+      <h2>Official NASA &amp; CSA Reference Data (7)</h2>
+      <button class="btn btn-secondary close-modal" data-close="resources-modal" type="button">Close</button>
+    </div>
+    <p class="modal-desc">GoSpace mission rules, Keplerian propagation, CubeSat limits, and CML gates are grounded in these 7 official resources:</p>
+    <ul id="resources-list" class="resources-list"></ul>
+  </dialog>
+
+  <dialog id="saveload-modal" class="modal">
+    <div class="modal-head">
+      <h2>Save, Load &amp; Compare Point Designs</h2>
+      <button class="btn btn-secondary close-modal" data-close="saveload-modal" type="button">Close</button>
+    </div>
+    <div class="save-form">
+      <input id="design-name-input" type="text" placeholder="Design name (e.g., WildFireSat Baseline)" maxlength="48" />
+      <button id="save-design-btn" class="btn btn-primary" type="button">Save Current</button>
+    </div>
+    <div id="saved-designs-list" class="saved-list"></div>
+    <div id="compare-box" class="compare-box"></div>
+  </dialog>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
