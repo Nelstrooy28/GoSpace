@@ -2,7 +2,7 @@ import { SCENARIOS, createInitialState, evaluateMissionDesign } from './catalog.
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { activateSafeMode, mountOrbit, scanAsteroid, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerOrbitStorm, unmountOrbit } from './sceneOrbit.js';
+import { activateSafeMode, mountOrbit, mountShowcase, scanAsteroid, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerOrbitStorm, unmountOrbit } from './sceneOrbit.js';
 import { isMuted, playEquip, playHover, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { SUB_TABS, renderHud, renderLoadoutDock, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
@@ -20,8 +20,16 @@ let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0;
 function unmountAll() {
   if (activeScene === 'hangar') unmountCleanroom();
   if (activeScene === 'launch') unmountLaunch();
-  if (activeScene === 'orbit') unmountOrbit();
+  if (activeScene === 'orbit' || activeScene === 'showcase') unmountOrbit();
   activeScene = null;
+}
+
+function triggerWarpFlash() {
+  const flash = document.getElementById('warp-flash');
+  if (!flash) return;
+  flash.classList.remove('active');
+  void flash.offsetWidth;
+  flash.classList.add('active');
 }
 
 function updateDebug(ev) {
@@ -54,6 +62,8 @@ function applyChrome() {
   document.getElementById('codex-menu').hidden = !codexOpen || titleOpen;
   document.getElementById('menu-btn').setAttribute('aria-expanded', String(codexOpen));
   document.getElementById('mute-btn').textContent = isMuted() ? '🔇' : '🔊';
+  const titleMute = document.getElementById('title-mute-btn');
+  if (titleMute) titleMute.textContent = isMuted() ? '🔇 AUDIO: OFF' : '🔊 AUDIO: ON';
 }
 
 function renderAll(rebuildScene = true, focusTag = null) {
@@ -68,8 +78,14 @@ function renderAll(rebuildScene = true, focusTag = null) {
   applyChrome();
 
   const vp = document.getElementById('viewport-container');
-  vp.dataset.stage = stage;
-  if (stage === 'hangar') {
+  vp.dataset.stage = titleOpen ? 'showcase' : stage;
+  if (titleOpen) {
+    if (activeScene !== 'showcase') {
+      unmountAll();
+      mountShowcase(vp, missionState);
+      activeScene = 'showcase';
+    }
+  } else if (stage === 'hangar') {
     if (activeScene !== 'hangar') {
       unmountAll(); mountCleanroom(vp, missionState);
       activeScene = 'hangar'; setAutoRotate(autoRotate); setExploded(exploded);
@@ -104,15 +120,42 @@ const handleSafeMode = () => { const r = activateSafeMode(); orbitScore += r.poi
 const handleScanAsteroid = () => { const r = scanAsteroid(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`); } };
 
 function init() {
-  document.getElementById('mode-campaign-btn').addEventListener('click', () => { playEquip(); missionState.sandboxMode = false; renderAll(false); });
-  document.getElementById('mode-sandbox-btn').addEventListener('click', () => { playEquip(); missionState.sandboxMode = true; renderAll(false); });
-  document.getElementById('contract-grid').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-start-scenario]'); if (!btn) return;
-    playEquip(); missionState = createInitialState(btn.dataset.startScenario, missionState.sandboxMode);
-    titleOpen = false; stage = 'hangar'; renderAll(true);
+  let lastTitleHover = null;
+  document.getElementById('title-overlay')?.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.menu-btn, .contract-card, #title-mute-btn');
+    if (el && el !== lastTitleHover) { lastTitleHover = el; playHover(); }
+    else if (!el) lastTitleHover = null;
   });
-  document.getElementById('active-mission-pill').addEventListener('click', () => { titleOpen = true; applyChrome(); updateDebug(lastEval); });
-  document.getElementById('reopen-title-btn').addEventListener('click', () => { titleOpen = true; codexOpen = false; applyChrome(); updateDebug(lastEval); });
+  const startMissionFromTitle = (scenarioId, sandboxMode) => {
+    playEquip();
+    triggerWarpFlash();
+    if (scenarioId) missionState = createInitialState(scenarioId, sandboxMode);
+    else missionState.sandboxMode = sandboxMode;
+    titleOpen = false;
+    stage = 'hangar';
+    renderAll(true);
+  };
+  document.getElementById('mode-campaign-btn').addEventListener('click', () => startMissionFromTitle(null, false));
+  document.getElementById('mode-sandbox-btn').addEventListener('click', () => startMissionFromTitle(null, true));
+  document.getElementById('how-to-play-btn')?.addEventListener('click', () => {
+    playEquip();
+    document.getElementById('howto-modal')?.showModal();
+  });
+  document.getElementById('title-mute-btn')?.addEventListener('click', () => { toggleMute(); applyChrome(); updateDebug(lastEval); });
+  document.getElementById('contract-grid').addEventListener('click', (e) => {
+    const card = e.target.closest('[data-start-scenario]');
+    if (!card) return;
+    startMissionFromTitle(card.dataset.startScenario, missionState.sandboxMode);
+  });
+  document.getElementById('contract-grid').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest('[data-start-scenario]');
+    if (!card) return;
+    e.preventDefault();
+    startMissionFromTitle(card.dataset.startScenario, missionState.sandboxMode);
+  });
+  document.getElementById('active-mission-pill').addEventListener('click', () => { titleOpen = true; renderAll(true); });
+  document.getElementById('reopen-title-btn').addEventListener('click', () => { titleOpen = true; codexOpen = false; renderAll(true); });
   document.getElementById('sandbox-toggle').addEventListener('change', (e) => { missionState.sandboxMode = e.target.checked; renderAll(false); });
   document.getElementById('menu-btn').addEventListener('click', () => { codexOpen = !codexOpen; applyChrome(); });
   document.getElementById('mute-btn').addEventListener('click', () => { toggleMute(); applyChrome(); updateDebug(lastEval); });

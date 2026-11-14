@@ -6,7 +6,7 @@
   <title>GoSpace — 3D Space Mission Architect</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Orbitron:wght@600;700;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Orbitron:wght@600;700;900&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230284c7'/><text x='16' y='21' font-size='14' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='white'>GS</text></svg>" />
   <link rel="stylesheet" href="./styles.css" />
   <script type="importmap">
@@ -20,20 +20,67 @@
 </head>
 <body>
   <div id="viewport-container" class="viewport-bg" data-stage="hangar"></div>
+  <div id="warp-flash" class="warp-flash" aria-hidden="true"></div>
   <div id="score-popups" class="score-popups" aria-live="polite"></div>
   <div id="game-tooltip" class="game-tooltip plate" hidden></div>
   <button id="hud-restore-btn" class="hud-restore plate btn-sci" type="button" hidden>SHOW HUD [H]</button>
 
-  <section id="title-overlay" class="title-overlay">
-    <div class="title-card plate">
-      <div class="title-eyebrow">INTERACTIVE 3D SPACE MISSION ARCHITECT</div>
-      <h1 class="game-logo">GOSPACE</h1>
-      <p class="title-sub">Architect real orbital spacecraft, launch rockets from the pad, and command live ground downlinks.</p>
-      <div class="mode-switch" role="group" aria-label="Game Mode">
-        <button id="mode-campaign-btn" class="btn-sci mode-btn active" type="button">PLAY CAMPAIGN</button>
-        <button id="mode-sandbox-btn" class="btn-sci mode-btn" type="button">SANDBOX FREEPLAY</button>
+  <section id="title-overlay" class="title-overlay" aria-label="Main Menu">
+    <div class="title-topbar">
+      <div class="title-version badge-tag">MDL-X FLIGHT SIM // v3.0</div>
+      <button id="title-mute-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Audio">🔊 AUDIO ON</button>
+    </div>
+
+    <div class="title-stage">
+      <div class="hero-col">
+        <div class="emblem-row">
+          <svg class="orbit-emblem" viewBox="0 0 72 72" aria-hidden="true">
+            <circle cx="36" cy="36" r="10" fill="url(#coreGrad)" />
+            <ellipse class="ring-a" cx="36" cy="36" rx="30" ry="12" fill="none" stroke="#38bdf8" stroke-width="2" transform="rotate(-24 36 36)" />
+            <ellipse class="ring-b" cx="36" cy="36" rx="30" ry="12" fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-dasharray="6 4" transform="rotate(32 36 36)" />
+            <circle class="sat-dot" cx="62" cy="24" r="3.6" fill="#fef08a" />
+            <defs>
+              <radialGradient id="coreGrad" cx="40%" cy="35%" r="65%">
+                <stop offset="0%" stop-color="#e0f2fe" />
+                <stop offset="60%" stop-color="#0284c7" />
+                <stop offset="100%" stop-color="#0f172a" />
+              </radialGradient>
+            </defs>
+          </svg>
+          <span class="title-eyebrow">ORBITAL MISSION ARCHITECTURE</span>
+        </div>
+
+        <h1 class="game-logo">GOSPACE</h1>
+        <p class="title-sub">DESIGN &bull; LAUNCH &bull; COMMAND THE COSMOS</p>
+
+        <div class="hero-actions">
+          <button id="mode-campaign-btn" class="menu-btn is-primary active" type="button">
+            <span class="menu-ico">▶</span>
+            <span class="menu-copy"><strong>PLAY CAMPAIGN</strong><small>Launch active contract with real mass &amp; budget</small></span>
+          </button>
+          <button id="mode-sandbox-btn" class="menu-btn is-sandbox" type="button">
+            <span class="menu-ico">🛠️</span>
+            <span class="menu-copy"><strong>SANDBOX FREEPLAY</strong><small>Unlock unlimited budget &amp; rocket payload mass</small></span>
+          </button>
+          <button id="how-to-play-btn" class="menu-btn" type="button">
+            <span class="menu-ico">📖</span>
+            <span class="menu-copy"><strong>HOW TO PLAY</strong><small>30-second flight engineering visual guide</small></span>
+          </button>
+        </div>
       </div>
-      <div id="contract-grid" class="contract-grid"></div>
+
+      <div class="contract-col">
+        <div class="contract-col-head">
+          <span class="contract-col-title">MISSION CONTRACTS</span>
+          <span id="title-mode-pill" class="badge-tag">CAMPAIGN MODE</span>
+        </div>
+        <div id="contract-grid" class="contract-grid"></div>
+      </div>
+    </div>
+
+    <div class="title-ticker plate">
+      <span class="ticker-dot" aria-hidden="true"></span>
+      <span>SYSTEMS ONLINE // KEPLERIAN PHYSICS ACTIVE // 60 FPS TELEMETRY READY</span>
     </div>
   </section>
 
@@ -63,7 +110,7 @@
       <div class="topbar-utils">
         <button id="mute-btn" class="btn-sci icon-btn" type="button" title="Toggle Audio">🔊</button>
         <button id="toggle-hud-btn" class="btn-sci" type="button" title="Hide HUD [H]">[H]</button>
-        <button id="menu-btn" class="btn-sci" type="button" aria-expanded="false">⚙️ Menu / Codex</button>
+        <button id="menu-btn" class="btn-sci" type="button" aria-expanded="false">⚙️ Menu</button>
       </div>
     </header>
 
@@ -110,6 +157,36 @@
       </div>
     </footer>
   </div>
+
+  <dialog id="howto-modal" class="modal plate howto-modal">
+    <div class="modal-head"><h2>30s FLIGHT ENGINEERING GUIDE</h2><button class="btn-sci close-modal" data-close="howto-modal" type="button">Close</button></div>
+    <div class="howto-grid">
+      <div class="howto-step plate">
+        <div class="howto-num">01</div>
+        <div class="howto-icon">🔭</div>
+        <h3>MATCH SENSOR</h3>
+        <p>Select a spacecraft Bus class and Science Payload matching your target wavelength band without compatibility alerts.</p>
+      </div>
+      <div class="howto-step plate">
+        <div class="howto-num">02</div>
+        <div class="howto-icon">⚡</div>
+        <h3>BALANCE GAUGES</h3>
+        <p>Tune Solar Wings, Batteries, Thermal ADCS, Rocket, and Comms until all 6 telemetry gauges reach green CML 4.</p>
+      </div>
+      <div class="howto-step plate">
+        <div class="howto-num">03</div>
+        <div class="howto-icon">🚀</div>
+        <h3>IGNITE ROCKET</h3>
+        <p>Roll out to the coastal launchpad, fire the main engines, and watch fairings open to deploy your spacecraft.</p>
+      </div>
+      <div class="howto-step plate">
+        <div class="howto-num">04</div>
+        <div class="howto-icon">📡</div>
+        <h3>BEAM DATA IN ORBIT</h3>
+        <p>Command live ground downlinks in line-of-sight passes, scan asteroids &amp; comets, and shield against solar flares.</p>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="resources-modal" class="modal plate">
     <div class="modal-head"><h2>SPACE ENGINEERING CODEX</h2><button class="btn-sci close-modal" data-close="resources-modal" type="button">Close</button></div>

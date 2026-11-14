@@ -15,21 +15,78 @@ const cardHtml = ({ field, id, icon, name, pills, selected, ok = true, multi = f
     <div class="stat-pills">${pills.map((p) => `<span class="spill">${esc(p)}</span>`).join('')}</div>
   </button>`;
 
+const CONTRACT_ART = {
+  'wildfiresat-l1': `<svg viewBox="0 0 110 100" aria-hidden="true">
+    <defs><radialGradient id="g-wf" cx="45%" cy="72%" r="68%"><stop offset="0%" stop-color="#1e3a8a"/><stop offset="65%" stop-color="#0b1b3d"/><stop offset="100%" stop-color="#040814"/></radialGradient></defs>
+    <rect width="110" height="100" fill="#050a18"/>
+    <path d="M-10 74 Q55 38 120 74 L120 105 L-10 105 Z" fill="url(#g-wf)" stroke="#38bdf8" stroke-width="1.2"/>
+    <path d="M8 82 Q55 56 102 82 M22 92 Q55 72 88 92" fill="none" stroke="#38bdf8" stroke-opacity="0.35" stroke-width="0.9" stroke-dasharray="3 3"/>
+    <circle cx="42" cy="70" r="9" fill="#f97316" fill-opacity="0.28"/><circle cx="42" cy="70" r="3.2" fill="#fbbf24"/>
+    <circle cx="71" cy="76" r="7" fill="#ef4444" fill-opacity="0.32"/><circle cx="71" cy="76" r="2.6" fill="#fde047"/>
+    <path d="M10 34 Q56 14 100 38" fill="none" stroke="#7dd3fc" stroke-width="1.4" stroke-dasharray="4 3"/>
+    <rect x="52" y="19" width="10" height="6" rx="1.5" fill="#fbbf24" stroke="#ffffff" stroke-width="0.8"/>
+    <polygon points="57,26 40,68 74,72" fill="#f97316" fill-opacity="0.16"/>
+  </svg>`,
+  'ocean-l2': `<svg viewBox="0 0 110 100" aria-hidden="true">
+    <defs><radialGradient id="g-oc" cx="38%" cy="38%" r="60%"><stop offset="0%" stop-color="#0ea5e9"/><stop offset="55%" stop-color="#0369a1"/><stop offset="100%" stop-color="#082f49"/></radialGradient></defs>
+    <rect width="110" height="100" fill="#040a18"/>
+    <circle cx="55" cy="52" r="30" fill="url(#g-oc)" stroke="#38bdf8" stroke-width="1.2"/>
+    <path d="M34 48 Q52 40 68 55 T82 44" fill="none" stroke="#34d399" stroke-width="3" stroke-opacity="0.55" stroke-linecap="round"/>
+    <ellipse cx="55" cy="52" rx="16" ry="41" transform="rotate(14 55 52)" fill="none" stroke="#7dd3fc" stroke-width="1.3" stroke-dasharray="4 3"/>
+    <polygon points="59,13 43,54 71,58" fill="#38bdf8" fill-opacity="0.24"/>
+    <rect x="54" y="10" width="10" height="6" rx="1.5" fill="#e2e8f0" stroke="#38bdf8" stroke-width="0.8"/>
+  </svg>`,
+  'lunar-l3': `<svg viewBox="0 0 110 100" aria-hidden="true">
+    <defs><radialGradient id="g-lu" cx="42%" cy="36%" r="58%"><stop offset="0%" stop-color="#cbd5e1"/><stop offset="70%" stop-color="#64748b"/><stop offset="100%" stop-color="#1e293b"/></radialGradient></defs>
+    <rect width="110" height="100" fill="#040814"/>
+    <circle cx="55" cy="50" r="28" fill="url(#g-lu)" stroke="#94a3b8" stroke-width="1"/>
+    <circle cx="43" cy="39" r="5" fill="#475569" fill-opacity="0.55"/>
+    <circle cx="67" cy="44" r="4" fill="#334155" fill-opacity="0.55"/>
+    <ellipse cx="55" cy="73" rx="12" ry="5" fill="#0f172a" stroke="#38bdf8" stroke-width="1.4"/>
+    <ellipse cx="55" cy="73" rx="6" ry="2.5" fill="#7dd3fc" fill-opacity="0.55"/>
+    <path d="M14 78 Q38 14 96 34" fill="none" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="4 3"/>
+    <circle cx="84" cy="27" r="3.5" fill="#fbbf24" stroke="#ffffff" stroke-width="0.9"/>
+  </svg>`,
+};
+
+const CONTRACT_META = {
+  'wildfiresat-l1': { title: 'Operation Wildfire Watch', wave: 'THERMAL IR', lv: '300kg LV', obj: 'Detect Pacific Rim wildfire hotspots from 550km LEO.' },
+  'ocean-l2': { title: 'Operation Ocean Pulse', wave: 'UV-VISIBLE', lv: '950kg LV', obj: 'Map global phytoplankton & polar ocean health in SSO.' },
+  'lunar-l3': { title: 'Operation Lunar Icebreaker', wave: 'CRYO MID-IR', lv: '4500kg LV', obj: 'Survey shadowed Lunar South Pole craters for water ice.' },
+};
+
 export function renderTitleOverlay(sandboxMode, activeScenarioId) {
   document.getElementById('mode-campaign-btn').classList.toggle('active', !sandboxMode);
   document.getElementById('mode-sandbox-btn').classList.toggle('active', sandboxMode);
-  document.getElementById('contract-grid').innerHTML = SCENARIOS.map((s) => `
-    <div class="contract-card">
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:center"><span class="contract-stars">${s.stars}</span><span class="badge-tag">${esc(s.badge)}</span></div>
-        <h3 style="margin:6px 0 4px;font-size:13.5px">${esc(s.name)}</h3>
-        <p style="margin:0;font-size:11px;color:var(--muted);line-height:1.35">${esc(s.summary)}</p>
+  const pill = document.getElementById('title-mode-pill');
+  if (pill) {
+    pill.textContent = sandboxMode ? 'SANDBOX FREEPLAY · ALL SYSTEMS UNLOCKED' : 'CAMPAIGN MODE · ENGINEERED CONTRACTS';
+    pill.classList.toggle('sandbox', sandboxMode);
+  }
+  document.getElementById('contract-grid').innerHTML = SCENARIOS.map((s) => {
+    const m = CONTRACT_META[s.id] || { title: s.name, wave: s.orbitIcon, lv: 'LV READY', obj: s.summary };
+    const selected = s.id === activeScenarioId;
+    return `
+    <div class="contract-card ${selected ? 'selected' : ''}" data-start-scenario="${s.id}" role="button" tabindex="0">
+      <div class="contract-art">${CONTRACT_ART[s.id] || ''}</div>
+      <div class="contract-body">
+        <div class="contract-top">
+          <span class="contract-stars">${s.stars}</span>
+          <span class="badge-tag">${esc(m.wave)}</span>
+        </div>
+        <h3 class="contract-title">${esc(m.title)}</h3>
+        <p class="contract-obj">${esc(m.obj)}</p>
+        <div class="contract-footer">
+          <div class="stat-pills">
+            <span class="spill">${esc(m.lv)}</span>
+            <span class="spill ok">$${s.budgetLimitM}M</span>
+            <span class="spill">${s.minLifetimeYr}YR</span>
+          </div>
+          <span class="btn-sci contract-cta ${selected ? 'active' : ''}">DEPLOY ›</span>
+        </div>
       </div>
-      <div>
-        <div class="stat-pills" style="margin-bottom:7px"><span class="spill">${esc(s.orbitIcon)}</span><span class="spill ok">CAP $${s.budgetLimitM}M</span><span class="spill">${s.minLifetimeYr}YR+</span></div>
-        <button class="btn-sci ${s.id === activeScenarioId ? 'active' : ''}" style="width:100%" data-start-scenario="${s.id}" type="button">LAUNCH CONTRACT ›</button>
-      </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 export function renderLoadoutDock(segment, subGroup, state, evaluation) {
@@ -160,13 +217,13 @@ export function renderStageHud(stage, state, ev, opts) {
   rev.innerHTML = `<div class="vp-card plate">
     <div class="card-head"><span>FLIGHT READINESS DEBRIEF</span><span class="badge-tag">${rank} · ${totalScore} PTS</span></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
-      <div><h2 style="margin:0">${esc(scenario.name)}</h2><div style="color:var(--muted);font-size:11.5px">${esc(orbitElements.name)} · Orbit Bonus +${oScore} pts</div></div>
+      <div><h2 style="margin:0;font-size:20px">${esc(scenario.name)}</h2><div style="color:var(--muted);font-size:14px">${esc(orbitElements.name)} · Orbit Bonus +${oScore} pts</div></div>
       <div class="stars-reveal">${'★'.repeat(starCount)}${'☆'.repeat(3 - starCount)}</div>
     </div>
-    <div class="collectible-card"><span style="font-size:26px">🏆</span><div><div class="badge-tag" style="display:inline-block;margin-bottom:3px">REAL-WORLD SPACECRAFT MATCH · ${esc(missionMatch.tag || 'SPACECRAFT')}</div>
-      <div style="font-weight:700">${esc(missionMatch.name)}</div><div style="font-size:11px;color:var(--muted)">${esc(missionMatch.detail)}</div></div></div>
-    <div style="font-family:var(--font-hud);font-size:10px;color:var(--cyan);margin-top:8px">MISSION DESIGN TELEMETRY</div>
-    <div class="vp-grid" style="margin:6px 0 10px">${getGaugeRows(ev).map((g) => `<div class="vp-stat"><div style="font-size:10px;color:var(--muted)">${g.label}</div><div style="font-family:var(--font-hud);font-size:13px">${esc(g.val)}</div></div>`).join('')}</div>
+    <div class="collectible-card"><span style="font-size:28px">🏆</span><div><div class="badge-tag" style="display:inline-block;margin-bottom:4px">REAL-WORLD SPACECRAFT MATCH · ${esc(missionMatch.tag || 'SPACECRAFT')}</div>
+      <div style="font-weight:700;font-size:16px">${esc(missionMatch.name)}</div><div style="font-size:14px;color:var(--muted)">${esc(missionMatch.detail)}</div></div></div>
+    <div style="font-family:var(--font-hud);font-size:14px;color:var(--cyan);margin-top:10px">MISSION DESIGN TELEMETRY</div>
+    <div class="vp-grid" style="margin:6px 0 12px">${getGaugeRows(ev).map((g) => `<div class="vp-stat"><div style="font-size:13.5px;color:var(--muted)">${g.label}</div><div style="font-family:var(--font-hud);font-size:16px">${esc(g.val)}</div></div>`).join('')}</div>
     <div class="btn-row"><button id="rev-next-btn" class="btn-sci active" type="button">🔄 Play Next Mission</button><button id="rev-back-btn" class="btn-sci" type="button">🛠️ Tweak Build</button><button id="rev-export-btn" class="btn-sci" type="button">📥 Export 3D Trajectory JSON</button><button id="rev-save-btn" class="btn-sci" type="button">💾 Save</button></div></div>`;
 }
 

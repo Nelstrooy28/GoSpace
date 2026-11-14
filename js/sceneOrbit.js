@@ -19,11 +19,13 @@ let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = n
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, beamHalo = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
 let gsNodes = [], gsPulseRing = null, orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
-let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false;
-let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null;
+let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false;
+let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, fitDist = 7.2, sunElapsed = 0;
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
 let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
+
+const parallaxTarget = new THREE.Vector2(), parallaxCur = new THREE.Vector2();
 
 const camTween = {
   active: false, t: 0, dur: 0.78,
@@ -283,8 +285,8 @@ function makeReticleSprite() {
   }));
 }
 
-function buildOrbitSpacecraft(missionState, orbitScale) {
-  satModel = buildSpacecraftModel(missionState, { showWarnings: false, deployProgress: 1, envMapIntensity: 0.55, castShadow: false, receiveShadow: false });
+function buildOrbitSpacecraft(missionState, orbitScale, envInt = 0.55) {
+  satModel = buildSpacecraftModel(missionState, { showWarnings: false, deployProgress: 1, envMapIntensity: envInt, castShadow: false, receiveShadow: false });
   satModel.group.scale.setScalar(orbitScale);
   satModel.group.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(satModel.group);
@@ -297,11 +299,13 @@ function buildOrbitSpacecraft(missionState, orbitScale) {
   thrusterGlow.position.set(0, -(satModel.dims.halfH + 0.34), 0);
   satModel.group.add(thrusterGlow);
 
-  velArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(), satFitR * 1.45, 0x38bdf8, satFitR * 0.28, satFitR * 0.14);
-  scene.add(velArrow);
-  targetReticle = makeReticleSprite();
-  targetReticle.renderOrder = 10;
-  scene.add(targetReticle);
+  if (!showcaseMode) {
+    velArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(), satFitR * 1.45, 0x38bdf8, satFitR * 0.28, satFitR * 0.14);
+    scene.add(velArrow);
+    targetReticle = makeReticleSprite();
+    targetReticle.renderOrder = 10;
+    scene.add(targetReticle);
+  }
   return grp;
 }
 
@@ -350,10 +354,15 @@ function startCameraTween(mode, immediate = false) {
 function buildWorld(missionState, evaluation) {
   orbitEl = evaluation.orbitElements;
   const deep = Boolean(orbitEl.deepSpace);
-  scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.55));
-  const sunLight = new THREE.DirectionalLight(0xfff7e6, 2.8);
+  scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, showcaseMode ? 0.72 : 0.55));
+  const sunLight = new THREE.DirectionalLight(0xfff7e6, showcaseMode ? 3.1 : 2.8);
   sunLight.position.set(260, 0, 0);
   scene.add(sunLight);
+  if (showcaseMode) {
+    const heroFill = new THREE.DirectionalLight(0xfde68a, 1.35);
+    heroFill.position.set(12, 8, 16);
+    scene.add(heroFill);
+  }
   earthshineLight = new THREE.DirectionalLight(0x5ec8ff, 0.95);
   earthshineLight.position.set(0, 0, 0);
   scene.add(earthshineLight, earthshineLight.target);
@@ -378,28 +387,53 @@ function buildWorld(missionState, evaluation) {
   umbra.rotation.z = Math.PI / 2; umbra.position.x = -13.4;
   scene.add(umbra);
 
-  const refGrid = new THREE.PolarGridHelper(18, 12, 4, 64, 0x1e3a5f, 0x0f2544);
-  refGrid.material.transparent = true; refGrid.material.opacity = 0.24;
-  scene.add(refGrid);
+  if (!showcaseMode) {
+    const refGrid = new THREE.PolarGridHelper(18, 12, 4, 64, 0x1e3a5f, 0x0f2544);
+    refGrid.material.transparent = true; refGrid.material.opacity = 0.24;
+    scene.add(refGrid);
 
-  gsNodes = STATIONS.map((gs) => {
-    const active = gs.id === missionState.stationId;
-    const localPos = latLonToVec(gs.lat, gs.lon, EARTH_R * 1.02), localNorm = localPos.clone().normalize();
-    const m = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.095 : 0.06, 12, 10), new THREE.MeshBasicMaterial({ color: active ? 0x22c55e : 0xf59e0b }));
-    m.position.copy(localPos); earthGroup.add(m);
-    let cone = null;
-    if (active) {
-      cone = new THREE.Mesh(new THREE.ConeGeometry(0.52, 0.95, 22, 1, true), new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }));
-      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), localNorm);
-      cone.position.copy(localPos).addScaledVector(localNorm, 0.475);
-      gsPulseRing = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.14, 24), new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
-      gsPulseRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), localNorm);
-      gsPulseRing.position.copy(localPos).addScaledVector(localNorm, 0.02);
-      earthGroup.add(cone, gsPulseRing);
-    }
-    return { ...gs, active, mesh: m, cone, localNorm };
-  });
+    gsNodes = STATIONS.map((gs) => {
+      const active = gs.id === missionState.stationId;
+      const localPos = latLonToVec(gs.lat, gs.lon, EARTH_R * 1.02), localNorm = localPos.clone().normalize();
+      const m = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.095 : 0.06, 12, 10), new THREE.MeshBasicMaterial({ color: active ? 0x22c55e : 0xf59e0b }));
+      m.position.copy(localPos); earthGroup.add(m);
+      let cone = null;
+      if (active) {
+        cone = new THREE.Mesh(new THREE.ConeGeometry(0.52, 0.95, 22, 1, true), new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }));
+        cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), localNorm);
+        cone.position.copy(localPos).addScaledVector(localNorm, 0.475);
+        gsPulseRing = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.14, 24), new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+        gsPulseRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), localNorm);
+        gsPulseRing.position.copy(localPos).addScaledVector(localNorm, 0.02);
+        earthGroup.add(cone, gsPulseRing);
+      }
+      return { ...gs, active, mesh: m, cone, localNorm };
+    });
+  }
   scene.add(earthGroup);
+
+  if (showcaseMode) {
+    spaceEnv = createSpaceEnvironment(scene, { moonPos: new THREE.Vector3(-12, 3.8, -14), moonScale: EARTH_R * 0.28 });
+    scene.traverse((obj) => {
+      if (obj.material && obj.material.isMeshStandardMaterial) obj.material.envMapIntensity = 0.16;
+    });
+    const heroCraftState = {
+      busId: 'flagship-bus',
+      instrumentIds: ['cryo-ir-mapper', 'neutron-spec'],
+      solarId: 'high-eff-gimbal',
+      batteryId: 'rad-hard-pack',
+      thermalId: 'cryocooler-st',
+      transceiverId: 'ka-optical',
+      wavelengthBand: 'cryo-ir'
+    };
+    satMesh = buildOrbitSpacecraft(heroCraftState, 0.19, 0.85);
+    satMesh.position.set(1.55, 1.32, 2.05);
+    scene.add(satMesh);
+    controls.enabled = false;
+    camera.position.set(2.35, 1.48, 3.65);
+    camera.lookAt(0.38, 0.45, 0.35);
+    return;
+  }
 
   // 2. Orbit Trajectory Ribbon + Core Line + Pe/Ap Beacons
   const track = generateOrbitTrack(orbitEl, 180);
@@ -458,6 +492,35 @@ function animate() {
   rafId = requestAnimationFrame(animate);
   const now = performance.now(), realDt = Math.min(clock.getDelta(), 0.05), simDt = realDt * timeWarp;
   simTime += simDt; sunElapsed += realDt;
+
+  if (showcaseMode) {
+    if (earthGroup) earthGroup.rotation.y += realDt * 0.018;
+    if (cloudMesh) cloudMesh.rotation.y += realDt * 0.024;
+    spaceEnv?.update(realDt, sunElapsed);
+    if (satMesh) {
+      satMesh.position.set(1.55, 1.32 + Math.sin(sunElapsed * 0.85) * 0.045, 2.05);
+      satMesh.rotation.y += realDt * 0.24;
+      satMesh.rotation.x = 0.22 + Math.sin(sunElapsed * 0.48) * 0.06;
+      satMesh.rotation.z = -0.16;
+      if (thrusterGlow) thrusterGlow.scale.setScalar(0.85 + 0.25 * Math.sin(sunElapsed * 10));
+      if (earthshineLight) {
+        earthshineLight.target.position.copy(satMesh.position);
+        earthshineLight.target.updateMatrixWorld();
+      }
+    }
+    parallaxCur.lerp(parallaxTarget, Math.min(1, realDt * 4.5));
+    if (camera) {
+      camera.position.set(
+        2.35 + parallaxCur.x * 0.3 + Math.sin(sunElapsed * 0.26) * 0.11,
+        1.48 - parallaxCur.y * 0.16 + Math.cos(sunElapsed * 0.22) * 0.05,
+        3.65
+      );
+      camera.lookAt(0.38 + parallaxCur.x * 0.08, 0.45 - parallaxCur.y * 0.05, 0.35);
+    }
+    bloomComp ? bloomComp.composer.render() : renderer.render(scene, camera);
+    return;
+  }
+
   if (earthGroup) earthGroup.rotation.y += simDt * ((Math.PI * 2) / 86400);
   if (cloudMesh) cloudMesh.rotation.y += realDt * 0.015;
   spaceEnv?.update(realDt, sunElapsed);
@@ -595,13 +658,25 @@ export function scanAsteroid() {
   playDownlinkPing(); return { ok: true, points: target.points, id: target.id, isComet: target.isComet };
 }
 
-export function mountOrbit(container, missionState, evaluation, onTelemetry) {
+export function mountOrbit(container, missionState, evaluation, onTelemetry, options = {}) {
   unmountOrbit();
+  showcaseMode = Boolean(options.showcase);
   stateRef = missionState; evalRef = evaluation; telemetryCb = onTelemetry;
   simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
   stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0; lastAutoFlare = 14; lastHudMs = 0;
   camTween.active = false; watchCometNext = false;
+  parallaxTarget.set(0, 0); parallaxCur.set(0, 0);
+
+  if (showcaseMode) {
+    parallaxHandler = (e) => {
+      parallaxTarget.set(
+        (e.clientX / Math.max(window.innerWidth, 1) - 0.5) * 2,
+        (e.clientY / Math.max(window.innerHeight, 1) - 0.5) * 2
+      );
+    };
+    window.addEventListener('mousemove', parallaxHandler, { passive: true });
+  }
 
   const w = Math.max(container.clientWidth, 320), h = Math.max(container.clientHeight, 320);
   renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -639,7 +714,16 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry) {
   animate();
 }
 
+export function mountShowcase(container, missionState) {
+  const showcaseEval = {
+    orbitElements: { id: 'showcase-leo', aKm: 7050, e: 0.002, iDeg: 52, raanDeg: 18, argPerigeeDeg: 40, meanAnomaly0Deg: 20, deepSpace: false }
+  };
+  return mountOrbit(container, missionState, showcaseEval, null, { showcase: true });
+}
+
 export function unmountOrbit() {
+  if (parallaxHandler) { window.removeEventListener('mousemove', parallaxHandler); parallaxHandler = null; }
+  showcaseMode = false;
   if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }
