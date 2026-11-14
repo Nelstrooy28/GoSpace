@@ -77,7 +77,12 @@ select, input[type="text"] { background: #0a101d; color: var(--text); border: 1p
 .vp-overlay-actions { display: flex; gap: 6px; flex-wrap: wrap; pointer-events: auto; }
 .vp-overlay-bottom { position: relative; z-index: 2; margin-top: auto; padding: 8px 12px; pointer-events: none; display: flex; justify-content: space-between; align-items: center; }
 .vp-float-pill { pointer-events: auto; background: rgba(10, 16, 29, 0.82); backdrop-filter: blur(6px); border: 1px solid var(--border); border-radius: 999px; padding: 5px 10px; font-size: 11px; color: var(--text); }
+.vp-warn-pill { border-color: rgba(245, 158, 11, 0.65); background: rgba(120, 53, 15, 0.82); color: #fde68a; }
 .btn.is-on { border-color: var(--accent); background: rgba(56, 189, 248, 0.2); color: #e0f2fe; }
+.grade-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.grade-badge { font-size: 16px; font-weight: 800; padding: 6px 14px; border-radius: 10px; border: 1px solid var(--accent); background: rgba(56, 189, 248, 0.15); }
+.grade-risk { border-color: var(--bad); background: rgba(239, 68, 68, 0.16); color: #fecaca; }
+.review-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .vp-card { background: rgba(12, 19, 34, 0.88); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
 .vp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 10px; }
 .vp-stat { background: #0a101d; border: 1px solid var(--border); border-radius: 8px; padding: 9px; }
