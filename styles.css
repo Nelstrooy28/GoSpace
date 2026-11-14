@@ -1769,6 +1769,246 @@ dialog button:hover {
   animation: pulseReady 1.7s ease-in-out infinite;
 }
 
+/* ================================================================
+   ORBITAL INSERTION BRIEFING POP-UP GUIDE & HUD PILL
+   ================================================================ */
+button.guide-pill {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.55), rgba(30, 58, 138, 0.68));
+  border-color: rgba(125, 211, 252, 0.72);
+  color: #f0f9ff;
+}
+
+button.guide-pill:hover {
+  border-color: #fde68a;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.42);
+}
+
+#briefing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 18px 12px;
+  pointer-events: auto;
+  background: radial-gradient(circle at 50% 45%, rgba(6, 16, 38, 0.42) 0%, rgba(4, 10, 24, 0.74) 100%);
+  backdrop-filter: blur(4px);
+}
+
+.briefing-card {
+  width: min(960px, 95vw);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 15px 22px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  border: 1.5px solid rgba(56, 189, 248, 0.68);
+  border-top: 3px solid #38bdf8;
+  background: linear-gradient(160deg, rgba(9, 22, 48, 0.94), rgba(5, 13, 30, 0.95));
+  box-shadow: 0 24px 68px rgba(0, 0, 0, 0.8), 0 0 42px rgba(56, 189, 248, 0.25);
+  animation: debriefRise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.brief-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.brief-head-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.brief-kicker {
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  color: #fde68a;
+}
+
+.brief-title {
+  margin: 0;
+  font-family: var(--font-hud);
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.03em;
+}
+
+.brief-sub {
+  font-size: 15px;
+  color: #bae6fd;
+}
+
+#briefing-overlay button.brief-close-btn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-family: var(--font-hud);
+  font-size: 18px;
+  font-weight: 800;
+  background: rgba(15, 29, 58, 0.9);
+  border: 1.5px solid rgba(125, 211, 252, 0.65);
+  color: #f0f9ff;
+}
+
+#briefing-overlay button.brief-close-btn:hover {
+  border-color: #fde68a;
+  background: rgba(14, 116, 144, 0.9);
+}
+
+.brief-sec-head {
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: var(--cyan-soft);
+  margin-bottom: 4px;
+}
+
+.brief-story {
+  padding: 9px 13px;
+  border-radius: 9px;
+  background: rgba(11, 27, 58, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.34);
+  border-left: 4px solid #38bdf8;
+}
+
+.brief-about {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.38;
+  color: #f1f5f9;
+}
+
+.brief-tasks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.brief-task-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: rgba(12, 26, 54, 0.84);
+  border: 1px solid rgba(56, 189, 248, 0.32);
+}
+
+.brief-step-num {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #e0f2fe;
+  background: rgba(2, 132, 199, 0.45);
+  border: 1px solid rgba(56, 189, 248, 0.6);
+}
+
+.brief-task-ico {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.brief-task-copy strong {
+  display: block;
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 3px;
+  padding-right: 26px;
+}
+
+.brief-task-copy p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.32;
+  color: #cbd5e1;
+}
+
+.brief-tip {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(120, 53, 15, 0.38);
+  border: 1px solid rgba(245, 158, 11, 0.62);
+  color: #fef3c7;
+  font-size: 14.5px;
+  line-height: 1.32;
+}
+
+.brief-keybinds {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(8, 18, 40, 0.78);
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  font-size: 14.5px;
+  color: #e2e8f0;
+}
+
+.brief-keybinds kbd {
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(2, 132, 199, 0.32);
+  border: 1px solid rgba(125, 211, 252, 0.55);
+  color: #7dd3fc;
+}
+
+.brief-actions {
+  display: flex;
+  justify-content: center;
+}
+
+#briefing-overlay button.brief-start-btn {
+  width: min(500px, 100%);
+  padding: 11px 22px;
+  font-family: var(--font-hud);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  border: 1.5px solid #fde68a;
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  border-radius: 4px;
+  box-shadow: 0 0 26px rgba(56, 189, 248, 0.45);
+  animation: pulseReady 1.7s ease-in-out infinite;
+}
+
+#briefing-overlay button.brief-start-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 32px rgba(251, 191, 36, 0.55);
+}
+
 .card-head {
   display: flex;
   justify-content: space-between;
@@ -2186,6 +2426,7 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 #hangar-loadout[hidden],
 #title-overlay[hidden],
 #review-overlay[hidden],
+#briefing-overlay[hidden],
 #codex-menu[hidden],
 #hud-restore-btn[hidden],
 #center-action-hud [hidden],

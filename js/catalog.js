@@ -17,7 +17,18 @@ export const SCENARIOS = [
     summary: 'Detect boreal wildfires & Arctic heat anomalies from Sun-Synchronous LEO on a tight CubeSat budget.',
     targetBand: 'ir', targetObjective: 'wildfire-ir', targetOrbit: 'sso-leo', targetLatency: 'realtime',
     budgetLimitM: 24, minLifetimeYr: 2, minScience: 75,
-    realMatch: { name: 'WildFireSat', tag: 'WILDFIRE FLEET', detail: 'Thermal IR wildfire monitoring mission paired with rapid heat-anomaly orbital analytics.' }
+    realMatch: { name: 'WildFireSat', tag: 'WILDFIRE FLEET', detail: 'Thermal IR wildfire monitoring mission paired with rapid heat-anomaly orbital analytics.' },
+    orbitGuide: {
+      codename: 'OPERATION BOREAL WATCH',
+      headline: 'Arctic Wildfire Watch · ★☆☆',
+      about: 'High-latitude boreal wildfires ignite remote forests long before ground crews spot smoke. Your thermal infrared CubeSat measures mid-infrared heat signatures from Sun-Synchronous polar orbit to alert responders within minutes.',
+      tasks: [
+        { icon: '📡', title: 'Beam Down Thermal Heat Maps', text: 'Fly into a green Polar Ground Station cone and press [SPACE] to transmit thermal fire hotspot maps (+50 pts).' },
+        { icon: '🔋', title: 'Manage Nightside Eclipse Power', text: 'Keep Battery above 25% while passing through Earth’s dark eclipse shadow; trigger [Q] Safe Mode if solar power dips.' },
+        { icon: '🛡️', title: 'Survive Orbital Hazards for ★★★', text: 'Respond quickly to micrometeoroid debris or solar storm alerts ([D]/[F]/[T]/[R]) to protect Hull Integrity and win +75 bonus pts.' }
+      ],
+      proTip: 'Use 25x or 100x Time Warp to glide rapidly toward the next green Polar cone, then drop to 1x to nail your [SPACE] downlink!'
+    }
   },
   {
     id: 'aurora-l1', level: 1, stars: '★☆☆', tag: 'Level 1 · Magnetics', badge: 'MAG-PLASMA', orbitIcon: '🌌 High-Arctic 680km',
@@ -25,7 +36,18 @@ export const SCENARIOS = [
     summary: 'Measure geomagnetic storms and auroral particle currents across high-inclination polar orbits.',
     targetBand: 'mag-plasma', targetObjective: 'aurora-mag', targetOrbit: 'polar-leo', targetLatency: 'realtime',
     budgetLimitM: 32, minLifetimeYr: 2.5, minScience: 75,
-    realMatch: { name: 'Swarm / e-POP Aurora Scout', tag: 'SPACE WEATHER', detail: 'Compact boom magnetometer & plasma analyzer mission mapping high-latitude ionospheric currents.' }
+    realMatch: { name: 'Swarm / e-POP Aurora Scout', tag: 'SPACE WEATHER', detail: 'Compact boom magnetometer & plasma analyzer mission mapping high-latitude ionospheric currents.' },
+    orbitGuide: {
+      codename: 'OPERATION POLAR CURTAIN',
+      headline: 'Ionosphere & Aurora Scout · ★☆☆',
+      about: 'Charged solar wind slamming into Earth’s poles sparks shimmering aurora while disrupting navigation signals and power grids. Your fluxgate magnetometer and plasma analyzer map geomagnetic storm currents straight across the polar oval.',
+      tasks: [
+        { icon: '🧭', title: 'Transmit Polar Storm Packets', text: 'Wait for a glowing green Polar Ground Station cone and press [SPACE] to downlink live auroral magnetic field sweeps.' },
+        { icon: '☀️', title: 'Shield Optics During Solar Storms', text: 'Polar arcs face elevated solar particle storms—tap [F] Shield Optics promptly so radiation spikes do not wipe buffered science.' },
+        { icon: '☄️', title: 'Scan Passing Space Rocks', text: 'Watch nearby near-Earth objects along your high-latitude arc and hit [E] Scan Asteroid (+60/+100 pts) for extra science!' }
+      ],
+      proTip: 'Keep Hull Integrity near 100% across the polar radiation belt—every clean anomaly repair awards +75 Flight Director pts!'
+    }
   },
   {
     id: 'ocean-l2', level: 2, stars: '★★☆', tag: 'Level 2 · SmallSat', badge: 'UV-VIS + LIDAR', orbitIcon: '🌊 Polar LEO 680km',
@@ -33,7 +55,18 @@ export const SCENARIOS = [
     summary: 'Measure global phytoplankton, coral reef clarity, and coastal aerosols with Hyperspectral + LiDAR optics.',
     targetBand: 'uv-vis', targetObjective: 'ocean-color', targetOrbit: 'polar-leo', targetLatency: 'daily',
     budgetLimitM: 125, minLifetimeYr: 3, minScience: 80,
-    realMatch: { name: 'PACE Coastal & Reef Orbiter', tag: 'OCEAN RADIOMETRY', detail: 'Hyperspectral radiometer paired with cloud/aerosol LiDAR for plankton and ocean color science.' }
+    realMatch: { name: 'PACE Coastal & Reef Orbiter', tag: 'OCEAN RADIOMETRY', detail: 'Hyperspectral radiometer paired with cloud/aerosol LiDAR for plankton and ocean color science.' },
+    orbitGuide: {
+      codename: 'OPERATION REEF SPECTRUM',
+      headline: 'Coastal Ocean & Reef Pulse · ★★☆',
+      about: 'Microscopic ocean phytoplankton generate half of Earth’s oxygen while coastal coral reefs signal warming ocean waters. Your Hyperspectral + LiDAR SmallSat captures crisp turquoise chlorophyll spectra and vertical aerosol profiles.',
+      tasks: [
+        { icon: '🌊', title: 'Downlink Heavy Hyperspectral Cubes', text: 'Multi-band ocean optics fill storage quickly—catch green Ground Station passes with [SPACE] before your buffer fills up.' },
+        { icon: '🔋', title: 'Balance Dual-Payload Power Draw', text: 'Monitor Battery SoC through Earth’s nightside eclipse and trigger [Q] Cycle Power if optical + laser load drains below 25%.' },
+        { icon: '🛠️', title: 'Clear Hazard Alerts Mid-Pass', text: 'A gimbal jam or solar flare blocks telemetry links until repaired—resolve alerts fast so your pass window is never wasted.' }
+      ],
+      proTip: 'Toggle between 🛰️ Chase Sat and 🌍 Full Orbit views to spot approaching coastline passes ahead of acquisition!'
+    }
   },
   {
     id: 'monsoon-l2', level: 2, stars: '★★☆', tag: 'Level 2 · Radar Ops', badge: 'SAR RADAR', orbitIcon: '🌀 Medium SSO 575km',
@@ -41,7 +74,18 @@ export const SCENARIOS = [
     summary: 'Pierce dense storm clouds day and night using high-power Synthetic Aperture Radar imaging.',
     targetBand: 'rf-sar', targetObjective: 'cyclone-sar', targetOrbit: 'sso-leo', targetLatency: 'realtime',
     budgetLimitM: 155, minLifetimeYr: 3.5, minScience: 80,
-    realMatch: { name: 'Sentinel / NISAR-Class Radar Eye', tag: 'ALL-WEATHER SAR', detail: 'High-wattage phased-array radar satellite delivering flood and cyclone mapping through thick cloud cover.' }
+    realMatch: { name: 'Sentinel / NISAR-Class Radar Eye', tag: 'ALL-WEATHER SAR', detail: 'High-wattage phased-array radar satellite delivering flood and cyclone mapping through thick cloud cover.' },
+    orbitGuide: {
+      codename: 'OPERATION CYCLONE PENETRATOR',
+      headline: 'Monsoon & Cyclone All-Weather Eye · ★★☆',
+      about: 'Optical cameras go blind above thick typhoon cloud decks right before dangerous landfalls. Your high-wattage Synthetic Aperture Radar (SAR) pulses right through cyclone walls day and night to track flood surges.',
+      tasks: [
+        { icon: '⚡', title: 'Power the High-Wattage SAR Wing', text: 'Active radar scanning draws heavy power—watch eclipse passages closely and trigger [T] Heaters or [Q] Safe Mode if needed.' },
+        { icon: '📡', title: 'Deliver Emergency Storm Tracks', text: 'Hit [SPACE] inside green Ground Station cones to rush all-weather storm eye telemetry down with minimal latency.' },
+        { icon: '🛡️', title: 'Dodge Orbital Debris Fields', text: 'Protect your wide SAR phased-array wing using [D] Thruster Dodge when debris warnings sound for +75 pts and 100% hull.' }
+      ],
+      proTip: 'Jump to 100x Time Warp over open ocean legs, then drop to 1x as the green Polar Station pulse ring expands!'
+    }
   },
   {
     id: 'lunar-l3', level: 3, stars: '★★★', tag: 'Level 3 · Lunar Polar', badge: 'CRYO IR + NEUTRON', orbitIcon: '🌙 Lunar Orbit',
@@ -49,7 +93,18 @@ export const SCENARIOS = [
     summary: 'Map permanently shadowed lunar craters for water ice using Cryo-IR spectroscopy and neutron detection.',
     targetBand: 'cryo-ir', targetObjective: 'lunar-volatiles', targetOrbit: 'lunar-transfer', targetLatency: 'archival',
     budgetLimitM: 520, minLifetimeYr: 5, minScience: 85,
-    realMatch: { name: 'Lunar Polar Volatiles Flagship', tag: 'LUNAR ICEBREAKER', detail: 'Cryogenic infrared observatory coupled with neutron spectrometer and sunshield thermal control.' }
+    realMatch: { name: 'Lunar Polar Volatiles Flagship', tag: 'LUNAR ICEBREAKER', detail: 'Cryogenic infrared observatory coupled with neutron spectrometer and sunshield thermal control.' },
+    orbitGuide: {
+      codename: 'OPERATION SHACKLETON ICE',
+      headline: 'Lunar South Pole Icebreaker · ★★★',
+      about: 'Sunbeams have not touched the floors of deep Lunar South Pole craters for billions of years, trapping ancient pockets of water ice. Your cryogenic IR telescope and neutron spectrometer map subsurface hydrogen reserves for future explorers.',
+      tasks: [
+        { icon: '❄️', title: 'Guard Deep-Space Cryo Balance', text: 'Long elliptical transfer arcs bring extreme thermal swings—activate [T] Heaters or [F] Shielding immediately when alerts fire.' },
+        { icon: '📡', title: 'Link with the Deep-Space Dish', text: 'Your high-apogee ellipse sweeps far out before diving back—hit [SPACE] whenever the Deep-Space Dish locks in green.' },
+        { icon: '☄️', title: 'Scan Deep-Space Objects Along the Arc', text: 'Press [E] Scan Asteroid (+100 deep-space bonus) and keep anomalies resolved cleanly to earn an S-Rank Flight Director crest!' }
+      ],
+      proTip: 'Use 100x Time Warp along the slow outer apogee arc and switch to ☄️ Asteroid & Comet cam to line up bonus scans!'
+    }
   },
   {
     id: 'asteroid-l3', level: 3, stars: '★★★', tag: 'Level 3 · Deep Space', badge: 'ION + PROSPECT', orbitIcon: '☄️ Deep Elliptical',
@@ -58,7 +113,18 @@ export const SCENARIOS = [
     targetBand: 'deep-spec', targetObjective: 'asteroid-prospect', targetOrbit: 'lunar-transfer', targetLatency: 'archival',
     requiresIon: true,
     budgetLimitM: 640, minLifetimeYr: 6, minScience: 85,
-    realMatch: { name: 'Psyche / Dawn Ion Prospector', tag: 'DEEP-SPACE ION', detail: 'Ion-propelled deep-space orbiter combining optical spyglass, multispectral imager, and gamma/neutron spectrometer.' }
+    realMatch: { name: 'Psyche / Dawn Ion Prospector', tag: 'DEEP-SPACE ION', detail: 'Ion-propelled deep-space orbiter combining optical spyglass, multispectral imager, and gamma/neutron spectrometer.' },
+    orbitGuide: {
+      codename: 'OPERATION PSYCHE PROSPECTOR',
+      headline: 'Near-Earth Asteroid Prospector · ★★★',
+      about: 'Metallic near-Earth asteroids expose primordial iron-nickel planetary cores and water-bearing minerals from the birth of our solar system. Your Xenon Ion explorer pairs high-resolution optics with elemental spectrometers to prospect them up close.',
+      tasks: [
+        { icon: '☄️', title: 'Run Close-Range Asteroid Scans', text: 'Hit [E] Scan Asteroid (or frame targets with ☄️ Asteroid & Comet cam) whenever NEAs and comets pass within sensor range (+60/+100 pts).' },
+        { icon: '⚙️', title: 'Keep Ion Drive & Gimbal Aligned', text: 'Counter solar flares ([F]), debris threats ([D]), and gimbal jams promptly so Xenon thrust and deep-space comms stay online.' },
+        { icon: '📡', title: 'Transmit Deep-Space Assay Archive', text: 'Catch green Deep-Space Dish link passes with [SPACE] to deliver asteroid composition maps home for an S-Rank crest.' }
+      ],
+      proTip: 'Try 🌌 Full Solar System cam to see your deep elliptical transfer track sweeping past Venus, Earth, Mars, and the Asteroid Belt!'
+    }
   }
 ];
 
@@ -277,5 +343,29 @@ export function evaluateMissionDesign(state) {
       powerMargin, dataMargin, lifetimeYears, scienceScore
     },
     mel, warnings, orbitElements: orbit, orbitStats, missionMatch: sc.realMatch, sandboxMode: Boolean(state.sandboxMode)
+  };
+}
+
+export const SANDBOX_ORBIT_GUIDE_FALLBACK = {
+  codename: 'SANDBOX FREEPLAY FLIGHT',
+  headline: 'Custom Orbital Architecture · FREEPLAY',
+  about: 'Unlimited budget and rocket payload mass let you test daring satellite builds without procurement caps. Push extreme sensors, RTGs, or Xenon Ion drives into real Keplerian orbits and watch how they withstand live space hazards.',
+  tasks: [
+    { icon: '📡', title: 'Test Green Ground Cones', text: 'Fly inside green Ground Station cones and press [SPACE] to transmit live science telemetry (+50 pts).' },
+    { icon: '☄️', title: 'Scan Asteroids & Comets', text: 'Hit [E] Scan Asteroid and try ☄️ Asteroid & Comet or 🌌 Full Solar System camera presets.' },
+    { icon: '⚠️', title: 'Stress-Test Orbital Hazards', text: 'Click ⚠️ Test Hazard or survive incoming debris, solar flares, and cryo freezes to verify your hardware protections.' }
+  ],
+  proTip: 'Equip Xenon Ion, Cryo Sunshields, or RTGs in the Hangar to unlock zero-damage emergency counter-moves in Orbit!'
+};
+
+export function getMissionOrbitGuide(scenario, sandboxMode = false) {
+  const g = scenario?.orbitGuide;
+  if (!g) return SANDBOX_ORBIT_GUIDE_FALLBACK;
+  if (!sandboxMode) return g;
+  return {
+    ...g,
+    codename: `${g.codename} · SANDBOX`,
+    headline: `${scenario.name} · SANDBOX FREEPLAY`,
+    proTip: `Sandbox Active (unlimited budget & rocket mass): ${g.proTip}`
   };
 }

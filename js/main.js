@@ -2,10 +2,10 @@ import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign } from '.
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { activateSafeMode, mountOrbit, mountShowcase, repairActiveHazard, scanAsteroid, seekOrbitToPass, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
-import { isMuted, playEquip, playHover, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
+import { activateSafeMode, mountOrbit, mountShowcase, repairActiveHazard, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
+import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
-import { SUB_TABS, renderHud, renderLoadoutDock, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
+import { SUB_TABS, renderHud, renderLoadoutDock, renderMissionBriefing, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
 const STORAGE_ACTIVE = 'gospace_active_v1', STORAGE_SAVED = 'gospace_saved_v1';
 const readJson = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch { return fb; } };
@@ -14,7 +14,7 @@ const FOCUS_MAP = { busId: 'bus', instrumentIds: 'payload', solarId: 'solar', th
 
 let stage = 'hangar', titleOpen = true, activeSegment = 'user', activeSub = 'obj', lastEval = null;
 let missionState = (() => { const s = readJson(STORAGE_ACTIVE, null); return s?.scenarioId ? s : createInitialState('wildfiresat-l1', false); })();
-let activeScene = null, hudHidden = false, codexOpen = false;
+let activeScene = null, hudHidden = false, codexOpen = false, briefingOpen = false;
 let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 25, orbitCam = 'full';
 let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0, orbitSessionDirty = true;
 
@@ -40,6 +40,7 @@ function updateDebug(ev) {
     cleanroomActive: activeScene === 'hangar', meshCount: activeScene === 'hangar' ? getMeshCount() : 0,
     launchActive: activeScene === 'launch', launchTelemetry,
     orbitActive: activeScene === 'orbit', orbitTelemetry, orbitScore,
+    briefingOpen, briefingPaused: Boolean(orbitTelemetry?.briefingPaused ?? (activeScene === 'orbit' && briefingOpen)),
     metrics: ev.metrics, warnings: ev.warnings
   };
 }
@@ -54,19 +55,41 @@ function spawnPopup(text) {
 function setStage(nextStage, keepOrbit = false) {
   const prevStage = stage;
   stage = nextStage; codexOpen = false;
+  if (stage === 'orbit' && prevStage === 'launch' && !isTutorialActive()) briefingOpen = true;
+  else if (stage !== 'orbit') briefingOpen = false;
   if (stage === 'review' && prevStage !== 'review') playVictoryFanfare();
   if (stage === 'orbit' && prevStage === 'review') setOrbitVictoryMode(false, orbitCam);
+  if (activeScene === 'orbit' && keepOrbit) setOrbitBriefingPaused(briefingOpen);
   renderAll(!keepOrbit);
+}
+
+function openMissionBriefing() {
+  briefingOpen = true;
+  codexOpen = false;
+  applyChrome();
+  if (activeScene === 'orbit') setOrbitBriefingPaused(true);
+  renderMissionBriefing(lastEval, stage, true);
+  updateDebug(lastEval);
+}
+
+function closeMissionBriefing(confirm = false) {
+  if (!briefingOpen) return;
+  briefingOpen = false;
+  if (confirm) playRepairSuccess(); else playHover();
+  if (activeScene === 'orbit') setOrbitBriefingPaused(false);
+  renderMissionBriefing(lastEval, stage, false);
+  updateDebug(lastEval);
 }
 
 function mountLiveOrbit(vp, isVictory = false) {
   unmountAll(); orbitTelemetry = null; orbitScore = 0; orbitSessionDirty = false;
   mountOrbit(vp, missionState, lastEval, (t) => {
     orbitTelemetry = t; orbitScore = t.missionScore || 0; orbitWarp = t.timeWarp ?? orbitWarp; updateOrbitOverlay(t);
-    if (window.__MISSION_DEBUG__) { window.__MISSION_DEBUG__.orbitTelemetry = t; window.__MISSION_DEBUG__.orbitScore = orbitScore; }
+    if (window.__MISSION_DEBUG__) { window.__MISSION_DEBUG__.orbitTelemetry = t; window.__MISSION_DEBUG__.orbitScore = orbitScore; window.__MISSION_DEBUG__.briefingPaused = t.briefingPaused; }
     notifyTutorialState();
   }, {
     victory: isVictory,
+    paused: briefingOpen && !isVictory,
     onHazardEvent: (ev) => {
       if (ev.type === 'trigger') {
         orbitWarp = ev.timeWarp ?? 1;
@@ -80,7 +103,7 @@ function mountLiveOrbit(vp, isVictory = false) {
     }
   });
   activeScene = 'orbit';
-  if (!isVictory) { setOrbitTimeWarp(orbitWarp); setOrbitCameraMode(orbitCam); }
+  if (!isVictory) { setOrbitTimeWarp(orbitWarp); setOrbitCameraMode(orbitCam); setOrbitBriefingPaused(briefingOpen); }
   else setOrbitTimeWarp(1);
 }
 
@@ -109,6 +132,8 @@ function renderAll(rebuildScene = true, focusTag = null) {
   const vp = document.getElementById('viewport-container');
   vp.dataset.stage = titleOpen ? 'showcase' : stage;
   if (titleOpen) {
+    briefingOpen = false;
+    setOrbitBriefingPaused(false);
     if (activeScene !== 'showcase') {
       unmountAll();
       mountShowcase(vp, missionState);
@@ -155,6 +180,7 @@ function renderAll(rebuildScene = true, focusTag = null) {
     scanPts: orbitTelemetry?.scanPts,
     batterySoc: orbitTelemetry?.batterySoc
   });
+  renderMissionBriefing(lastEval, stage, briefingOpen && !titleOpen && stage !== 'review');
   updateDebug(lastEval);
   notifyTutorialState();
 }
@@ -323,7 +349,12 @@ function init() {
     else if (e.target.closest('[data-cam]')) { orbitCam = e.target.closest('[data-cam]').dataset.cam; setOrbitCameraMode(orbitCam); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore, hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100 }); }
     else if (e.target.closest('[data-warp]')) { orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp); setOrbitTimeWarp(orbitWarp); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore, hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100 }); }
     else if (e.target.closest('#orb-test-hazard-btn')) triggerTestHazard();
+    else if (e.target.closest('#hud-mission-guide-btn')) { playEquip(); openMissionBriefing(); }
     else if (e.target.closest('#orb-debrief-btn')) { playEquip(); setStage('review', true); }
+  });
+  document.getElementById('briefing-overlay')?.addEventListener('click', (e) => {
+    if (e.target.closest('#brief-close-btn')) closeMissionBriefing(false);
+    else if (e.target.closest('#brief-start-btn')) closeMissionBriefing(true);
   });
   document.getElementById('hazard-alert-hud').addEventListener('click', (e) => {
     if (e.target.closest('#hazard-repair-btn')) handleRepairHazard(null);
@@ -358,6 +389,10 @@ function init() {
   window.addEventListener('keydown', (e) => {
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
     const k = e.key.toLowerCase();
+    if (briefingOpen && !titleOpen) {
+      if (e.key === 'Escape') { e.preventDefault(); closeMissionBriefing(false); return; }
+      if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); closeMissionBriefing(true); return; }
+    }
     if (e.key === 'Escape' && stage === 'review' && !titleOpen) {
       e.preventDefault();
       playEquip();

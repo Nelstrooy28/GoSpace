@@ -21,7 +21,7 @@ let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = n
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, beamHalo = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
 let gsNodes = [], gsPulseRing = null, orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
-let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false;
+let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false;
 let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, fitDist = 7.2, sunElapsed = 0;
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
@@ -612,7 +612,7 @@ function buildWorld(missionState, evaluation) {
 
 function animate() {
   rafId = requestAnimationFrame(animate);
-  const now = performance.now(), realDt = Math.min(clock.getDelta(), 0.05), simDt = realDt * timeWarp;
+  const now = performance.now(), realDt = Math.min(clock.getDelta(), 0.05), simDt = briefingPaused ? 0 : realDt * timeWarp;
   simTime += simDt; sunElapsed += realDt;
 
   if (showcaseMode) {
@@ -715,7 +715,7 @@ function animate() {
   updateOrbitHazards(realDt, {
     inEclipse: prop.inEclipse,
     timeWarp,
-    tutorialActive: isTutorialActive() || victoryMode
+    tutorialActive: isTutorialActive() || victoryMode || briefingPaused
   });
   const hazardSnap = getHazardSnapshot();
   const activeHaz = hazardSnap.activeHazard;
@@ -800,7 +800,7 @@ function animate() {
   hazardNow = prop.inEclipse || stormActive || Boolean(activeHaz);
   const cryoDrain = activeKind === 'cryo' ? -0.65 * (activeHaz?.drainMult ?? 1) : 0;
   const pwrRate = safeModeActive ? 0.35 : (cryoDrain || (hazardNow ? -0.45 : Math.max(0.15, (evalRef.metrics.powerMargin + 25) * 0.012)));
-  if (simDt > 0) {
+  if (simDt > 0 && !briefingPaused) {
     batterySoc = Math.max(5, Math.min(100, batterySoc + pwrRate * (simDt / 60)));
     bufferGb = Math.min(32, bufferGb + (simDt / 86400) * 1.6);
   }
@@ -844,7 +844,7 @@ function animate() {
       anomaliesMissed: hazardSnap.anomaliesMissed,
       hazardState: hazardSnap,
       nearestNeaId: nearest?.target.id || '', nearestNeaDist: nearest ? Number(nearest.dist.toFixed(1)) : 99,
-      timeWarp, cameraMode, fitDist: Number(fitDist.toFixed(1))
+      timeWarp, briefingPaused, simTime: Number(simTime.toFixed(1)), cameraMode, fitDist: Number(fitDist.toFixed(1))
     });
   }
   controls.update();
@@ -852,6 +852,8 @@ function animate() {
 }
 
 export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); };
+export const setOrbitBriefingPaused = (paused) => { briefingPaused = Boolean(paused); };
+export const isOrbitBriefingPaused = () => briefingPaused;
 export const setOrbitCameraMode = (m) => { cameraMode = m; startCameraTween(m, false); };
 export function setOrbitVictoryMode(enabled, restoreCam = 'chase') {
   victoryMode = Boolean(enabled);
@@ -920,6 +922,7 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   unmountOrbit();
   showcaseMode = Boolean(options.showcase);
   victoryMode = Boolean(options.victory);
+  briefingPaused = Boolean(options.paused);
   stateRef = missionState; evalRef = evaluation; telemetryCb = onTelemetry; hazardEventCb = options.onHazardEvent || null;
   simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
   stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
@@ -1019,6 +1022,7 @@ export function unmountOrbit() {
   if (parallaxHandler) { window.removeEventListener('mousemove', parallaxHandler); parallaxHandler = null; }
   showcaseMode = false;
   victoryMode = false;
+  briefingPaused = false;
   if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }

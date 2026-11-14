@@ -1,4 +1,4 @@
-import { CATALOG, OFFICIAL_RESOURCES, SCENARIOS } from './catalog.js';
+import { CATALOG, OFFICIAL_RESOURCES, SCENARIOS, getMissionOrbitGuide } from './catalog.js';
 import { playRankStamp, playStarChime } from './sfx.js';
 
 let debriefTimers = [];
@@ -221,6 +221,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <button id="vp-autorotate-btn" class="btn-sci ${opts.autoRotate ? 'is-on' : ''}" type="button">Auto-Spin</button>
         <button id="vp-explode-btn" class="btn-sci ${opts.exploded ? 'is-on' : ''}" type="button">Explode</button>
         <button id="vp-reset-btn" class="btn-sci" type="button">Reset</button>
+        <button id="hud-mission-guide-btn" class="btn-sci guide-pill" type="button">📋 Mission Guide</button>
       </div></div>`;
     actions.innerHTML = ''; return;
   }
@@ -256,6 +257,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.orbitWarp === 100 ? 'is-on' : ''}" data-warp="100" type="button">100x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
         <button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Test Hazard</button>
+        <button id="hud-mission-guide-btn" class="btn-sci guide-pill" type="button">📋 Mission Guide</button>
         <button id="orb-debrief-btn" class="btn-sci active" type="button">🏆 View Debrief</button>
       </div>
       <div class="hull-meter-row">
@@ -492,4 +494,66 @@ export const renderResourcesList = () => { document.getElementById('resources-li
 export function renderSavedModal(savedList, currentEval) {
   document.getElementById('saved-designs-list').innerHTML = savedList.length ? savedList.map((d, idx) => `<div class="saved-row"><span><strong>${esc(d.name)}</strong> · CML ${d.cmlLevel} · $${d.budgetM}M · Sci ${d.scienceScore}</span><span><button class="btn-sci" data-load-idx="${idx}" type="button">Load</button> <button class="btn-sci" data-cmp-idx="${idx}" type="button">Cmp</button> <button class="btn-sci" data-del-idx="${idx}" type="button">Del</button></span></div>`).join('') : '<p style="color:var(--muted)">No saved designs yet.</p>';
   document.getElementById('compare-box').innerHTML = `<strong>Active:</strong> CML ${currentEval.cmlLevel} · $${currentEval.metrics.budget.usedM}M · ${currentEval.metrics.mass.totalKg} kg · Sci ${currentEval.metrics.scienceScore}/100`;
+}
+
+export function renderMissionBriefing(ev, stage, open) {
+  const el = document.getElementById('briefing-overlay');
+  if (!el) return;
+  if (!open || !ev) {
+    el.hidden = true;
+    el.dataset.key = '';
+    return;
+  }
+  const key = `${ev.scenario.id}|${ev.sandboxMode ? 1 : 0}|${stage}`;
+  el.hidden = false;
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+
+  const guide = getMissionOrbitGuide(ev.scenario, ev.sandboxMode);
+  const startLabel = stage === 'orbit'
+    ? '🚀 BEGIN ORBITAL OPERATIONS [SPACE]'
+    : '✓ CLOSE BRIEFING · BACK TO HANGAR [SPACE]';
+
+  el.innerHTML = `<div class="briefing-card plate" role="dialog" aria-modal="true" aria-labelledby="brief-title-heading">
+    <div class="brief-topbar">
+      <div class="brief-head-copy">
+        <span class="brief-kicker">ORBITAL INSERTION BRIEFING · ${esc(guide.codename)}</span>
+        <h2 id="brief-title-heading" class="brief-title">${esc(guide.headline)}</h2>
+        <div class="brief-sub">${esc(ev.orbitElements.name)} · Spacecraft Mass ${esc(ev.metrics.mass.totalKg)} kg · ${stage === 'orbit' ? 'ORBIT HAZARDS PAUSED' : 'PRE-FLIGHT BRIEFING'}</div>
+      </div>
+      <button id="brief-close-btn" class="brief-close-btn" type="button" title="Close Briefing [ESC]" aria-label="Close Mission Briefing">✕</button>
+    </div>
+
+    <section class="brief-story">
+      <div class="brief-sec-head">🌍 WHAT THIS MISSION IS ABOUT</div>
+      <p class="brief-about">${esc(guide.about)}</p>
+    </section>
+
+    <section class="brief-objectives">
+      <div class="brief-sec-head">🎯 YOUR ORBIT OBJECTIVES</div>
+      <div class="brief-tasks">
+        ${guide.tasks.map((t, idx) => `<div class="brief-task-card">
+          <span class="brief-step-num">${idx + 1}</span>
+          <span class="brief-task-ico" aria-hidden="true">${t.icon}</span>
+          <div class="brief-task-copy">
+            <strong>${esc(t.title)}</strong>
+            <p>${esc(t.text)}</p>
+          </div>
+        </div>`).join('')}
+      </div>
+    </section>
+
+    <div class="brief-tip">💡 <strong>PRO TIP:</strong> ${esc(guide.proTip)}</div>
+
+    <div class="brief-keybinds" aria-label="Orbital Controls">
+      <span><kbd>[SPACE]</kbd> Transmit in Green Cone</span>
+      <span><kbd>[E]</kbd> Scan Asteroid</span>
+      <span><kbd>[1x–100x]</kbd> Time Warp</span>
+      <span><kbd>[Click / Hotkey]</kbd> Fix Hazards</span>
+    </div>
+
+    <div class="brief-actions">
+      <button id="brief-start-btn" class="brief-start-btn" type="button">${startLabel}</button>
+    </div>
+  </div>`;
 }
