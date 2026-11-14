@@ -14,7 +14,7 @@
   --text: #eef6ff;
   --muted: #b6cbe2;
   --font-hud: 'Orbitron', 'Segoe UI', sans-serif;
-  --font-ui: 'Exo 2', 'Segoe UI', sans-serif;
+  --font-ui: 'Chakra Petch', 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Consolas', monospace;
 }
 
@@ -1388,6 +1388,243 @@ dialog h3 {
   #launch-cta-btn, .btn-rollout { padding: 9px 14px; min-width: 185px; }
 }
 
+/* ================================================================
+   INTERACTIVE 7-STEP FLIGHT ACADEMY TUTORIAL
+   ================================================================ */
+#tutorial-root,
+.tut-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+#tut-spotlight,
+.tut-spotlight {
+  position: fixed;
+  z-index: 61;
+  pointer-events: none;
+  border-radius: 10px;
+  border: 2px solid var(--cyan);
+  box-shadow: 0 0 0 9999px rgba(4, 10, 24, 0.58), 0 0 26px rgba(56, 189, 248, 0.65), inset 0 0 14px rgba(56, 189, 248, 0.25);
+  transition: left 0.22s ease, top 0.22s ease, width 0.22s ease, height 0.22s ease;
+  animation: tutSpotPulse 1.7s ease-in-out infinite;
+}
+
+#tut-spotlight.is-clear,
+.tut-spotlight.is-clear {
+  border-color: var(--amber);
+  box-shadow: 0 0 28px rgba(245, 158, 11, 0.72), inset 0 0 14px rgba(245, 158, 11, 0.2);
+}
+
+@keyframes tutSpotPulse {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.55)); }
+  50% { filter: drop-shadow(0 0 18px rgba(245, 158, 11, 0.85)); }
+}
+
+.tut-corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--amber-soft);
+  border-style: solid;
+}
+
+.tut-corner.tl { top: -4px; left: -4px; border-width: 3px 0 0 3px; border-top-left-radius: 4px; }
+.tut-corner.tr { top: -4px; right: -4px; border-width: 3px 3px 0 0; border-top-right-radius: 4px; }
+.tut-corner.bl { bottom: -4px; left: -4px; border-width: 0 0 3px 3px; border-bottom-left-radius: 4px; }
+.tut-corner.br { bottom: -4px; right: -4px; border-width: 0 3px 3px 0; border-bottom-right-radius: 4px; }
+
+.tut-arrow-svg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 62;
+  pointer-events: none;
+}
+
+.tut-arrow-path {
+  stroke-dasharray: 8 6;
+  animation: tutArrowFlow 1s linear infinite;
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.75));
+}
+
+@keyframes tutArrowFlow {
+  from { stroke-dashoffset: 28; }
+  to { stroke-dashoffset: 0; }
+}
+
+body:has(#tutorial-root:not([hidden])) #game-tooltip {
+  display: none !important;
+}
+
+#tut-coach-card,
+.tut-card {
+  position: fixed;
+  z-index: 85;
+  width: min(420px, 92vw);
+  padding: 14px 16px;
+  pointer-events: auto;
+  border-color: rgba(56, 189, 248, 0.65);
+  border-top: 3px solid var(--amber);
+  background: linear-gradient(155deg, rgba(8, 18, 38, 0.96), rgba(5, 12, 26, 0.94));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.78), 0 0 28px rgba(56, 189, 248, 0.22);
+  transition: left 0.22s ease, top 0.22s ease;
+}
+
+.tut-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tut-avatar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tut-avatar {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5));
+}
+
+.tut-visor-pulse {
+  transform-origin: center;
+  animation: emblemSpin 9s linear infinite;
+}
+
+.tut-step-label {
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--cyan-soft);
+}
+
+.tut-step-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.tut-dot {
+  width: 14px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+.tut-dot.done {
+  background: var(--green);
+}
+
+.tut-dot.active {
+  width: 24px;
+  background: var(--amber);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.75);
+}
+
+.tut-headline {
+  margin: 4px 0 6px;
+  font-family: var(--font-hud);
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.25;
+}
+
+.tut-prompt {
+  margin: 0 0 10px;
+  font-family: var(--font-ui);
+  font-size: 15.5px;
+  font-weight: 500;
+  color: #f0f7ff;
+  line-height: 1.4;
+}
+
+.tut-tip {
+  padding: 8px 11px;
+  border-radius: 7px;
+  background: rgba(6, 78, 59, 0.34);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  border-left: 4px solid var(--amber);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: #fde68a;
+  line-height: 1.38;
+  margin-bottom: 11px;
+}
+
+.tut-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tut-skip-btn,
+.tut-assist-btn {
+  font-size: 14px !important;
+  padding: 6px 12px !important;
+}
+
+.tut-gauge-flash {
+  animation: tutGaugePulse 0.6s ease-in-out 2;
+}
+
+@keyframes tutGaugePulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 24px rgba(16, 185, 129, 0.85), inset 0 0 14px rgba(56, 189, 248, 0.4); border-radius: 8px; }
+}
+
+.tut-toast {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 65;
+  width: min(560px, 92vw);
+  padding: 18px 22px;
+  pointer-events: auto;
+  border-color: var(--green);
+  border-top: 4px solid var(--amber);
+  background: linear-gradient(155deg, rgba(7, 19, 38, 0.96), rgba(4, 12, 26, 0.95));
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.8), 0 0 32px rgba(16, 185, 129, 0.35);
+}
+
+.tut-toast-badge {
+  display: inline-block;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.65);
+  border: 1px solid rgba(16, 185, 129, 0.6);
+  border-radius: 5px;
+  padding: 3px 10px;
+  margin-bottom: 8px;
+}
+
+.tut-toast h3 {
+  margin: 0 0 6px;
+  font-family: var(--font-hud);
+  font-size: 20px;
+  color: #ffffff;
+}
+
+.tut-toast p {
+  margin: 0 0 14px;
+  font-size: 15.5px;
+  color: #f0f7ff;
+  line-height: 1.42;
+}
+
 /* Always honor HTML [hidden] above all ID display rules */
 [hidden],
 #hangar-loadout[hidden],
@@ -1395,6 +1632,10 @@ dialog h3 {
 #review-overlay[hidden],
 #codex-menu[hidden],
 #hud-restore-btn[hidden],
-#center-action-hud [hidden] {
+#center-action-hud [hidden],
+#tutorial-root[hidden],
+#tut-spotlight[hidden],
+#tut-coach-card[hidden],
+#tut-complete-toast[hidden] {
   display: none !important;
 }

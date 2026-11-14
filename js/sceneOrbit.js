@@ -636,6 +636,35 @@ function animate() {
 
 export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); };
 export const setOrbitCameraMode = (m) => { cameraMode = m; startCameraTween(m, false); };
+export function seekOrbitToPass(leadSeconds = 110) {
+  if (!orbitEl || !earthGroup || !gsNodes.length) return false;
+  const activeGs = gsNodes.find((g) => g.active) || gsNodes[0];
+  if (!activeGs) return false;
+  const baseEarthY = earthGroup.rotation.y;
+  const rotPerSec = (Math.PI * 2) / 86400;
+  const satTest = new THREE.Vector3(), gsPos = new THREE.Vector3(), gsNorm = new THREE.Vector3();
+  const quat = new THREE.Quaternion(), euler = new THREE.Euler(0, 0, 0);
+  for (let dt = 0; dt <= 28800; dt += 45) {
+    const tTest = simTime + dt;
+    const p = propagateOrbit(orbitEl, tTest);
+    satTest.set(p.position[0] * KM_TO_SCENE, p.position[1] * KM_TO_SCENE, p.position[2] * KM_TO_SCENE);
+    euler.y = baseEarthY + dt * rotPerSec;
+    quat.setFromEuler(euler);
+    gsPos.copy(activeGs.localNorm).multiplyScalar(EARTH_R * 1.005).applyQuaternion(quat);
+    gsNorm.copy(activeGs.localNorm).applyQuaternion(quat);
+    const losDot = satTest.clone().sub(gsPos).normalize().dot(gsNorm);
+    const rangeOk = orbitEl.deepSpace ? true : satTest.distanceTo(gsPos) < 5.2;
+    if (losDot > 0.14 && rangeOk) {
+      const targetDt = Math.max(0, dt - leadSeconds);
+      simTime += targetDt;
+      earthGroup.rotation.y += targetDt * rotPerSec;
+      stormUntil = 0;
+      lastAutoFlare = simTime + 9999;
+      return true;
+    }
+  }
+  return false;
+}
 export const triggerOrbitStorm = () => { stormUntil = performance.now() + 6000; playWarning(); };
 export function transmitScience() {
   if (!inLineOfSight) return { ok: false, points: 0, station: 'None' };

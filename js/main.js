@@ -2,8 +2,9 @@ import { SCENARIOS, createInitialState, evaluateMissionDesign } from './catalog.
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { activateSafeMode, mountOrbit, mountShowcase, scanAsteroid, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerOrbitStorm, unmountOrbit } from './sceneOrbit.js';
+import { activateSafeMode, mountOrbit, mountShowcase, scanAsteroid, seekOrbitToPass, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerOrbitStorm, unmountOrbit } from './sceneOrbit.js';
 import { isMuted, playEquip, playHover, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
+import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
 import { SUB_TABS, renderHud, renderLoadoutDock, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
 const STORAGE_ACTIVE = 'gospace_active_v1', STORAGE_SAVED = 'gospace_saved_v1';
@@ -35,6 +36,7 @@ function triggerWarpFlash() {
 function updateDebug(ev) {
   window.__MISSION_DEBUG__ = {
     stage, scenarioId: missionState.scenarioId, cmlLevel: ev.cmlLevel, titleOpen, hudHidden, muted: isMuted(),
+    tutorialActive: isTutorialActive(),
     cleanroomActive: activeScene === 'hangar', meshCount: activeScene === 'hangar' ? getMeshCount() : 0,
     launchActive: activeScene === 'launch', launchTelemetry,
     orbitActive: activeScene === 'orbit', orbitTelemetry, orbitScore,
@@ -96,6 +98,7 @@ function renderAll(rebuildScene = true, focusTag = null) {
       mountLaunch(vp, missionState, (t) => {
         launchTelemetry = t; updateLaunchOverlay(t);
         if (window.__MISSION_DEBUG__) window.__MISSION_DEBUG__.launchTelemetry = t;
+        notifyTutorialState();
       }, () => { if (stage === 'launch') setStage('orbit'); });
       activeScene = 'launch'; setLaunchCamera(launchCam);
     }
@@ -105,6 +108,7 @@ function renderAll(rebuildScene = true, focusTag = null) {
       mountOrbit(vp, missionState, lastEval, (t) => {
         orbitTelemetry = t; orbitScore = t.missionScore || 0; updateOrbitOverlay(t);
         if (window.__MISSION_DEBUG__) { window.__MISSION_DEBUG__.orbitTelemetry = t; window.__MISSION_DEBUG__.orbitScore = orbitScore; }
+        notifyTutorialState();
       });
       activeScene = 'orbit'; setOrbitTimeWarp(orbitWarp); setOrbitCameraMode(orbitCam);
     }
@@ -112,10 +116,19 @@ function renderAll(rebuildScene = true, focusTag = null) {
 
   renderStageHud(stage, missionState, lastEval, { autoRotate, exploded, meshCount: getMeshCount(), launchCam, orbitCam, orbitWarp, orbitScore });
   updateDebug(lastEval);
+  notifyTutorialState();
 }
 
 const openSaveModal = () => { renderSavedModal(readJson(STORAGE_SAVED, []), lastEval); document.getElementById('saveload-modal').showModal(); };
-const handleTransmit = () => { const r = transmitScience(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} DATA DOWNLINKED (${r.station})!`); } };
+const handleTransmit = () => {
+  const r = transmitScience();
+  if (r.ok) {
+    orbitScore += r.points;
+    if (orbitTelemetry) orbitTelemetry.downlinkCount = (orbitTelemetry.downlinkCount || 0) + 1;
+    spawnPopup(`+${r.points} DATA DOWNLINKED (${r.station})!`);
+    notifyTutorialState();
+  }
+};
 const handleSafeMode = () => { const r = activateSafeMode(); orbitScore += r.points; spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`); };
 const handleScanAsteroid = () => { const r = scanAsteroid(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`); } };
 
@@ -135,11 +148,64 @@ function init() {
     stage = 'hangar';
     renderAll(true);
   };
-  document.getElementById('mode-campaign-btn').addEventListener('click', () => startMissionFromTitle(null, false));
-  document.getElementById('mode-sandbox-btn').addEventListener('click', () => startMissionFromTitle(null, true));
+  const tutorialCallbacks = {
+    getContext: () => ({ stage, titleOpen, activeSegment, activeSub, missionState, lastEval, launchTelemetry, orbitTelemetry }),
+    setupStarterBuild: () => {
+      triggerWarpFlash();
+      titleOpen = false;
+      stage = 'hangar';
+      activeSegment = 'user';
+      activeSub = 'obj';
+      codexOpen = false;
+      hudHidden = false;
+      missionState = {
+        ...createInitialState('wildfiresat-l1', false),
+        instrumentIds: ['arctic-multispec'],
+        solarId: 'body-mounted',
+        vehicleId: 'falcon9-csli',
+        transceiverId: 'uhf',
+      };
+      renderAll(true);
+    },
+    setSegment: (seg, sub) => {
+      activeSegment = seg;
+      activeSub = sub || SUB_TABS[seg][0].id;
+      renderAll(false);
+    },
+    selectPart: (field, id, mode) => {
+      if (field === 'instrumentIds') {
+        const s = new Set(missionState.instrumentIds || []);
+        if (mode === 'add') s.add(id);
+        else if (s.has(id)) s.delete(id); else s.add(id);
+        missionState.instrumentIds = [...s];
+      } else {
+        missionState[field] = id;
+      }
+      playEquip();
+      renderAll(true, FOCUS_MAP[field] || null);
+    },
+    goToStage: (next) => setStage(next),
+    igniteLaunch: () => triggerIgnition(),
+    setOrbitWarp: (w) => {
+      orbitWarp = Number(w);
+      setOrbitTimeWarp(orbitWarp);
+      if (stage === 'orbit') renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore });
+    },
+    seekPass: () => seekOrbitToPass(110),
+    transmitNow: () => handleTransmit(),
+    returnHome: () => { titleOpen = true; renderAll(true); },
+  };
+
+  document.getElementById('mode-campaign-btn').addEventListener('click', () => { stopTutorial(); startMissionFromTitle(null, false); });
+  document.getElementById('mode-sandbox-btn').addEventListener('click', () => { stopTutorial(); startMissionFromTitle(null, true); });
   document.getElementById('how-to-play-btn')?.addEventListener('click', () => {
     playEquip();
-    document.getElementById('howto-modal')?.showModal();
+    startInteractiveTutorial(tutorialCallbacks);
+  });
+  document.getElementById('replay-tutorial-btn')?.addEventListener('click', () => {
+    playEquip();
+    codexOpen = false;
+    startInteractiveTutorial(tutorialCallbacks);
   });
   document.getElementById('title-mute-btn')?.addEventListener('click', () => { toggleMute(); applyChrome(); updateDebug(lastEval); });
   document.getElementById('contract-grid').addEventListener('click', (e) => {
