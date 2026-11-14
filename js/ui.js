@@ -133,24 +133,40 @@ export function renderHud(evaluation) {
     + '</tbody></table>';
 }
 
+export function updateCleanroomOverlay(state, evaluation, opts) {
+  const titlePill = document.getElementById('cleanroom-title-pill');
+  const metaPill = document.getElementById('cleanroom-meta-pill');
+  const bus = CATALOG.space.buses.find((b) => b.id === state.busId);
+  if (titlePill) titlePill.textContent = `${evaluation.scenario.name} · ${evaluation.cmlLabel}`;
+  if (metaPill) metaPill.textContent = `${bus ? `${bus.name} (${bus.busClass.toUpperCase()})` : state.busId} · ${opts.meshCount} 3D parts`;
+  document.getElementById('vp-autorotate-btn')?.classList.toggle('is-on', opts.autoRotate);
+  document.getElementById('vp-explode-btn')?.classList.toggle('is-on', opts.exploded);
+}
+
 export function renderViewport(stage, state, evaluation) {
   const vp = document.getElementById('viewport-container');
   vp.dataset.stage = stage;
+  vp.classList.toggle('is-3d', stage === 'cleanroom');
   const { scenario, orbitElements, orbitStats, metrics, missionMatch, cmlLevel, cmlLabel } = evaluation;
-  const live = propagateOrbit(orbitElements, 600);
   if (stage === 'cleanroom') {
-    vp.innerHTML = `<div class="vp-card" data-viewport-hook="cleanroom-3d">
-      <h3>Cleanroom Point Design · ${esc(scenario.name)}</h3>
-      <p class="field-tip">${esc(scenario.summary)} (3D Cleanroom assembly mounts here in Milestone 2.)</p>
-    </div>
-    <div class="vp-grid">
-      <div class="vp-stat"><div class="vp-stat-label">Spacecraft Bus</div><div class="vp-stat-val">${esc(state.busId)}</div></div>
-      <div class="vp-stat"><div class="vp-stat-label">Instruments (${state.instrumentIds.length})</div><div class="vp-stat-val">${esc(state.instrumentIds.join(', ') || 'None')}</div></div>
-      <div class="vp-stat"><div class="vp-stat-label">Payload / Cap</div><div class="vp-stat-val">${metrics.mass.payloadKg} / ${metrics.mass.busLimitKg} kg</div></div>
-      <div class="vp-stat"><div class="vp-stat-label">JPL Gate</div><div class="vp-stat-val">${esc(cmlLabel)}</div></div>
-    </div>`;
+    if (!document.getElementById('cleanroom-canvas-host')) {
+      vp.innerHTML = `<div id="cleanroom-canvas-host" class="canvas-host" data-viewport-hook="cleanroom-3d"></div>
+      <div class="vp-overlay-top">
+        <div class="vp-float-pill" id="cleanroom-title-pill"></div>
+        <div class="vp-overlay-actions">
+          <button id="vp-autorotate-btn" class="btn btn-secondary is-on" type="button">Auto-Rotate</button>
+          <button id="vp-explode-btn" class="btn btn-secondary" type="button">Exploded View</button>
+          <button id="vp-reset-btn" class="btn btn-secondary" type="button">Reset Camera</button>
+        </div>
+      </div>
+      <div class="vp-overlay-bottom">
+        <div class="vp-float-pill" id="cleanroom-meta-pill"></div>
+        <div class="vp-float-pill">Drag: Orbit · Scroll: Zoom</div>
+      </div>`;
+    }
     return;
   }
+  const live = propagateOrbit(orbitElements, 600);
   if (stage === 'orbit') {
     vp.innerHTML = `<div class="vp-card" data-viewport-hook="orbit-3d">
       <h3>NASA Mission Viz Keplerian Propagator · ${esc(orbitElements.name)}</h3>

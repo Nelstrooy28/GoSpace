@@ -1,6 +1,7 @@
 import { SCENARIOS, createInitialState, evaluateMissionDesign } from './catalog.js';
 import { exportMissionVizJSON } from './missionVizPropagator.js';
-import { renderHud, renderResourcesList, renderSavedModal, renderSegmentPanel, renderViewport } from './ui.js';
+import { getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
+import { renderHud, renderResourcesList, renderSavedModal, renderSegmentPanel, renderViewport, updateCleanroomOverlay } from './ui.js';
 
 const STORAGE_ACTIVE = 'gospace_active_v1';
 const STORAGE_SAVED = 'gospace_saved_v1';
@@ -9,6 +10,9 @@ let stage = 'cleanroom';
 let activeSegment = 'user';
 let missionState = loadActiveState();
 let lastEval = null;
+let cleanroomMounted = false;
+let autoRotate = true;
+let exploded = false;
 
 function loadActiveState() {
   try {
@@ -46,6 +50,8 @@ function updateDebug(evaluation) {
     stage,
     scenarioId: missionState.scenarioId,
     cmlLevel: evaluation.cmlLevel,
+    cleanroomActive: stage === 'cleanroom' && cleanroomMounted,
+    meshCount: stage === 'cleanroom' ? getMeshCount() : 0,
     metrics: evaluation.metrics,
     warnings: evaluation.warnings
   };
@@ -67,7 +73,25 @@ function renderAll() {
 
   document.getElementById('segment-content').innerHTML = renderSegmentPanel(activeSegment, missionState, lastEval);
   renderHud(lastEval);
-  renderViewport(stage, missionState, lastEval);
+
+  if (stage === 'cleanroom') {
+    renderViewport('cleanroom', missionState, lastEval);
+    if (!cleanroomMounted) {
+      mountCleanroom(document.getElementById('cleanroom-canvas-host'), missionState);
+      cleanroomMounted = true;
+      setAutoRotate(autoRotate);
+      setExploded(exploded);
+    } else {
+      updateSpacecraft(missionState);
+    }
+    updateCleanroomOverlay(missionState, lastEval, { autoRotate, exploded, meshCount: getMeshCount() });
+  } else {
+    if (cleanroomMounted) {
+      unmountCleanroom();
+      cleanroomMounted = false;
+    }
+    renderViewport(stage, missionState, lastEval);
+  }
   updateDebug(lastEval);
 }
 
@@ -113,6 +137,20 @@ function bindEvents() {
     if (!btn) return;
     stage = btn.dataset.stage;
     renderAll();
+  });
+
+  document.getElementById('viewport-container').addEventListener('click', (e) => {
+    if (e.target.closest('#vp-autorotate-btn')) {
+      autoRotate = !autoRotate;
+      setAutoRotate(autoRotate);
+      updateCleanroomOverlay(missionState, lastEval, { autoRotate, exploded, meshCount: getMeshCount() });
+    } else if (e.target.closest('#vp-explode-btn')) {
+      exploded = !exploded;
+      setExploded(exploded);
+      updateCleanroomOverlay(missionState, lastEval, { autoRotate, exploded, meshCount: getMeshCount() });
+    } else if (e.target.closest('#vp-reset-btn')) {
+      resetCamera();
+    }
   });
 
   document.getElementById('mel-toggle').addEventListener('click', () => {
