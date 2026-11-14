@@ -6,18 +6,8 @@
 - **Persistence:** Use `localStorage` to save, load, and compare mission designs + Sandbox mode toggle.
 - **Git Workflow:** Commit with author `Nelstrooy28 <nelstrooygalat28@gmail.com>` and `git push origin main` at the end of every completed step.
 
-## File Structure (< 250 lines per file)
-- `index.html` — Import map, full-screen 3D viewport & floating glassmorphic game HUD overlays
-- `styles.css` — Deep-space glassmorphic game HUD, collapsible drawers, launch CTA & animations
-- `js/missionVizPropagator.js` — Keplerian 2D-ellipse-to-3D orbit propagator & 3D trajectory JSON export
-- `js/catalog.js` — Mission scenarios, buses, rockets, orbits, instruments & `evaluateMissionDesign()`
-- `js/main.js` — Single-player 4-stage state machine (Hangar -> Launchpad -> Orbit -> Debrief)
-- `js/sceneCleanroom.js` — Interactive 3D Hangar procedural spacecraft assembly & OrbitControls
-- `js/sceneLaunch.js` — Procedural 3D Launchpad, multi-stage rocket liftoff, sky-to-space ascent & fairing jettison
-- `js/sceneOrbit.js` — Unobstructed full-view 3D multi-layer Earth, Moon, Ap/Pe orbit visuals & interactive downlinks
-- `js/solarSystem.js` — Procedural Milky Way sky-dome, Sun, Solar System planets & 3D InstancedMesh asteroid belt/NEAs
-- `js/sfx.js` — Procedural Web Audio synthesizer (UI clicks, equip lock, rocket rumble, downlink ping & victory fanfare)
-- `js/ui.js` — Sci-fi HUD, title mission cards, loadout dock, Codex menu, launch tachometer & 3-star debrief
+## Modular High-Fidelity 3D Rule
+Keep logic cleanly separated across modular ES files (`index.html`, `styles.css`, `js/main.js`, `js/ui.js`, `js/catalog.js`, `js/missionVizPropagator.js`, `js/sfx.js`, `js/sceneCleanroom.js`, `js/sceneLaunch.js`, `js/sceneOrbit.js`, `js/solarSystem.js`), with NO artificial line-count cap. Prioritize rich 3D visual detail, custom GLSL shaders, high-resolution procedural `<canvas>` textures, particle effects, and complete code—never truncate or simplify visuals to save lines.
 
 ## Dev Server & Verification Rules
 - Serve locally with `npx -y serve -l 3000 .` or `python -m http.server 3000` (free port 3000 first).

@@ -1,12 +1,12 @@
 import { generateOrbitTrack } from './missionVizPropagator.js';
 
 export const OFFICIAL_RESOURCES = [
-  { id: 1, agency: 'SYSTEMS', title: 'Design and Develop Science Missions', url: 'https://www.nasa.gov/wp-content/uploads/2025/04/250323-design-and-develop-science-mission.pdf?emrc=a454cf' },
-  { id: 2, agency: 'DESIGN', title: 'Mission Design Telemetry & Lab Framework', url: 'https://etd.gsfc.nasa.gov/capabilities/integrated-design-center/mission-design-lab/' },
-  { id: 3, agency: 'MATURITY', title: 'Concept Maturity (CML 1–4) Framework', url: 'https://dataverse.jpl.nasa.gov/dataset.xhtml?persistentId=hdl:2014/44299' },
-  { id: 4, agency: 'ORBIT', title: 'Keplerian 3D Orbit Trajectory Spec', url: 'https://nasa.github.io/mission-viz/' },
-  { id: 5, agency: 'OPTICS', title: 'Space Observatory Wavelength Rules', url: 'https://science.nasa.gov/mission/webb/game-build-it-yourself/' },
-  { id: 6, agency: 'CUBESAT', title: 'CubeSat 101 Systems Guide', url: 'https://www3.nasa.gov/sites/default/files/atoms/files/nasa_csli_cubesat_101_508.pdf' },
+  { id: 1, agency: 'SYSTEMS', title: 'Spacecraft Systems Engineering Guide', url: 'https://en.wikipedia.org/wiki/Spacecraft_design' },
+  { id: 2, agency: 'DESIGN', title: 'Mission Design Telemetry & Lab Framework', url: 'https://en.wikipedia.org/wiki/Concurrent_engineering' },
+  { id: 3, agency: 'MATURITY', title: 'Concept Maturity & Readiness Scale (1–4)', url: 'https://en.wikipedia.org/wiki/Technology_readiness_level' },
+  { id: 4, agency: 'ORBIT', title: 'Keplerian 3D Orbit Trajectory Spec', url: 'https://en.wikipedia.org/wiki/Keplerian_elements' },
+  { id: 5, agency: 'OPTICS', title: 'Space Observatory Wavelength Rules', url: 'https://en.wikipedia.org/wiki/Infrared_astronomy' },
+  { id: 6, agency: 'CUBESAT', title: 'CubeSat Systems & Standards', url: 'https://www.cubesat.org/cubesatinfo' },
   { id: 7, agency: 'SCIENCE', title: 'Arctic & Earth Observation Activities', url: 'https://www.asc-csa.gc.ca/eng/youth-educators/digital-games-and-activities.asp' }
 ];
 

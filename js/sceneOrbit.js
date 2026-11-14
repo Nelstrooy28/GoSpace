@@ -1,119 +1,459 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { generateOrbitTrack, propagateOrbit } from './missionVizPropagator.js';
-import { createSpaceEnvironment } from './solarSystem.js';
+import { createSpaceEnvironment, fbm2, hash2 } from './solarSystem.js';
 import { playDownlinkPing, playSafeMode, playWarning } from './sfx.js';
 
 const EARTH_R = 2.0, KM_TO_SCENE = EARTH_R / 6371;
-const STATIONS = [{ id: 'inuvik', name: 'Arctic Polar Station', lat: 68.36, lon: -133.72 }, { id: 'nsn', name: 'Global Near-Space Network', lat: 37.94, lon: -75.46 }, { id: 'dsn', name: 'Deep-Space Dish Array', lat: 35.43, lon: -116.89 }];
+const SUN_DIR = new THREE.Vector3(1, 0, 0);
+const STATIONS = [
+  { id: 'inuvik', name: 'Arctic Polar Station', lat: 68.36, lon: -133.72 },
+  { id: 'nsn', name: 'Global Near-Space Network', lat: 37.94, lon: -75.46 },
+  { id: 'dsn', name: 'Deep-Space Dish Array', lat: 35.43, lon: -116.89 }
+];
 
 let renderer = null, scene = null, camera = null, controls = null, resizeObserver = null, spaceEnv = null;
-let rafId = 0, earthGroup = null, cloudMesh = null, satMesh = null, beamLine = null, scanLine = null, orbitLine = null;
-let gsNodes = [], orbitPts = [], colorAttr = null, velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
+let rafId = 0, earthGroup = null, cloudMesh = null, nightMat = null, atmoMat = null;
+let satMesh = null, thrusterGlow = null, beamLine = null, beamHalo = null, scanLine = null;
+let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
+let gsNodes = [], gsPulseRing = null, orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
 let simTime = 0, timeWarp = 25, cameraMode = 'full', stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, fitDist = 7.2, sunElapsed = 0;
-let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14, inLineOfSight = false, activeStationName = 'None', hazardNow = false;
-const clock = new THREE.Clock(), trackCenter = new THREE.Vector3(), tmpSat = new THREE.Vector3(), tmpNext = new THREE.Vector3(), tmpGs = new THREE.Vector3(), tmpNorm = new THREE.Vector3();
+let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
+let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
+
+const camTween = {
+  active: false, t: 0, dur: 0.78,
+  fromPos: new THREE.Vector3(), toPos: new THREE.Vector3(),
+  fromTarget: new THREE.Vector3(), toTarget: new THREE.Vector3()
+};
+
+const clock = new THREE.Clock(), trackCenter = new THREE.Vector3();
+const tmpSat = new THREE.Vector3(), tmpNext = new THREE.Vector3(), tmpGs = new THREE.Vector3(), tmpNorm = new THREE.Vector3();
 
 function latLonToVec(latDeg, lonDeg, r) {
   const lat = (latDeg * Math.PI) / 180, lon = (lonDeg * Math.PI) / 180;
   return new THREE.Vector3(r * Math.cos(lat) * Math.cos(lon), r * Math.sin(lat), -r * Math.cos(lat) * Math.sin(lon));
 }
 
+function continentSignal(u, v) {
+  // Organic continental plates + polar caps using multi-octave FBM
+  const lon = u * Math.PI * 2;
+  const ridge = fbm2(u * 6.5 + 1.3, v * 4.2 + 0.7, 5);
+  const fine = fbm2(u * 18.0 + 4.1, v * 12.0 + 2.3, 3);
+  const bias = Math.sin(lon * 2.0 - 0.6) * 0.08 + Math.cos(lon * 3.0 + 1.1) * 0.05;
+  const latFactor = Math.cos((v - 0.5) * Math.PI);
+  return ridge * 0.76 + fine * 0.24 + bias - (1 - latFactor) * 0.08;
+}
+
 function makeEarthMaps() {
-  const mk = (w, h, fn) => { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
-  const lands = [[105, 86, 46, 32], [142, 158, 25, 40], [278, 84, 68, 30], [292, 146, 36, 42], [412, 166, 30, 22], [190, 52, 24, 14]];
-  const map = mk(512, 256, (ctx) => {
-    const g = ctx.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, '#f1f5f9'); g.addColorStop(0.11, '#0c4a6e'); g.addColorStop(0.5, '#062c56'); g.addColorStop(0.89, '#0c4a6e'); g.addColorStop(1, '#f1f5f9');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 512, 256);
-    lands.forEach(([x, y, rx, ry], idx) => { ctx.fillStyle = idx % 2 ? '#2d6a4f' : '#3a7d44'; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0.2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#a1884f'; ctx.beginPath(); ctx.ellipse(x + 6, y - 3, rx * 0.45, ry * 0.35, 0.1, 0, Math.PI * 2); ctx.fill(); });
+  const w = 1024, h = 512;
+  const diffC = document.createElement('canvas'); diffC.width = w; diffC.height = h;
+  const rghC = document.createElement('canvas'); rghC.width = w; rghC.height = h;
+  const bmpC = document.createElement('canvas'); bmpC.width = w; bmpC.height = h;
+  const cityC = document.createElement('canvas'); cityC.width = w; cityC.height = h;
+
+  const dCtx = diffC.getContext('2d'), rCtx = rghC.getContext('2d'), bCtx = bmpC.getContext('2d'), ctCtx = cityC.getContext('2d');
+  const dImg = dCtx.createImageData(w, h), rImg = rCtx.createImageData(w, h), bImg = bCtx.createImageData(w, h);
+  const dd = dImg.data, rd = rImg.data, bd = bImg.data;
+  ctCtx.fillStyle = '#000';
+  ctCtx.fillRect(0, 0, w, h);
+
+  const seaLevel = 0.54;
+  for (let y = 0; y < h; y += 1) {
+    const v = y / h, lat = Math.abs(v - 0.5) * 2;
+    for (let x = 0; x < w; x += 1) {
+      const u = x / w, idx = (y * w + x) * 4;
+      const elev = continentSignal(u, v);
+      const moisture = fbm2(u * 9 + 7.2, v * 5 + 3.1, 3);
+      const polarIce = lat > 0.87 - fbm2(u * 12, v * 6, 2) * 0.07;
+
+      let r = 0, g = 0, b = 0, rough = 220, bump = 128;
+      if (polarIce) {
+        r = 238; g = 245; b = 252; rough = 195; bump = 165;
+      } else if (elev < seaLevel) {
+        // Bathymetry + bright shallow coastal shelves
+        const depth = Math.max(0, Math.min(1, (seaLevel - elev) / 0.25));
+        const shelf = Math.max(0, 1 - (seaLevel - elev) / 0.045);
+        r = Math.round(7 + (1 - depth) * 14 + shelf * 24);
+        g = Math.round(32 + (1 - depth) * 48 + shelf * 78);
+        b = Math.round(76 + (1 - depth) * 72 + shelf * 56);
+        rough = 58; // Specular Sun glint over oceans
+        bump = 92;
+      } else {
+        const hNorm = Math.min(1, (elev - seaLevel) / 0.28);
+        if (hNorm > 0.78) {
+          r = 214; g = 220; b = 226; // Alpine peaks
+        } else if (lat < 0.42 && moisture < 0.44) {
+          r = 186 - hNorm * 35; g = 148 - hNorm * 30; b = 88 - hNorm * 20; // Arid deserts
+        } else {
+          r = 42 + hNorm * 58; g = 104 + hNorm * 38; b = 56 + hNorm * 24; // Forests & plains
+        }
+        rough = 226;
+        bump = Math.min(255, Math.round(135 + hNorm * 115));
+
+        // Coastal & lowland city lights on populated latitudes
+        if (lat < 0.72 && hNorm < 0.35 && hash2(x, y) > 0.992 && moisture > 0.42) {
+          ctCtx.fillStyle = `rgba(255,214,120,${0.65 + hash2(y, x) * 0.35})`;
+          ctCtx.fillRect(x, y, 2, 2);
+        }
+      }
+      dd[idx] = r; dd[idx + 1] = g; dd[idx + 2] = b; dd[idx + 3] = 255;
+      rd[idx] = rough; rd[idx + 1] = rough; rd[idx + 2] = rough; rd[idx + 3] = 255;
+      bd[idx] = bump; bd[idx + 1] = bump; bd[idx + 2] = bump; bd[idx + 3] = 255;
+    }
+  }
+  dCtx.putImageData(dImg, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  bCtx.putImageData(bImg, 0, 0);
+
+  // Add subtle regional urban metropolitan clusters onto night-city map
+  for (let i = 0; i < 65; i += 1) {
+    const ux = hash2(i, 51), vy = 0.18 + hash2(i, 73) * 0.64;
+    if (continentSignal(ux, vy) > seaLevel + 0.01) {
+      const cx = ux * w, cy = vy * h;
+      const glow = ctCtx.createRadialGradient(cx, cy, 0.5, cx, cy, 8 + (i % 8));
+      glow.addColorStop(0, 'rgba(255,210,115,0.92)');
+      glow.addColorStop(0.5, 'rgba(251,146,60,0.35)');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctCtx.fillStyle = glow;
+      ctCtx.beginPath(); ctCtx.arc(cx, cy, 8 + (i % 8), 0, Math.PI * 2); ctCtx.fill();
+    }
+  }
+
+  // 1024x512 cyclonic cloud canopy
+  const cldC = document.createElement('canvas'); cldC.width = w; cldC.height = h;
+  const clCtx = cldC.getContext('2d');
+  const clImg = clCtx.createImageData(w, h), cld = clImg.data;
+  for (let y = 0; y < h; y += 1) {
+    const v = y / h;
+    for (let x = 0; x < w; x += 1) {
+      const u = x / w, idx = (y * w + x) * 4;
+      const swirl = fbm2(u * 10 + Math.sin(v * 8) * 0.35, v * 6, 4);
+      const wisp = fbm2(u * 24 + swirl * 2.2, v * 14, 3);
+      const cov = Math.max(0, (swirl * 0.6 + wisp * 0.4) - 0.52) / 0.48;
+      cld[idx] = 244; cld[idx + 1] = 248; cld[idx + 2] = 255;
+      cld[idx + 3] = Math.min(235, Math.round(cov * 290));
+    }
+  }
+  clCtx.putImageData(clImg, 0, 0);
+
+  const map = new THREE.CanvasTexture(diffC); map.colorSpace = THREE.SRGBColorSpace;
+  const roughnessMap = new THREE.CanvasTexture(rghC);
+  const bumpMap = new THREE.CanvasTexture(bmpC);
+  const nightMap = new THREE.CanvasTexture(cityC); nightMap.colorSpace = THREE.SRGBColorSpace;
+  const cloudMap = new THREE.CanvasTexture(cldC); cloudMap.colorSpace = THREE.SRGBColorSpace;
+  return { map, roughnessMap, bumpMap, nightMap, cloudMap };
+}
+
+function makeNightLightsMaterial(nightMap) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uNightMap: { value: nightMap }, uSunDir: { value: SUN_DIR } },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vWorldNormal;
+      void main() {
+        vUv = uv;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uNightMap;
+      uniform vec3 uSunDir;
+      varying vec2 vUv;
+      varying vec3 vWorldNormal;
+      void main() {
+        float sunDot = dot(normalize(vWorldNormal), normalize(uSunDir));
+        float nightMask = smoothstep(0.14, -0.22, sunDot);
+        vec3 cities = texture2D(uNightMap, vUv).rgb * nightMask * 1.35;
+        if (length(cities) < 0.02) discard;
+        gl_FragColor = vec4(cities, nightMask);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
   });
-  const emissiveMap = mk(256, 128, (ctx) => {
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 256, 128); ctx.fillStyle = '#ffd166';
-    lands.forEach(([x, y, rx, ry]) => { for (let k = 0; k < 14; k += 1) ctx.fillRect((x * 0.5) + ((k * 17) % Math.max(8, rx)) - rx * 0.45, (y * 0.5) + ((k * 13) % Math.max(6, ry)) - ry * 0.45, 1.8, 1.8); });
+}
+
+function makeAtmosphereRimMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uSunDir: { value: SUN_DIR } },
+    vertexShader: `
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPos;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uSunDir;
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPos;
+      void main() {
+        vec3 n = normalize(vWorldNormal);
+        vec3 viewDir = normalize(cameraPosition - vWorldPos);
+        float d = dot(viewDir, n);
+        float rim = smoothstep(0.0, 0.44, -d) * pow(clamp(1.0 + d, 0.0, 1.0), 2.1);
+        float daySide = 0.22 + 0.78 * smoothstep(-0.35, 0.55, dot(n, normalize(uSunDir)));
+        vec3 atmoColor = mix(vec3(0.08, 0.28, 0.75), vec3(0.32, 0.78, 1.0), daySide);
+        gl_FragColor = vec4(atmoColor * rim * daySide * 1.15, rim * 0.85);
+      }
+    `,
+    side: THREE.BackSide,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
   });
-  const cloudMap = mk(256, 128, (ctx) => {
-    for (let i = 0; i < 48; i += 1) { ctx.fillStyle = `rgba(241,245,249,${0.12 + (i % 4) * 0.06})`; ctx.beginPath(); ctx.ellipse((i * 47) % 256, 18 + (i * 23) % 92, 18 + (i % 14), 5 + (i % 5), 0.15, 0, Math.PI * 2); ctx.fill(); }
-  });
-  return { map, emissiveMap, cloudMap };
 }
 
 function makeTagSprite(label, color) {
-  const c = document.createElement('canvas'); c.width = 96; c.height = 48; const ctx = c.getContext('2d');
-  ctx.fillStyle = 'rgba(4,10,22,0.86)'; ctx.fillRect(8, 8, 80, 32); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(8, 8, 80, 32);
-  ctx.fillStyle = color; ctx.font = 'bold 22px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 48, 25);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));
-  sp.scale.set(0.85, 0.42, 1); return sp;
+  const c = document.createElement('canvas'); c.width = 224; c.height = 56;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(4,10,22,0.88)'; ctx.fillRect(6, 6, 212, 44);
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(6, 6, 212, 44);
+  ctx.fillStyle = color; ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, 112, 29);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(1.55, 0.39, 1);
+  return sp;
 }
 
-function applyCameraPreset(mode) {
+function buildOrbitRibbon(points, halfWidth) {
+  const n = points.length, pos = new Float32Array(n * 2 * 3), col = new Float32Array(n * 2 * 3), idx = [];
+  const up = new THREE.Vector3(0, 1, 0), tang = new THREE.Vector3(), side = new THREE.Vector3();
+  for (let i = 0; i < n; i += 1) {
+    const p = points[i], next = points[(i + 1) % n];
+    tang.subVectors(next, p).normalize();
+    side.crossVectors(tang, up);
+    if (side.lengthSq() < 0.001) side.set(1, 0, 0);
+    side.normalize().multiplyScalar(halfWidth);
+
+    const a = p.clone().add(side), b = p.clone().sub(side);
+    const v0 = i * 2, v1 = i * 2 + 1;
+    pos[v0 * 3] = a.x; pos[v0 * 3 + 1] = a.y; pos[v0 * 3 + 2] = a.z;
+    pos[v1 * 3] = b.x; pos[v1 * 3 + 1] = b.y; pos[v1 * 3 + 2] = b.z;
+    if (i < n - 1) {
+      const n0 = (i + 1) * 2, n1 = (i + 1) * 2 + 1;
+      idx.push(v0, v1, n0, v1, n1, n0);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  ribbonColorAttr = new THREE.BufferAttribute(col, 3);
+  geo.setAttribute('color', ribbonColorAttr);
+  geo.setIndex(idx);
+  return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+  }));
+}
+
+function buildOrbitSpacecraft(scaleFactor) {
+  const grp = new THREE.Group(), s = scaleFactor;
+  grp.add(new THREE.Mesh(
+    new THREE.BoxGeometry(0.18 * s, 0.14 * s, 0.18 * s),
+    new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.25 })
+  ));
+  grp.add(new THREE.Mesh(
+    new THREE.BoxGeometry(0.76 * s, 0.025 * s, 0.16 * s),
+    new THREE.MeshStandardMaterial({ color: 0x1d4ed8, emissive: 0x0f172a, roughness: 0.3, metalness: 0.5 })
+  ));
+  const sensorTurret = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.055 * s, 0.065 * s, 0.11 * s, 12),
+    new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.3 })
+  );
+  sensorTurret.position.set(0, -0.1 * s, 0);
+  grp.add(sensorTurret);
+  const dish = new THREE.Mesh(
+    new THREE.ConeGeometry(0.08 * s, 0.05 * s, 14, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.6, roughness: 0.3, side: THREE.DoubleSide })
+  );
+  dish.position.set(0, 0.11 * s, 0);
+  grp.add(dish);
+  thrusterGlow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.05 * s, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending })
+  );
+  thrusterGlow.position.set(-0.12 * s, 0, 0);
+  grp.add(thrusterGlow);
+  velArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 0.78 * s, 0x38bdf8, 0.2 * s, 0.1 * s);
+  grp.add(velArrow);
+  return grp;
+}
+
+function getPresetPose(mode) {
+  if (mode === 'full') {
+    return {
+      pos: new THREE.Vector3(trackCenter.x + fitDist * 0.56, trackCenter.y + fitDist * 0.42, trackCenter.z + fitDist * 0.74),
+      target: trackCenter.clone()
+    };
+  }
+  if (mode === 'chase' && satMesh) {
+    const dir = tmpSat.length() > 0.1 ? tmpSat.clone().normalize() : new THREE.Vector3(1, 0.4, 1);
+    return {
+      pos: tmpSat.clone().addScaledVector(dir, orbitEl?.deepSpace ? 4.2 : 1.8).add(new THREE.Vector3(0, 0.65, 0.9)),
+      target: tmpSat.clone()
+    };
+  }
+  if (mode === 'asteroid' && spaceEnv) {
+    const { nea } = spaceEnv.findNearestNea(tmpSat);
+    return { pos: nea.mesh.position.clone().add(new THREE.Vector3(2.4, 1.4, 3.2)), target: nea.mesh.position.clone() };
+  }
+  return { pos: new THREE.Vector3(26, 118, 290), target: new THREE.Vector3(10, 0, -10) };
+}
+
+function startCameraTween(mode, immediate = false) {
   if (!camera || !controls) return;
-  if (mode === 'full') { camera.position.set(trackCenter.x + fitDist * 0.56, trackCenter.y + fitDist * 0.44, trackCenter.z + fitDist * 0.72); controls.target.copy(trackCenter); }
-  else if (mode === 'chase' && satMesh) { controls.target.copy(tmpSat.clone().multiplyScalar(0.35)); const dir = tmpSat.length() > 0.1 ? tmpSat.clone().normalize() : new THREE.Vector3(1, 0.4, 1); camera.position.copy(tmpSat).addScaledVector(dir, orbitEl?.deepSpace ? 4.2 : 1.75).add(new THREE.Vector3(0, 0.65, 0.9)); }
-  else if (mode === 'asteroid' && spaceEnv) { const { nea } = spaceEnv.findNearestNea(tmpSat); controls.target.copy(nea.mesh.position); camera.position.copy(nea.mesh.position).add(new THREE.Vector3(2.4, 1.5, 3.2)); }
-  else if (mode === 'solar') { controls.target.set(85, 0, -25); camera.position.set(18, 78, 196); }
-  controls.update();
+  const pose = getPresetPose(mode);
+  if (immediate) {
+    camTween.active = false;
+    camera.position.copy(pose.pos);
+    controls.target.copy(pose.target);
+    controls.update();
+    return;
+  }
+  camTween.active = true;
+  camTween.t = 0;
+  camTween.fromPos.copy(camera.position);
+  camTween.toPos.copy(pose.pos);
+  camTween.fromTarget.copy(controls.target);
+  camTween.toTarget.copy(pose.target);
 }
 
 function buildWorld(missionState, evaluation) {
-  orbitEl = evaluation.orbitElements; const deep = Boolean(orbitEl.deepSpace);
-  scene.add(new THREE.AmbientLight(0x334155, 0.45));
-  const sunLight = new THREE.DirectionalLight(0xfff7e6, 2.7); sunLight.position.set(260, 0, 0); scene.add(sunLight);
+  orbitEl = evaluation.orbitElements;
+  const deep = Boolean(orbitEl.deepSpace);
+  scene.add(new THREE.AmbientLight(0x334155, 0.42));
+  const sunLight = new THREE.DirectionalLight(0xfff7e6, 2.8);
+  sunLight.position.set(260, 0, 0);
+  scene.add(sunLight);
 
+  // 1. Multi-layer 1024x512 Earth + Night City Shader + Clouds + Fresnel Rim Shader
   const maps = makeEarthMaps();
   earthGroup = new THREE.Group();
-  earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, 48, 32), new THREE.MeshStandardMaterial({ map: maps.map, emissiveMap: maps.emissiveMap, emissive: 0xffb347, emissiveIntensity: 0.42, roughness: 0.72, metalness: 0.08 })));
-  cloudMesh = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.018, 40, 24), new THREE.MeshStandardMaterial({ map: maps.cloudMap, transparent: true, opacity: 0.82, depthWrite: false }));
+  earthGroup.add(new THREE.Mesh(
+    new THREE.SphereGeometry(EARTH_R, 64, 40),
+    new THREE.MeshStandardMaterial({
+      map: maps.map, roughnessMap: maps.roughnessMap, roughness: 1.0,
+      bumpMap: maps.bumpMap, bumpScale: 0.045, metalness: 0.06
+    })
+  ));
+  nightMat = makeNightLightsMaterial(maps.nightMap);
+  earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.003, 56, 36), nightMat));
+  cloudMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(EARTH_R * 1.018, 48, 32),
+    new THREE.MeshStandardMaterial({ map: maps.cloudMap, transparent: true, opacity: 0.85, depthWrite: false, roughness: 0.9 })
+  );
   earthGroup.add(cloudMesh);
-  earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.072, 36, 24), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.18, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false })));
+  atmoMat = makeAtmosphereRimMaterial();
+  earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.088, 48, 32), atmoMat));
 
-  const umbra = new THREE.Mesh(new THREE.CylinderGeometry(EARTH_R * 0.99, EARTH_R * 0.62, 28, 28, 1, true), new THREE.MeshBasicMaterial({ color: 0x020617, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }));
-  umbra.rotation.z = Math.PI / 2; umbra.position.x = -14; scene.add(umbra);
-  const refGrid = new THREE.PolarGridHelper(16, 12, 4, 48, 0x1e3a5f, 0x0f2544); refGrid.material.transparent = true; refGrid.material.opacity = 0.22; scene.add(refGrid);
+  // Earth Umbra Cone & Equatorial Reference Grid
+  const uCan = document.createElement('canvas'); uCan.width = 16; uCan.height = 128;
+  const uCtx = uCan.getContext('2d'), ug = uCtx.createLinearGradient(0, 0, 0, 128);
+  ug.addColorStop(0, 'rgba(2,6,23,0)'); ug.addColorStop(0.55, 'rgba(2,6,23,0.10)'); ug.addColorStop(1, 'rgba(2,6,23,0.22)');
+  uCtx.fillStyle = ug; uCtx.fillRect(0, 0, 16, 128);
+  const uTex = new THREE.CanvasTexture(uCan);
+  const umbra = new THREE.Mesh(
+    new THREE.CylinderGeometry(EARTH_R * 0.65, EARTH_R * 0.96, 26, 32, 1, true),
+    new THREE.MeshBasicMaterial({ map: uTex, transparent: true, side: THREE.DoubleSide, depthWrite: false })
+  );
+  umbra.rotation.z = Math.PI / 2; umbra.position.x = -13.4;
+  scene.add(umbra);
+
+  const refGrid = new THREE.PolarGridHelper(18, 12, 4, 64, 0x1e3a5f, 0x0f2544);
+  refGrid.material.transparent = true; refGrid.material.opacity = 0.24;
+  scene.add(refGrid);
 
   gsNodes = STATIONS.map((gs) => {
-    const active = gs.id === missionState.stationId, localPos = latLonToVec(gs.lat, gs.lon, EARTH_R * 1.02), localNorm = localPos.clone().normalize();
-    const m = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.095 : 0.06, 12, 10), new THREE.MeshBasicMaterial({ color: active ? 0x22c55e : 0xf59e0b }));
+    const active = gs.id === missionState.stationId;
+    const localPos = latLonToVec(gs.lat, gs.lon, EARTH_R * 1.02);
+    const localNorm = localPos.clone().normalize();
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(active ? 0.095 : 0.06, 12, 10),
+      new THREE.MeshBasicMaterial({ color: active ? 0x22c55e : 0xf59e0b })
+    );
     m.position.copy(localPos); earthGroup.add(m);
     let cone = null;
     if (active) {
-      cone = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.88, 18, 1, true), new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
-      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), localNorm); cone.position.copy(localPos).addScaledVector(localNorm, 0.44); earthGroup.add(cone);
+      cone = new THREE.Mesh(
+        new THREE.ConeGeometry(0.52, 0.95, 22, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false })
+      );
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), localNorm);
+      cone.position.copy(localPos).addScaledVector(localNorm, 0.475);
+      gsPulseRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.08, 0.14, 24),
+        new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false })
+      );
+      gsPulseRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), localNorm);
+      gsPulseRing.position.copy(localPos).addScaledVector(localNorm, 0.02);
+      earthGroup.add(cone, gsPulseRing);
     }
     return { ...gs, active, mesh: m, cone, localNorm };
   });
   scene.add(earthGroup);
 
-  const track = generateOrbitTrack(orbitEl, 150);
+  // 2. Orbit Trajectory Ribbon + Core Line + Pe/Ap 3D Markers
+  const track = generateOrbitTrack(orbitEl, 180);
   orbitPts = track.points.map((p) => new THREE.Vector3(p.position[0] * KM_TO_SCENE, p.position[1] * KM_TO_SCENE, p.position[2] * KM_TO_SCENE));
   const box = new THREE.Box3().setFromPoints(orbitPts); box.getCenter(trackCenter);
-  const sphere = new THREE.Sphere(); box.getBoundingSphere(sphere); fitDist = Math.max(6.4, sphere.radius * 2.55);
+  const sphere = new THREE.Sphere(); box.getBoundingSphere(sphere);
+  fitDist = Math.max(6.4, sphere.radius * 2.55);
 
-  let pePt = orbitPts[0], apPt = orbitPts[0];
-  orbitPts.forEach((p) => { if (p.lengthSq() < pePt.lengthSq()) pePt = p; if (p.lengthSq() > apPt.lengthSq()) apPt = p; });
-  const peTag = makeTagSprite('Pe', '#10b981'); peTag.position.copy(pePt).add(new THREE.Vector3(0, 0.45, 0)); scene.add(peTag);
-  const apTag = makeTagSprite('Ap', '#f59e0b'); apTag.position.copy(apPt).add(new THREE.Vector3(0, 0.55, 0)); scene.add(apTag);
+  let pePt = orbitPts[0], apPt = orbitPts[0], peMin = Infinity, apMax = -Infinity, peAlt = 0, apAlt = 0;
+  orbitPts.forEach((p, idx) => {
+    const d2 = p.lengthSq();
+    const alt = Math.round(track.points[idx]?.altitudeKm ?? (p.length() - EARTH_R) / KM_TO_SCENE);
+    if (d2 < peMin) { peMin = d2; pePt = p; peAlt = alt; }
+    if (d2 > apMax) { apMax = d2; apPt = p; apAlt = alt; }
+  });
+  const beaconScale = deep ? 0.24 : 0.11;
+  const peGem = new THREE.Mesh(new THREE.OctahedronGeometry(beaconScale, 0), new THREE.MeshBasicMaterial({ color: 0x10b981 }));
+  peGem.position.copy(pePt);
+  const apGem = new THREE.Mesh(new THREE.OctahedronGeometry(beaconScale, 0), new THREE.MeshBasicMaterial({ color: 0xf59e0b }));
+  apGem.position.copy(apPt);
+  const peTag = makeTagSprite(`Pe · ${peAlt}km`, '#10b981'); peTag.position.copy(pePt).add(new THREE.Vector3(0, 0.36, 0));
+  const apTag = makeTagSprite(`Ap · ${apAlt}km`, '#f59e0b'); apTag.position.copy(apPt).add(new THREE.Vector3(0, 0.48, 0));
+  scene.add(peGem, apGem, peTag, apTag);
 
-  const moonPos = orbitEl.id === 'lunar-transfer' ? apPt.clone().multiplyScalar(1.04) : new THREE.Vector3(-14, 3.5, -16);
+  const moonPos = orbitEl.id === 'lunar-transfer' ? apPt.clone().multiplyScalar(1.04) : new THREE.Vector3(-15, 3.4, -16);
   spaceEnv = createSpaceEnvironment(scene, { moonPos, moonScale: deep ? EARTH_R * 0.44 : EARTH_R * 0.3 });
 
   const oGeo = new THREE.BufferGeometry().setFromPoints(orbitPts);
-  colorAttr = new THREE.BufferAttribute(new Float32Array(orbitPts.length * 3), 3);
-  oGeo.setAttribute('color', colorAttr);
-  orbitLine = new THREE.Line(oGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.92 }));
-  scene.add(orbitLine);
+  lineColorAttr = new THREE.BufferAttribute(new Float32Array(orbitPts.length * 3), 3);
+  oGeo.setAttribute('color', lineColorAttr);
+  orbitLine = new THREE.Line(oGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 }));
+  ribbonMesh = buildOrbitRibbon(orbitPts, orbitEl.id === 'lunar-transfer' ? 0.28 : (deep ? 0.14 : 0.055));
+  scene.add(ribbonMesh, orbitLine);
 
-  satMesh = new THREE.Group();
-  const sc = orbitEl.id === 'lunar-transfer' ? 3.2 : (deep ? 1.8 : 0.92);
-  satMesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.18 * sc, 0.14 * sc, 0.18 * sc), new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.8, roughness: 0.25 })));
-  satMesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.66 * sc, 0.03 * sc, 0.14 * sc), new THREE.MeshStandardMaterial({ color: 0x1d4ed8, emissive: 0x0f172a })));
-  velArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 0.72 * sc, 0x38bdf8, 0.2 * sc, 0.1 * sc);
-  satMesh.add(velArrow); scene.add(satMesh);
+  // 3. Detailed 3D Spacecraft + Downlink/Scan Beams
+  satMesh = buildOrbitSpacecraft(orbitEl.id === 'lunar-transfer' ? 3.2 : (deep ? 1.85 : 0.95));
+  scene.add(satMesh);
 
-  beamLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.92 }));
-  scanLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.95 }));
-  beamLine.visible = false; scanLine.visible = false; scene.add(beamLine, scanLine);
-  controls.maxDistance = 420; applyCameraPreset(cameraMode);
+  beamLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.95 })
+  );
+  beamHalo = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending })
+  );
+  scanLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.95 })
+  );
+  beamLine.visible = false; beamHalo.visible = false; scanLine.visible = false;
+  scene.add(beamLine, beamHalo, scanLine);
+
+  controls.maxDistance = 680;
+  startCameraTween(cameraMode, true);
 }
 
 function animate() {
@@ -130,88 +470,152 @@ function animate() {
   if (satMesh) {
     satMesh.position.copy(tmpSat);
     if (velArrow) velArrow.setDirection(tmpNext.sub(tmpSat).normalize());
-    if (cameraMode === 'chase') controls.target.lerp(tmpSat, 0.12);
-  }
-  if (colorAttr && orbitPts.length) {
-    const head = Math.floor(((prop.trueAnomalyDeg / 360) * (orbitPts.length - 1)));
-    for (let i = 0; i < orbitPts.length; i += 1) {
-      const distBack = (head - i + orbitPts.length) % orbitPts.length;
-      const wake = Math.max(0.18, 1 - distBack / (orbitPts.length * 0.55));
-      colorAttr.setXYZ(i, distBack < 14 ? 0.95 : 0.22 * wake, 0.75 * wake, 1.0 * wake);
-    }
-    colorAttr.needsUpdate = true;
+    if (thrusterGlow) thrusterGlow.material.opacity = 0.55 + 0.35 * Math.sin(sunElapsed * 11);
   }
 
-  if (simTime > 12 && simTime - lastAutoFlare > 24 && now > stormUntil) { stormUntil = now + 5500; lastAutoFlare = simTime; playWarning(); }
+  // Smooth camera preset tween or live chase follow
+  if (camTween.active && camera && controls) {
+    camTween.t = Math.min(1, camTween.t + realDt / camTween.dur);
+    const e = camTween.t < 0.5 ? 4 * camTween.t ** 3 : 1 - ((-2 * camTween.t + 2) ** 3) / 2;
+    camera.position.lerpVectors(camTween.fromPos, camTween.toPos, e);
+    controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, e);
+    if (camTween.t >= 1) camTween.active = false;
+  } else if (cameraMode === 'chase' && controls) {
+    controls.target.lerp(tmpSat, 0.12);
+  }
+
+  // Update vertex colors along both line core & additive ribbon
+  if (lineColorAttr && ribbonColorAttr && orbitPts.length) {
+    const head = Math.floor(((prop.trueAnomalyDeg / 360) * (orbitPts.length - 1)));
+    const len = orbitPts.length;
+    for (let i = 0; i < len; i += 1) {
+      const distBack = (head - i + len) % len;
+      const wake = Math.max(0.14, 1 - distBack / (len * 0.55));
+      const hot = distBack < 14;
+      const r = hot ? 0.98 : 0.16 * wake, g = hot ? 0.85 : 0.72 * wake, b = hot ? 0.55 : 1.0 * wake;
+      lineColorAttr.setXYZ(i, r, g, b);
+      const rb = hot ? 0.85 : Math.max(0.04, wake * 0.45);
+      ribbonColorAttr.setXYZ(i * 2, r * rb, g * rb, b * rb);
+      ribbonColorAttr.setXYZ(i * 2 + 1, r * rb, g * rb, b * rb);
+    }
+    lineColorAttr.needsUpdate = true;
+    ribbonColorAttr.needsUpdate = true;
+  }
+
+  if (simTime > 12 && simTime - lastAutoFlare > 24 && now > stormUntil) {
+    stormUntil = now + 5500; lastAutoFlare = simTime; playWarning();
+  }
   const stormActive = now < stormUntil, safeModeActive = now < safeModeUntil;
   hazardNow = prop.inEclipse || stormActive;
   const pwrRate = safeModeActive ? 0.35 : (hazardNow ? -0.45 : Math.max(0.15, (evalRef.metrics.powerMargin + 25) * 0.012));
-  if (simDt > 0) { batterySoc = Math.max(5, Math.min(100, batterySoc + pwrRate * (simDt / 60))); bufferGb = Math.min(32, bufferGb + (simDt / 86400) * 1.6); }
+  if (simDt > 0) {
+    batterySoc = Math.max(5, Math.min(100, batterySoc + pwrRate * (simDt / 60)));
+    bufferGb = Math.min(32, bufferGb + (simDt / 86400) * 1.6);
+  }
 
   inLineOfSight = false; activeStationName = 'None';
   const activeGs = gsNodes.find((g) => g.active) || gsNodes[0];
   if (activeGs && beamLine) {
-    activeGs.mesh.getWorldPosition(tmpGs); tmpNorm.copy(activeGs.localNorm).applyQuaternion(earthGroup.quaternion);
-    const losDot = tmpSat.clone().sub(tmpGs).normalize().dot(tmpNorm), rangeOk = orbitEl.deepSpace ? true : tmpSat.distanceTo(tmpGs) < 5.5;
-    if (activeGs.cone) activeGs.cone.material.opacity = 0.16 + 0.14 * Math.abs(Math.sin(now * 0.004));
+    activeGs.mesh.getWorldPosition(tmpGs);
+    tmpNorm.copy(activeGs.localNorm).applyQuaternion(earthGroup.quaternion);
+    const losDot = tmpSat.clone().sub(tmpGs).normalize().dot(tmpNorm);
+    const rangeOk = orbitEl.deepSpace ? true : tmpSat.distanceTo(tmpGs) < 5.6;
+    if (activeGs.cone) activeGs.cone.material.opacity = 0.16 + 0.15 * Math.abs(Math.sin(now * 0.004));
+    if (gsPulseRing) {
+      const p = 1 + 0.8 * ((now * 0.0012) % 1);
+      gsPulseRing.scale.setScalar(p);
+      gsPulseRing.material.opacity = Math.max(0.05, 0.85 * (2 - p));
+    }
     if (losDot > 0.08 && rangeOk && !stormActive) {
-      inLineOfSight = true; activeStationName = activeGs.name; beamLine.visible = true;
-      beamLine.material.color.setHex(now < beamBoostUntil ? 0x34d399 : 0x22d3ee); beamLine.geometry.setFromPoints([tmpSat, tmpGs]);
-      if (simDt > 0 && bufferGb > 0) { const xfer = Math.min(bufferGb, (simDt / 60) * 0.08); bufferGb -= xfer; downlinkedGb += xfer; }
-    } else beamLine.visible = false;
+      inLineOfSight = true; activeStationName = activeGs.name;
+      beamLine.visible = true; beamHalo.visible = true;
+      beamLine.material.color.setHex(now < beamBoostUntil ? 0x34d399 : 0x22d3ee);
+      beamLine.geometry.setFromPoints([tmpSat, tmpGs]);
+      beamHalo.geometry.setFromPoints([tmpSat, tmpGs]);
+      if (simDt > 0 && bufferGb > 0) {
+        const xfer = Math.min(bufferGb, (simDt / 60) * 0.08);
+        bufferGb -= xfer; downlinkedGb += xfer;
+      }
+    } else {
+      beamLine.visible = false; beamHalo.visible = false;
+    }
   }
-  if (scanLine) { scanLine.visible = now < scanUntil && Boolean(scanTarget); if (scanLine.visible) scanLine.geometry.setFromPoints([tmpSat, scanTarget.mesh.position]); }
+  if (scanLine) {
+    scanLine.visible = now < scanUntil && Boolean(scanTarget);
+    if (scanLine.visible) scanLine.geometry.setFromPoints([tmpSat, scanTarget.mesh.position]);
+  }
 
   if (telemetryCb && now - lastHudMs > 120) {
     lastHudMs = now;
     const nearest = spaceEnv?.findNearestNea(tmpSat);
     telemetryCb({
-      altitudeKm: Math.round(prop.altitudeKm), speedKms: Number(prop.speedKms.toFixed(2)), inEclipse: prop.inEclipse, stormActive, safeModeActive, inLineOfSight,
-      batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)), linkedStation: activeStationName,
-      missionScore, downlinkCount, flareMitigated, asteroidsScanned, nearestNeaId: nearest?.nea.id || '', nearestNeaDist: nearest ? Number(nearest.dist.toFixed(1)) : 99,
+      altitudeKm: Math.round(prop.altitudeKm), speedKms: Number(prop.speedKms.toFixed(2)),
+      inEclipse: prop.inEclipse, stormActive, safeModeActive, inLineOfSight,
+      batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
+      linkedStation: activeStationName, missionScore, downlinkCount, flareMitigated, asteroidsScanned,
+      nearestNeaId: nearest?.nea.id || '', nearestNeaDist: nearest ? Number(nearest.dist.toFixed(1)) : 99,
       timeWarp, cameraMode, fitDist: Number(fitDist.toFixed(1))
     });
   }
-  controls.update(); renderer.render(scene, camera);
+  controls.update();
+  renderer.render(scene, camera);
 }
 
 export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); };
-export const setOrbitCameraMode = (m) => { cameraMode = m; applyCameraPreset(m); };
+export const setOrbitCameraMode = (m) => { cameraMode = m; startCameraTween(m, false); };
 export const triggerOrbitStorm = () => { stormUntil = performance.now() + 6000; playWarning(); };
 export function transmitScience() {
   if (!inLineOfSight) return { ok: false, points: 0, station: 'None' };
-  const xfer = Math.max(0.15, Math.min(bufferGb, 1.4)); bufferGb = Math.max(0, bufferGb - xfer); downlinkedGb += xfer;
-  downlinkCount += 1; missionScore += 50; beamBoostUntil = performance.now() + 900; playDownlinkPing();
-  return { ok: true, points: 50, station: activeStationName };
+  const xfer = Math.max(0.15, Math.min(bufferGb, 1.4));
+  bufferGb = Math.max(0, bufferGb - xfer); downlinkedGb += xfer;
+  downlinkCount += 1; missionScore += 50; beamBoostUntil = performance.now() + 900;
+  playDownlinkPing(); return { ok: true, points: 50, station: activeStationName };
 }
 export function activateSafeMode() {
   safeModeUntil = performance.now() + 6500; batterySoc = Math.min(100, batterySoc + 8);
-  const pts = hazardNow ? 75 : 25; missionScore += pts; if (hazardNow) flareMitigated += 1;
+  const pts = hazardNow ? 75 : 25; missionScore += pts;
+  if (hazardNow) flareMitigated += 1;
   playSafeMode(); return { ok: true, points: pts, hazard: hazardNow };
 }
 export function scanAsteroid() {
   if (!spaceEnv) return { ok: false, points: 0 };
   const { nea } = spaceEnv.findNearestNea(tmpSat);
-  scanTarget = nea; scanUntil = performance.now() + 1200; asteroidsScanned += 1; missionScore += 60;
+  scanTarget = nea; scanUntil = performance.now() + 1200;
+  asteroidsScanned += 1; missionScore += 60;
   playDownlinkPing(); return { ok: true, points: 60, id: nea.id };
 }
 
 export function mountOrbit(container, missionState, evaluation, onTelemetry) {
-  unmountOrbit(); stateRef = missionState; evalRef = evaluation; telemetryCb = onTelemetry;
-  simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0; stormUntil = 0; safeModeUntil = 0;
-  beamBoostUntil = 0; scanUntil = 0; scanTarget = null; missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0; lastAutoFlare = 14; lastHudMs = 0;
+  unmountOrbit();
+  stateRef = missionState; evalRef = evaluation; telemetryCb = onTelemetry;
+  simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
+  stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
+  missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0; lastAutoFlare = 14; lastHudMs = 0;
+  camTween.active = false;
+
   const w = Math.max(container.clientWidth, 320), h = Math.max(container.clientHeight, 320);
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setSize(w, h, false); renderer.outputColorSpace = THREE.SRGBColorSpace; container.appendChild(renderer.domElement);
-  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(46, w / h, 0.1, 2600);
-  controls = new OrbitControls(camera, renderer.domElement); Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, minDistance: 2.5 });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(46, w / h, 0.1, 3600);
+  controls = new OrbitControls(camera, renderer.domElement);
+  Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, minDistance: 2.5 });
+  controls.addEventListener('start', () => { camTween.active = false; });
+
   buildWorld(stateRef, evalRef);
   resizeObserver = new ResizeObserver(() => {
     if (!renderer || !camera || !container) return;
     const nw = Math.max(container.clientWidth, 1), nh = Math.max(container.clientHeight, 1);
-    camera.aspect = nw / nh; camera.updateProjectionMatrix(); renderer.setSize(nw, nh, false);
+    camera.aspect = nw / nh; camera.updateProjectionMatrix();
+    renderer.setSize(nw, nh, false);
   });
-  resizeObserver.observe(container); clock.start(); animate();
+  resizeObserver.observe(container);
+  clock.start();
+  animate();
 }
 
 export function unmountOrbit() {
@@ -220,9 +624,20 @@ export function unmountOrbit() {
   if (controls) { controls.dispose(); controls = null; }
   spaceEnv?.dispose(); spaceEnv = null;
   if (scene) {
-    scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); if (m.emissiveMap) m.emissiveMap.dispose(); m.dispose(); }); });
+    scene.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+          ['map', 'emissiveMap', 'roughnessMap', 'bumpMap'].forEach((k) => { if (m[k]) m[k].dispose(); });
+          if (m.uniforms?.uNightMap?.value) m.uniforms.uNightMap.value.dispose();
+          m.dispose();
+        });
+      }
+    });
     scene = null;
   }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
-  earthGroup = cloudMesh = satMesh = beamLine = scanLine = orbitLine = velArrow = colorAttr = null; gsNodes = []; orbitPts = [];
+  earthGroup = cloudMesh = nightMat = atmoMat = satMesh = thrusterGlow = beamLine = beamHalo = scanLine = null;
+  orbitLine = ribbonMesh = velArrow = lineColorAttr = ribbonColorAttr = gsPulseRing = null;
+  gsNodes = []; orbitPts = [];
 }

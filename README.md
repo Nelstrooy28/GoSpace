@@ -15,7 +15,7 @@
 3. **Playable 3D Orbit Simulator (`js/sceneOrbit.js` & `js/missionVizPropagator.js`)**
    - Propagates your orbit from 2D Keplerian ellipse elements (`a`, `e`, `i`, RAAN, argument of perigee, true anomaly) into 3D space around a procedural Earth (plus Moon for HEO/Lunar trajectories).
    - Tracks altitude, orbital velocity, Earth Eclipse Shadow vs. sunlit charging, battery state of charge, and line-of-sight RF/optical links to **Arctic Polar Station**, **Global Near-Space Network**, and **Deep-Space Dish Array**.
-   - Interactive gameplay: press `[SPACE]` over a ground station radar cone to transmit science (`+50 pts`) and press `[E]` during eclipses or solar flares to cycle power safe mode (`+75 pts`).
+   - Interactive gameplay: press `[SPACE]` over a ground station radar cone to transmit science (`+50 pts`), press `[E]` to scan near-Earth asteroids (`+60 pts`), and press `[Q]` during eclipses or solar flares to cycle power safe mode (`+75 pts`).
 
 4. **Flight Readiness Debrief (`js/ui.js`)**
    - Generates a **Flight Readiness Debrief** (`★`–`★★★` rating, rank, and 6 telemetry stats) and unlocks a **Real-World Spacecraft Match** (*WildFireSat*, *PACE Climate Orbiter*, or *Lunar Trailblazer & Webb Space Observatory*).
@@ -23,12 +23,12 @@
 
 ## Space Engineering References
 
-- [Design and Develop Science Missions](https://www.nasa.gov/wp-content/uploads/2025/04/250323-design-and-develop-science-mission.pdf?emrc=a454cf)
-- [Mission Design Telemetry & Lab Framework](https://etd.gsfc.nasa.gov/capabilities/integrated-design-center/mission-design-lab/)
-- [Concept Maturity (CML 1–4) Framework](https://dataverse.jpl.nasa.gov/dataset.xhtml?persistentId=hdl:2014/44299)
-- [Keplerian 3D Orbit Trajectory Spec](https://nasa.github.io/mission-viz/)
-- [Space Observatory Wavelength Rules](https://science.nasa.gov/mission/webb/game-build-it-yourself/)
-- [CubeSat 101 Systems Guide](https://www3.nasa.gov/sites/default/files/atoms/files/nasa_csli_cubesat_101_508.pdf)
+- [Spacecraft Systems Engineering Guide](https://en.wikipedia.org/wiki/Spacecraft_design)
+- [Mission Design Telemetry & Lab Framework](https://en.wikipedia.org/wiki/Concurrent_engineering)
+- [Concept Maturity & Readiness Scale (1–4)](https://en.wikipedia.org/wiki/Technology_readiness_level)
+- [Keplerian 3D Orbit Trajectory Spec](https://en.wikipedia.org/wiki/Keplerian_elements)
+- [Space Observatory Wavelength Rules](https://en.wikipedia.org/wiki/Infrared_astronomy)
+- [CubeSat Systems & Standards](https://www.cubesat.org/cubesatinfo)
 - [Arctic & Earth Observation Activities](https://www.asc-csa.gc.ca/eng/youth-educators/digital-games-and-activities.asp)
 
 ## Run Locally & GitHub Pages Deployment
