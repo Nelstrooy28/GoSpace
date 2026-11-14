@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { CATALOG } from './catalog.js';
 import { fbm2 } from './solarSystem.js';
 
 const find = (arr, id) => arr.find((x) => x.id === id) || null;
-let renderer = null, scene = null, camera = null, controls = null, resizeObserver = null;
+let renderer = null, scene = null, camera = null, controls = null, resizeObserver = null, envRT = null;
 let rafId = 0, craftRoot = null, autoRotate = true, exploded = false, meshCount = 0;
 let pulseMeshes = [], animParts = [], subGroups = {}, popTarget = null, popProg = 1, camGoal = null;
 const clock = new THREE.Clock();
 
-const texCache = { kaptonBump: null, solarMap: null, floorMap: null };
+const texCache = { kaptonBump: null, solarMap: null, floorMap: null, bgMap: null };
 
 function getCleanroomTextures() {
   if (!texCache.kaptonBump) {
@@ -76,6 +77,19 @@ function getCleanroomTextures() {
     texCache.floorMap.colorSpace = THREE.SRGBColorSpace;
   }
 
+  if (!texCache.bgMap) {
+    const bc = document.createElement('canvas');
+    bc.width = 512; bc.height = 512;
+    const bctx = bc.getContext('2d');
+    const bg = bctx.createRadialGradient(256, 230, 30, 256, 256, 360);
+    bg.addColorStop(0, '#1a2740');
+    bg.addColorStop(0.55, '#0f182a');
+    bg.addColorStop(1, '#090e18');
+    bctx.fillStyle = bg;
+    bctx.fillRect(0, 0, 512, 512);
+    texCache.bgMap = new THREE.CanvasTexture(bc);
+    texCache.bgMap.colorSpace = THREE.SRGBColorSpace;
+  }
   return texCache;
 }
 
@@ -96,6 +110,7 @@ function disposeGroup(group) {
 function addPart(parent, geo, mat, pos = [0, 0, 0], rot = [0, 0, 0]) {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(...pos); m.rotation.set(...rot);
+  m.castShadow = true; m.receiveShadow = true;
   parent.add(m); meshCount += 1;
   return m;
 }
@@ -108,18 +123,19 @@ function regAnim(obj, basePos, offset) {
 
 function makeMats() {
   const tex = getCleanroomTextures();
-  const std = (color, metalness, roughness, extra = {}) => new THREE.MeshStandardMaterial({ color, metalness, roughness, ...extra });
+  const std = (color, metalness, roughness, extra = {}) =>
+    new THREE.MeshStandardMaterial({ color, metalness, roughness, envMapIntensity: 1.05, ...extra });
   return {
-    gold: std(0xd99b1e, 0.56, 0.46, { bumpMap: tex.kaptonBump, bumpScale: 0.022 }),
-    rail: std(0x1e2533, 0.45, 0.54),
-    alloy: std(0x94a3b8, 0.58, 0.45),
-    bronze: std(0xb45309, 0.58, 0.46),
-    white: std(0xdbe3ee, 0.14, 0.62),
-    solar: std(0x1e40af, 0.3, 0.48, { map: tex.solarMap, emissive: 0x091d4a, emissiveIntensity: 0.08 }),
-    lens: std(0x0284c7, 0.55, 0.28, { emissive: 0x0369a1, emissiveIntensity: 0.16 }),
-    hdrCyan: std(0x38bdf8, 0.35, 0.45),
-    shield: std(0xb6c2d1, 0.52, 0.48, { side: THREE.DoubleSide }),
-    dish: std(0xdbe3ee, 0.32, 0.52, { side: THREE.DoubleSide }),
+    gold: std(0xebb328, 0.85, 0.32, { bumpMap: tex.kaptonBump, bumpScale: 0.024, envMapIntensity: 1.2 }),
+    rail: std(0x283244, 0.65, 0.42, { envMapIntensity: 1.0 }),
+    alloy: std(0xa8b5c7, 0.78, 0.32, { envMapIntensity: 1.15 }),
+    bronze: std(0xc96a1b, 0.76, 0.34, { envMapIntensity: 1.1 }),
+    white: std(0xe2e8f0, 0.16, 0.48, { envMapIntensity: 0.9 }),
+    solar: std(0x1d4ed8, 0.5, 0.25, { map: tex.solarMap, emissive: 0x091d4a, emissiveIntensity: 0.08, envMapIntensity: 1.15 }),
+    lens: std(0x0284c7, 0.7, 0.08, { emissive: 0x0369a1, emissiveIntensity: 0.16, envMapIntensity: 1.2 }),
+    hdrCyan: std(0x38bdf8, 0.55, 0.32, { envMapIntensity: 1.1 }),
+    shield: std(0xcbd5e1, 0.74, 0.34, { side: THREE.DoubleSide, envMapIntensity: 1.1 }),
+    dish: std(0xe2e8f0, 0.42, 0.38, { side: THREE.DoubleSide, envMapIntensity: 1.0 }),
     warn: new THREE.MeshStandardMaterial({ color: 0xef4444, wireframe: true, transparent: true, opacity: 0.85 })
   };
 }
@@ -327,50 +343,94 @@ export function mountCleanroom(container, missionState) {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(w, h, false);
-  renderer.setClearColor(0x040914, 1);
+  renderer.setClearColor(0x090e18, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.95;
+  renderer.toneMappingExposure = 1.18;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
+  const tex = getCleanroomTextures();
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x040914, 0.028);
+  scene.background = tex.bgMap;
+  scene.fog = new THREE.FogExp2(0x090e18, 0.014);
+
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+  scene.environment = envRT.texture;
+  pmrem.dispose();
+
   camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 100);
   controls = new OrbitControls(camera, renderer.domElement);
-  Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, minDistance: 2.2, maxDistance: 12, maxPolarAngle: Math.PI * 0.48 });
+  Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, minDistance: 2.2, maxDistance: 12, maxPolarAngle: Math.PI * 0.85 });
   controls.addEventListener('start', () => { camGoal = null; });
   resetCamera();
 
-  // Balanced 3-point studio lighting (soft hemisphere fill + key directional + gentle cool rim)
-  scene.add(new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.85));
-  [[0xffffff, 1.55, 6, 8, 5], [0x7dd3fc, 0.78, -6, 4, -5], [0xfef3c7, 0.36, 2, -3, 4]].forEach(([c, i, x, y, z]) => {
-    const l = new THREE.DirectionalLight(c, i); l.position.set(x, y, z); scene.add(l);
-  });
+  // 4-point cleanroom studio lighting + hemisphere ambient wrap + soft shadows
+  scene.add(new THREE.HemisphereLight(0xddeeff, 0x1e293b, 0.75));
+  const keyLight = new THREE.DirectionalLight(0xfff6e8, 2.4);
+  keyLight.position.set(4.5, 7.5, 5.5);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(2048, 2048);
+  keyLight.shadow.camera.near = 1;
+  keyLight.shadow.camera.far = 22;
+  keyLight.shadow.camera.left = -4.5;
+  keyLight.shadow.camera.right = 4.5;
+  keyLight.shadow.camera.top = 4.5;
+  keyLight.shadow.camera.bottom = -4.5;
+  keyLight.shadow.bias = -0.0005;
+  scene.add(keyLight);
 
-  // Clean matte dark-slate floor grid & satin pedestal turntable
-  const tex = getCleanroomTextures();
+  const fillLight = new THREE.DirectionalLight(0x9ecbff, 1.3);
+  fillLight.position.set(-6, 3.5, 4);
+  scene.add(fillLight);
+
+  const rimLight = new THREE.DirectionalLight(0x66d9ff, 1.6);
+  rimLight.position.set(-2, 5, -6);
+  scene.add(rimLight);
+
+  const nadirLight = new THREE.PointLight(0xdbeeff, 1.2, 12);
+  nadirLight.position.set(0, -1.35, 0);
+  scene.add(nadirLight);
+
+  // Cleanroom bay ribs & matte dark-slate floor + illuminated turntable pedestal
+  const ribMat = new THREE.MeshStandardMaterial({ color: 0x162238, metalness: 0.55, roughness: 0.5, envMapIntensity: 0.7 });
+  for (let i = 0; i < 4; i++) {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(8.85, 0.04, 8, 64, Math.PI), ribMat);
+    rib.position.y = -1.95;
+    rib.rotation.y = (i * Math.PI) / 4;
+    scene.add(rib);
+  }
+
   const floor = new THREE.Mesh(
     new THREE.CircleGeometry(9, 64),
-    new THREE.MeshStandardMaterial({ map: tex.floorMap, roughness: 0.88, metalness: 0.1 })
+    new THREE.MeshStandardMaterial({ map: tex.floorMap, roughness: 0.82, metalness: 0.15, envMapIntensity: 0.6 })
   );
-  floor.rotation.x = -Math.PI / 2; floor.position.y = -1.67;
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -1.95;
+  floor.receiveShadow = true;
   scene.add(floor);
 
-  const grid = new THREE.GridHelper(14, 28, 0x1e3a5f, 0x0f1d35);
-  grid.position.y = -1.655;
+  const grid = new THREE.GridHelper(14, 28, 0x284b7a, 0x132542);
+  grid.position.y = -1.938;
   scene.add(grid);
 
-  const ped = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.55, 1.78, 0.14, 48),
-    new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.42, roughness: 0.58 })
-  );
-  ped.position.y = -1.58; scene.add(ped);
+  const pedMat = new THREE.MeshStandardMaterial({ color: 0x131d31, metalness: 0.55, roughness: 0.42, envMapIntensity: 0.9 });
+  const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.72, 0.12, 48, 1, true), pedMat);
+  ped.position.y = -1.87;
+  ped.receiveShadow = true;
+  scene.add(ped);
+
+  const pedTop = new THREE.Mesh(new THREE.CircleGeometry(1.45, 48), pedMat);
+  pedTop.rotation.x = -Math.PI / 2; pedTop.position.y = -1.81;
+  pedTop.receiveShadow = true;
+  scene.add(pedTop);
 
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(1.64, 0.025, 12, 64),
-    new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.48, metalness: 0.35 })
+    new THREE.TorusGeometry(1.52, 0.026, 12, 64),
+    new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0ea5e9, emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.45 })
   );
-  ring.rotation.x = Math.PI / 2; ring.position.y = -1.51; scene.add(ring);
+  ring.rotation.x = Math.PI / 2; ring.position.y = -1.805; scene.add(ring);
 
   craftRoot = new THREE.Group(); scene.add(craftRoot); updateSpacecraft(missionState);
   resizeObserver = new ResizeObserver(() => {
@@ -387,6 +447,7 @@ export function unmountCleanroom() {
   if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }
+  if (envRT) { envRT.dispose(); envRT = null; }
   if (scene) { disposeGroup(scene); scene = null; }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
   craftRoot = null; pulseMeshes = []; animParts = []; subGroups = {}; popTarget = null; camGoal = null; meshCount = 0;
