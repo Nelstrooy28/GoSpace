@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CATALOG } from './catalog.js';
-import { createBloomComposer, fbm2, hash2 } from './solarSystem.js';
+import { fbm2 } from './solarSystem.js';
 
 const find = (arr, id) => arr.find((x) => x.id === id) || null;
-let renderer = null, bloomComp = null, scene = null, camera = null, controls = null, resizeObserver = null;
-let rafId = 0, craftRoot = null, motesPoints = null, autoRotate = true, exploded = false, meshCount = 0;
+let renderer = null, scene = null, camera = null, controls = null, resizeObserver = null;
+let rafId = 0, craftRoot = null, autoRotate = true, exploded = false, meshCount = 0;
 let pulseMeshes = [], animParts = [], subGroups = {}, popTarget = null, popProg = 1, camGoal = null;
 const clock = new THREE.Clock();
 
-const texCache = { kaptonBump: null, solarMap: null, floorMap: null, beamTex: null };
+const texCache = { kaptonBump: null, solarMap: null, floorMap: null };
 
 function getCleanroomTextures() {
   if (!texCache.kaptonBump) {
@@ -76,13 +76,6 @@ function getCleanroomTextures() {
     texCache.floorMap.colorSpace = THREE.SRGBColorSpace;
   }
 
-  if (!texCache.beamTex) {
-    const bc = document.createElement('canvas'); bc.width = 32; bc.height = 128;
-    const bCtx = bc.getContext('2d'), bg = bCtx.createLinearGradient(0, 0, 0, 128);
-    bg.addColorStop(0, 'rgba(56,189,248,0.22)'); bg.addColorStop(0.6, 'rgba(56,189,248,0.07)'); bg.addColorStop(1, 'rgba(56,189,248,0)');
-    bCtx.fillStyle = bg; bCtx.fillRect(0, 0, 32, 128);
-    texCache.beamTex = new THREE.CanvasTexture(bc);
-  }
   return texCache;
 }
 
@@ -117,16 +110,16 @@ function makeMats() {
   const tex = getCleanroomTextures();
   const std = (color, metalness, roughness, extra = {}) => new THREE.MeshStandardMaterial({ color, metalness, roughness, ...extra });
   return {
-    gold: std(0xeab308, 0.88, 0.26, { bumpMap: tex.kaptonBump, bumpScale: 0.032 }),
-    rail: std(0x161b24, 0.78, 0.32),
-    alloy: std(0x94a3b8, 0.86, 0.24),
-    bronze: std(0xb45309, 0.88, 0.28),
-    white: std(0xe2e8f0, 0.22, 0.45),
-    solar: std(0x1e40af, 0.55, 0.2, { map: tex.solarMap, emissive: 0x091d4a, emissiveIntensity: 0.42 }),
-    lens: std(0x38bdf8, 0.92, 0.08, { emissive: 0x0ea5e9, emissiveIntensity: 1.15 }),
-    hdrCyan: new THREE.MeshBasicMaterial({ color: 0x7dd3fc }),
-    shield: std(0xc0cad8, 0.9, 0.22, { side: THREE.DoubleSide }),
-    dish: std(0xe2e8f0, 0.55, 0.3, { side: THREE.DoubleSide }),
+    gold: std(0xd99b1e, 0.56, 0.46, { bumpMap: tex.kaptonBump, bumpScale: 0.022 }),
+    rail: std(0x1e2533, 0.45, 0.54),
+    alloy: std(0x94a3b8, 0.58, 0.45),
+    bronze: std(0xb45309, 0.58, 0.46),
+    white: std(0xdbe3ee, 0.14, 0.62),
+    solar: std(0x1e40af, 0.3, 0.48, { map: tex.solarMap, emissive: 0x091d4a, emissiveIntensity: 0.08 }),
+    lens: std(0x0284c7, 0.55, 0.28, { emissive: 0x0369a1, emissiveIntensity: 0.16 }),
+    hdrCyan: std(0x38bdf8, 0.35, 0.45),
+    shield: std(0xb6c2d1, 0.52, 0.48, { side: THREE.DoubleSide }),
+    dish: std(0xdbe3ee, 0.32, 0.52, { side: THREE.DoubleSide }),
     warn: new THREE.MeshStandardMaterial({ color: 0xef4444, wireframe: true, transparent: true, opacity: 0.85 })
   };
 }
@@ -305,15 +298,6 @@ function animate() {
   rafId = requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   if (craftRoot) { if (autoRotate) craftRoot.rotation.y += dt * 0.3; craftRoot.position.y = Math.sin(t * 1.4) * 0.04; }
-  if (motesPoints) {
-    const pos = motesPoints.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i += 1) {
-      let y = pos.getY(i) + dt * (0.14 + (i % 5) * 0.03);
-      if (y > 3.6) y = -1.4;
-      pos.setY(i, y);
-    }
-    pos.needsUpdate = true;
-  }
   if (popTarget && popProg < 1) {
     popProg = Math.min(1, popProg + dt * 4.2);
     popTarget.scale.setScalar(popProg >= 1 ? 1 : 0.2 + 0.8 * popProg + Math.sin(popProg * Math.PI) * 0.1);
@@ -326,7 +310,7 @@ function animate() {
   animParts.forEach((p) => p.obj.position.lerp(exploded ? p.exp : p.base, Math.min(1, dt * 7)));
   pulseMeshes.forEach((m) => { m.material.opacity = 0.4 + 0.45 * Math.abs(Math.sin(t * 4)); });
   controls.update();
-  bloomComp ? bloomComp.composer.render() : renderer.render(scene, camera);
+  renderer.render(scene, camera);
 }
 
 export const setAutoRotate = (v) => { autoRotate = Boolean(v); };
@@ -340,68 +324,53 @@ export function resetCamera() {
 export function mountCleanroom(container, missionState) {
   unmountCleanroom();
   const w = Math.max(container.clientWidth, 320), h = Math.max(container.clientHeight, 320);
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(w, h, false);
   renderer.setClearColor(0x040914, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 0.95;
   container.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x040914, 0.035);
+  scene.fog = new THREE.FogExp2(0x040914, 0.028);
   camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 100);
   controls = new OrbitControls(camera, renderer.domElement);
   Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, minDistance: 2.2, maxDistance: 12, maxPolarAngle: Math.PI * 0.48 });
   controls.addEventListener('start', () => { camGoal = null; });
   resetCamera();
 
-  bloomComp = createBloomComposer(renderer, scene, camera, w, h, { strength: 0.54, radius: 0.42, threshold: 0.78 });
-
-  scene.add(new THREE.AmbientLight(0xdbeafe, 0.72));
-  [[0xffffff, 2.5, 6, 8, 5], [0x38bdf8, 1.5, -6, 4, -5], [0xfbbf24, 0.7, 2, -3, 4]].forEach(([c, i, x, y, z]) => {
+  // Balanced 3-point studio lighting (soft hemisphere fill + key directional + gentle cool rim)
+  scene.add(new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.85));
+  [[0xffffff, 1.55, 6, 8, 5], [0x7dd3fc, 0.78, -6, 4, -5], [0xfef3c7, 0.36, 2, -3, 4]].forEach(([c, i, x, y, z]) => {
     const l = new THREE.DirectionalLight(c, i); l.position.set(x, y, z); scene.add(l);
   });
 
-  // Reflective dark epoxy cleanroom floor, turntable & overhead truss spotlights
+  // Clean matte dark-slate floor grid & satin pedestal turntable
   const tex = getCleanroomTextures();
   const floor = new THREE.Mesh(
     new THREE.CircleGeometry(9, 64),
-    new THREE.MeshStandardMaterial({ map: tex.floorMap, roughness: 0.24, metalness: 0.65 })
+    new THREE.MeshStandardMaterial({ map: tex.floorMap, roughness: 0.88, metalness: 0.1 })
   );
-  floor.rotation.x = -Math.PI / 2; floor.position.y = -1.66;
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -1.67;
   scene.add(floor);
 
-  const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.78, 0.14, 48), new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.28 }));
+  const grid = new THREE.GridHelper(14, 28, 0x1e3a5f, 0x0f1d35);
+  grid.position.y = -1.655;
+  scene.add(grid);
+
+  const ped = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.55, 1.78, 0.14, 48),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.42, roughness: 0.58 })
+  );
   ped.position.y = -1.58; scene.add(ped);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.64, 0.028, 12, 64), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.64, 0.025, 12, 64),
+    new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.48, metalness: 0.35 })
+  );
   ring.rotation.x = Math.PI / 2; ring.position.y = -1.51; scene.add(ring);
-
-  const truss = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.06, 8, 48), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.35 }));
-  truss.rotation.x = Math.PI / 2; truss.position.y = 3.7; scene.add(truss);
-  [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3].forEach((a) => {
-    const beam = new THREE.Mesh(
-      new THREE.ConeGeometry(2.1, 5.1, 24, 1, true),
-      new THREE.MeshBasicMaterial({ map: tex.beamTex, transparent: true, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
-    );
-    beam.position.set(Math.cos(a) * 1.4, 1.15, Math.sin(a) * 1.4);
-    beam.rotation.z = Math.cos(a) * 0.26;
-    beam.rotation.x = -Math.sin(a) * 0.26;
-    scene.add(beam);
-  });
-
-  // Floating cleanroom dust motes
-  const mPos = new Float32Array(160 * 3);
-  for (let i = 0; i < 160; i += 1) {
-    mPos[i * 3] = (hash2(i, 1) - 0.5) * 6.5;
-    mPos[i * 3 + 1] = -1.4 + hash2(i, 2) * 5.0;
-    mPos[i * 3 + 2] = (hash2(i, 3) - 0.5) * 6.5;
-  }
-  const mGeo = new THREE.BufferGeometry();
-  mGeo.setAttribute('position', new THREE.BufferAttribute(mPos, 3));
-  motesPoints = new THREE.Points(mGeo, new THREE.PointsMaterial({ color: 0xbae6fd, size: 0.035, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
-  scene.add(motesPoints);
 
   craftRoot = new THREE.Group(); scene.add(craftRoot); updateSpacecraft(missionState);
   resizeObserver = new ResizeObserver(() => {
@@ -409,7 +378,6 @@ export function mountCleanroom(container, missionState) {
     const nw = Math.max(container.clientWidth, 1), nh = Math.max(container.clientHeight, 1);
     camera.aspect = nw / nh; camera.updateProjectionMatrix();
     renderer.setSize(nw, nh, false);
-    bloomComp?.setSize(nw, nh);
   });
   resizeObserver.observe(container); clock.start(); animate();
   return meshCount;
@@ -419,8 +387,7 @@ export function unmountCleanroom() {
   if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }
-  if (bloomComp) { bloomComp.dispose(); bloomComp = null; }
   if (scene) { disposeGroup(scene); scene = null; }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
-  craftRoot = motesPoints = null; pulseMeshes = []; animParts = []; subGroups = {}; popTarget = null; camGoal = null; meshCount = 0;
+  craftRoot = null; pulseMeshes = []; animParts = []; subGroups = {}; popTarget = null; camGoal = null; meshCount = 0;
 }
