@@ -7,7 +7,7 @@
 - **Git Workflow:** Commit with author `Nelstrooy28 <nelstrooygalat28@gmail.com>` and `git push origin main` at the end of every completed step.
 
 ## Modular High-Fidelity 3D Rule
-Keep logic cleanly separated across modular ES files (`index.html`, `styles.css`, `js/main.js`, `js/ui.js`, `js/catalog.js`, `js/missionVizPropagator.js`, `js/sfx.js`, `js/sceneCleanroom.js`, `js/sceneLaunch.js`, `js/sceneOrbit.js`, `js/solarSystem.js`), with NO artificial line-count cap. Prioritize rich 3D visual detail, custom GLSL shaders, high-resolution procedural `<canvas>` textures, particle effects, and complete code—never truncate or simplify visuals to save lines.
+Keep logic cleanly separated across modular ES files (`index.html`, `styles.css`, `js/main.js`, `js/ui.js`, `js/catalog.js`, `js/missionVizPropagator.js`, `js/sfx.js`, `js/spacecraftModel.js`, `js/sceneCleanroom.js`, `js/sceneLaunch.js`, `js/sceneOrbit.js`, `js/solarSystem.js`), with NO artificial line-count cap. Prioritize rich 3D visual detail, custom GLSL shaders, high-resolution procedural `<canvas>` textures, particle effects, and complete code—never truncate or simplify visuals to save lines.
 
 ## Dev Server & Verification Rules
 - Serve locally with `npx -y serve -l 3000 .` or `python -m http.server 3000` (free port 3000 first).

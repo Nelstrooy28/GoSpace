@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createBloomComposer, fbm2 } from './solarSystem.js';
+import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
 import { playCountdownBeep, playStageSep, startRocketRumbling, stopRocketRumbling } from './sfx.js';
 
 let renderer = null, bloomComp = null, scene = null, camera = null, controls = null, resizeObserver = null, rafId = 0;
-let rocketGroup = null, coreGroup = null, stage2Group = null, fairingL = null, fairingR = null;
-let sideBoosters = [], wingL = null, wingR = null, arms = [], clamps = [], mastBeacons = [];
+let rocketGroup = null, coreGroup = null, stage2Group = null, fairingL = null, fairingR = null, launchCraft = null;
+let sideBoosters = [], arms = [], clamps = [], mastBeacons = [];
 let flames = [], sideFlames = [], mvacPlume = null, engineBells = [], mvacBell = null, vaporCone = null;
 let puffs = [], sparks = [], oceanMat = null, skyMat = null, starMat = null, trenchLight = null, floodLight = null;
 let camMode = 'trench', rocketSpec = null, lastRocketY = 0;
@@ -225,28 +226,31 @@ function buildRocket(missionState) {
   );
   mvacPlume.visible = false;
 
-  // Player Configured Payload Spacecraft inside Fairing
-  const satY = s2Y + 1.24;
-  const goldMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.72, roughness: 0.32 });
-  const solarMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, metalness: 0.45, roughness: 0.28 });
-  const busSides = missionState.busId === 'flagship-bus' ? 6 : (missionState.busId === 'espa-smallsat' ? 8 : 4);
-  addMesh(stage2Group, new THREE.CylinderGeometry(0.15, 0.16, 0.34, busSides), goldMat, [0, satY, 0]);
-  addMesh(stage2Group, new THREE.CylinderGeometry(0.08, 0.09, 0.2, 16), silverMat, [0, satY + 0.24, 0]);
-  wingL = new THREE.Group(); wingL.position.set(-0.15, satY, 0);
-  addMesh(wingL, new THREE.BoxGeometry(0.55, 0.025, 0.2), solarMat, [-0.28, 0, 0]);
-  wingL.rotation.z = Math.PI / 2; stage2Group.add(wingL);
-  wingR = new THREE.Group(); wingR.position.set(0.15, satY, 0);
-  addMesh(wingR, new THREE.BoxGeometry(0.55, 0.025, 0.2), solarMat, [0.28, 0, 0]);
-  wingR.rotation.z = -Math.PI / 2; stage2Group.add(wingR);
+  // Player Configured Payload Spacecraft inside Fairing (identical to Hangar build, stowed at t=0)
+  const fairBaseY = s2Y + 0.94;
+  launchCraft = buildSpacecraftModel(missionState, { showWarnings: false, deployProgress: 0, envMapIntensity: 0.85, castShadow: false, receiveShadow: false });
+  launchCraft.group.updateMatrixWorld(true);
+  const craftBox = new THREE.Box3().setFromObject(launchCraft.group);
+  const craftSize = new THREE.Vector3(); craftBox.getSize(craftSize);
+  const maxHorizR = Math.max(craftSize.x, craftSize.z) * 0.5;
+  const fitScale = Math.min(0.26, (r * 0.98) / Math.max(maxHorizR, 0.45), 1.18 / Math.max(craftSize.y, 0.9));
+  launchCraft.group.scale.setScalar(fitScale);
+  launchCraft.group.position.set(0, fairBaseY + 0.1 - craftBox.min.y * fitScale, 0);
+  stage2Group.add(launchCraft.group);
+
+  // Payload Attach Fitting (PAF) + Dedicated Stage 2 Reveal Fill Lights
+  addMesh(stage2Group, new THREE.CylinderGeometry(Math.max(r * 0.45, fitScale * 0.65), r * 0.72, 0.14, 20), darkMat, [0, fairBaseY + 0.04, 0]);
+  const s2Key = new THREE.PointLight(0xfffbeb, 1.8, 8); s2Key.position.set(1.3, fairBaseY + 1.25, 1.5); stage2Group.add(s2Key);
+  const s2Fill = new THREE.PointLight(0x93c5fd, 1.1, 8); s2Fill.position.set(-1.3, fairBaseY + 0.9, -1.2); stage2Group.add(s2Fill);
 
   // Fairing Halves + Prandtl-Glauert Max-Q Vapor Cone
-  const fairBaseY = s2Y + 0.94;
+  const fairR = Math.max(r * 1.26, maxHorizR * fitScale + 0.05);
   fairingL = new THREE.Group(); fairingL.position.set(0, fairBaseY, 0);
-  addMesh(fairingL, new THREE.CylinderGeometry(r * 1.26, r * 1.06, 0.98, 18, 1, false, Math.PI / 2, Math.PI), fairingMat, [0, 0.49, 0]);
-  addMesh(fairingL, new THREE.ConeGeometry(r * 1.26, 0.68, 18, 1, false, Math.PI / 2, Math.PI), fairingMat, [0, 1.32, 0]);
+  addMesh(fairingL, new THREE.CylinderGeometry(fairR, r * 1.06, 1.04, 18, 1, false, Math.PI / 2, Math.PI), fairingMat, [0, 0.52, 0]);
+  addMesh(fairingL, new THREE.ConeGeometry(fairR, 0.72, 18, 1, false, Math.PI / 2, Math.PI), fairingMat, [0, 1.4, 0]);
   fairingR = new THREE.Group(); fairingR.position.set(0, fairBaseY, 0);
-  addMesh(fairingR, new THREE.CylinderGeometry(r * 1.26, r * 1.06, 0.98, 18, 1, false, -Math.PI / 2, Math.PI), fairingMat, [0, 0.49, 0]);
-  addMesh(fairingR, new THREE.ConeGeometry(r * 1.26, 0.68, 18, 1, false, -Math.PI / 2, Math.PI), fairingMat, [0, 1.32, 0]);
+  addMesh(fairingR, new THREE.CylinderGeometry(fairR, r * 1.06, 1.04, 18, 1, false, -Math.PI / 2, Math.PI), fairingMat, [0, 0.52, 0]);
+  addMesh(fairingR, new THREE.ConeGeometry(fairR, 0.72, 18, 1, false, -Math.PI / 2, Math.PI), fairingMat, [0, 1.4, 0]);
   stage2Group.add(fairingL, fairingR);
 
   vaporCone = addMesh(
@@ -384,7 +388,7 @@ function triggerSparkBurst(yWorld, count = 28, speed = 3.2) {
   });
 }
 
-function updateCameras(dt, ry, prevRy, shakeAmt) {
+function updateCameras(dt, ry, prevRy, shakeAmt, elapsed = 0) {
   const sx = (Math.random() - 0.5) * shakeAmt, sy = (Math.random() - 0.5) * shakeAmt;
   if (controls) controls.enabled = camMode === 'free';
   if (camMode === 'free' && controls) {
@@ -392,6 +396,13 @@ function updateCameras(dt, ry, prevRy, shakeAmt) {
     camera.position.y += dy;
     controls.target.y += dy;
     controls.update();
+    return;
+  }
+  if (ignitedCmd && elapsed >= 10.1 && rocketSpec) {
+    // Cut to Stage 2 Payload Reveal camera during Fairing Separation & Solar Deployment
+    const satFocusY = ry + rocketSpec.fairingBaseY + 0.58;
+    camera.position.set(2.1 + sx * 0.25, satFocusY + 0.72 + sy * 0.25, 2.45);
+    camera.lookAt(0, satFocusY, 0);
     return;
   }
   if (camMode === 'trench') {
@@ -498,8 +509,8 @@ function animate() {
     if (!fairingDone) { fairingDone = true; playStageSep(); }
     fairingL.position.x -= dt * 1.45; fairingL.rotation.z += dt * 0.62;
     fairingR.position.x += dt * 1.45; fairingR.rotation.z -= dt * 0.62;
-    wingL.rotation.z = THREE.MathUtils.lerp(wingL.rotation.z, 0, dt * 4.8);
-    wingR.rotation.z = THREE.MathUtils.lerp(wingR.rotation.z, 0, dt * 4.8);
+    const deployT = Math.min(1, (elapsed - 10.6) / 1.85);
+    launchCraft?.setDeployProgress(deployT);
   }
 
   sparks.forEach((sp) => {
@@ -543,7 +554,7 @@ function animate() {
 
   const maxQShake = elapsed >= 5.8 && elapsed <= 7.5 ? 0.065 : 0;
   const vib = ignitedCmd && elapsed >= 2.2 && elapsed < 9.4 ? Math.max(0.032, maxQShake) : 0;
-  updateCameras(dt, rocketGroup.position.y, prevRy, vib);
+  updateCameras(dt, rocketGroup.position.y, prevRy, vib, elapsed);
 
   const now = performance.now();
   if (updateCb && now - lastHudMs > 90) {
@@ -617,13 +628,14 @@ export function unmountLaunch() {
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }
   if (bloomComp) { bloomComp.dispose(); bloomComp = null; }
+  if (launchCraft) { launchCraft.dispose(); launchCraft = null; }
   if (scene) {
     const cached = new Set(Object.values(launchTexCache).filter((v) => v && typeof v === 'object'));
     scene.traverse((o) => {
       if (o.geometry) o.geometry.dispose();
       if (o.material) {
         (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-          ['map', 'bumpMap', 'emissiveMap'].forEach((k) => { if (m[k] && !cached.has(m[k])) m[k].dispose(); });
+          ['map', 'bumpMap', 'emissiveMap'].forEach((k) => { if (m[k] && !cached.has(m[k]) && !isCachedCraftTexture(m[k])) m[k].dispose(); });
           m.dispose();
         });
       }
@@ -631,7 +643,7 @@ export function unmountLaunch() {
     scene = null;
   }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
-  rocketGroup = coreGroup = stage2Group = fairingL = fairingR = wingL = wingR = null;
+  rocketGroup = coreGroup = stage2Group = fairingL = fairingR = launchCraft = null;
   mvacPlume = mvacBell = vaporCone = oceanMat = skyMat = starMat = trenchLight = floodLight = rocketSpec = null;
   sideBoosters = []; arms = []; clamps = []; mastBeacons = []; flames = []; sideFlames = [];
   engineBells = []; puffs = []; sparks = [];
