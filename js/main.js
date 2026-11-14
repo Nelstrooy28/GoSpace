@@ -14,7 +14,7 @@ const FOCUS_MAP = { busId: 'bus', instrumentIds: 'payload', solarId: 'solar', th
 let stage = 'hangar', titleOpen = true, activeSegment = 'user', activeSub = 'obj', lastEval = null;
 let missionState = (() => { const s = readJson(STORAGE_ACTIVE, null); return s?.scenarioId ? s : createInitialState('wildfiresat-l1', false); })();
 let activeScene = null, hudHidden = false, codexOpen = false;
-let autoRotate = true, exploded = false, launchCam = 'rocket', orbitWarp = 25, orbitCam = 'full';
+let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 25, orbitCam = 'full';
 let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0;
 
 function unmountAll() {
@@ -159,8 +159,7 @@ function init() {
     else if (e.target.closest('#vp-autorotate-btn')) { autoRotate = !autoRotate; setAutoRotate(autoRotate); renderStageHud(stage, missionState, lastEval, { autoRotate, exploded, meshCount: getMeshCount() }); }
     else if (e.target.closest('#vp-explode-btn')) { exploded = !exploded; setExploded(exploded); renderStageHud(stage, missionState, lastEval, { autoRotate, exploded, meshCount: getMeshCount() }); }
     else if (e.target.closest('#vp-reset-btn')) resetCamera();
-    else if (e.target.closest('#lch-pad-btn')) { launchCam = 'pad'; setLaunchCamera('pad'); renderStageHud(stage, missionState, lastEval, { launchCam }); }
-    else if (e.target.closest('#lch-rkt-btn')) { launchCam = 'rocket'; setLaunchCamera('rocket'); renderStageHud(stage, missionState, lastEval, { launchCam }); }
+    else if (e.target.closest('[data-lcam]')) { launchCam = e.target.closest('[data-lcam]').dataset.lcam; setLaunchCamera(launchCam); renderStageHud(stage, missionState, lastEval, { launchCam }); }
     else if (e.target.closest('#lch-skip-btn')) setStage('orbit');
     else if (e.target.closest('[data-cam]')) { orbitCam = e.target.closest('[data-cam]').dataset.cam; setOrbitCameraMode(orbitCam); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore }); }
     else if (e.target.closest('[data-warp]')) { orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp); setOrbitTimeWarp(orbitWarp); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore }); }

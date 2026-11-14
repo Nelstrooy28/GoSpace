@@ -121,8 +121,10 @@ export function renderStageHud(stage, state, ev, opts) {
         <div><div id="lch-callout" class="callout-tag">READY FOR IGNITION</div><div id="launch-telem" class="telem-mono">HOLD · 0 km · 0.00 km/s</div></div>
       </div>
       <div class="btn-row">
-        <button id="lch-pad-btn" class="btn-sci ${opts.launchCam === 'pad' ? 'is-on' : ''}" type="button">Pad Cam</button>
-        <button id="lch-rkt-btn" class="btn-sci ${opts.launchCam === 'rocket' ? 'is-on' : ''}" type="button">Rocket Cam</button>
+        <button class="btn-sci ${opts.launchCam === 'trench' ? 'is-on' : ''}" data-lcam="trench" type="button">🎥 Pad Trench</button>
+        <button class="btn-sci ${opts.launchCam === 'track' ? 'is-on' : ''}" data-lcam="track" type="button">🎥 Tower Track</button>
+        <button class="btn-sci ${opts.launchCam === 'hull' ? 'is-on' : ''}" data-lcam="hull" type="button">🎥 Rocket Hull Cam</button>
+        <button class="btn-sci ${opts.launchCam === 'free' ? 'is-on' : ''}" data-lcam="free" type="button">🎥 Free Cam</button>
         <button id="lch-skip-btn" class="btn-sci active" type="button">Skip &gt;&gt;</button>
       </div></div>`;
     actions.innerHTML = `<button id="lch-ignite-btn" class="action-prompt" type="button">🔥 PRESS [SPACE] OR CLICK TO IGNITE</button>`;

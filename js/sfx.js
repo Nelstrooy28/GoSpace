@@ -72,6 +72,11 @@ export function playVictoryFanfare() {
   });
 }
 
+export function playStageSep() {
+  tone(160, 48, 0.22, 'sawtooth', 0.11, 0);
+  tone(820, 290, 0.14, 'triangle', 0.07, 0.03);
+}
+
 export function startRocketRumbling() {
   const c = ensureCtx(); if (!c || rumbleNodes) return;
   const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), data = buf.getChannelData(0);
