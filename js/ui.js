@@ -132,10 +132,10 @@ export function renderStageHud(stage, state, ev, opts) {
     hud.innerHTML = `<div class="stage-card plate">
       <div class="card-head"><span>ORBITAL OPS</span><span id="orb-score-pill" class="badge-tag">SCORE ${opts.orbitScore || 0}</span></div>
       <div class="btn-row">
-        <button class="btn-sci ${opts.orbitCam === 'full' ? 'is-on' : ''}" data-cam="full" type="button">Full Orbit</button>
-        <button class="btn-sci ${opts.orbitCam === 'chase' ? 'is-on' : ''}" data-cam="chase" type="button">Chase</button>
-        <button class="btn-sci ${opts.orbitCam === 'polar' ? 'is-on' : ''}" data-cam="polar" type="button">Polar</button>
-        <button class="btn-sci ${opts.orbitCam === 'free' ? 'is-on' : ''}" data-cam="free" type="button">Free</button>
+        <button class="btn-sci ${opts.orbitCam === 'chase' ? 'is-on' : ''}" data-cam="chase" type="button">🛰️ Chase Sat</button>
+        <button class="btn-sci ${opts.orbitCam === 'full' ? 'is-on' : ''}" data-cam="full" type="button">🌍 Full Orbit</button>
+        <button class="btn-sci ${opts.orbitCam === 'asteroid' ? 'is-on' : ''}" data-cam="asteroid" type="button">☄️ Asteroid</button>
+        <button class="btn-sci ${opts.orbitCam === 'solar' ? 'is-on' : ''}" data-cam="solar" type="button">🌌 Solar System</button>
       </div>
       <div class="btn-row">
         <button class="btn-sci ${opts.orbitWarp === 1 ? 'is-on' : ''}" data-warp="1" type="button">1x</button>
@@ -146,7 +146,8 @@ export function renderStageHud(stage, state, ev, opts) {
       </div>
       <div id="orbit-telem" class="telem-mono">Propagating Keplerian track...</div></div>`;
     actions.innerHTML = `<button id="orb-transmit-btn" class="action-prompt is-cyan" type="button" hidden>📡 [SPACE] TRANSMIT SCIENCE (+50)</button>
-      <button id="orb-safemode-btn" class="action-prompt" type="button" hidden>🛡️ [E] CYCLE POWER / SAFE MODE</button>`;
+      <button id="orb-scan-btn" class="action-prompt is-cyan" type="button">☄️ [E] SCAN ASTEROID (+60)</button>
+      <button id="orb-safemode-btn" class="action-prompt" type="button" hidden>🛡️ [Q] CYCLE POWER / SAFE MODE</button>`;
     return;
   }
   hud.innerHTML = ''; actions.innerHTML = '';
@@ -177,7 +178,7 @@ export function updateLaunchOverlay(t) {
 
 export function updateOrbitOverlay(t) {
   const d = document.getElementById('orbit-telem');
-  if (d && t) d.textContent = `ALT ${t.altitudeKm}km · ${t.speedKms}km/s · ${t.stormActive ? 'SOLAR FLARE!' : (t.inEclipse ? 'ECLIPSE' : 'SUNLIT')} | BATT ${t.batterySoc}% · DL ${t.downlinkedGb}GB`;
+  if (d && t) d.textContent = `ALT ${t.altitudeKm}km · ${t.speedKms}km/s · ${t.stormActive ? 'SOLAR FLARE!' : (t.inEclipse ? 'ECLIPSE' : 'SUNLIT')} | BATT ${t.batterySoc}% · ${t.nearestNeaId || 'NEA'}`;
   document.getElementById('orb-score-pill')?.replaceChildren(document.createTextNode(`SCORE ${t.missionScore}`));
   document.getElementById('orb-storm-btn')?.classList.toggle('is-on', Boolean(t?.stormActive));
   const tx = document.getElementById('orb-transmit-btn'); if (tx) tx.hidden = !t?.inLineOfSight;

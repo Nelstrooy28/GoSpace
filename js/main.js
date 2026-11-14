@@ -2,7 +2,7 @@ import { SCENARIOS, createInitialState, evaluateMissionDesign } from './catalog.
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { activateSafeMode, mountOrbit, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerOrbitStorm, unmountOrbit } from './sceneOrbit.js';
+import { activateSafeMode, mountOrbit, scanAsteroid, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerOrbitStorm, unmountOrbit } from './sceneOrbit.js';
 import { isMuted, playEquip, playHover, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { SUB_TABS, renderHud, renderLoadoutDock, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
@@ -101,6 +101,7 @@ function renderAll(rebuildScene = true, focusTag = null) {
 const openSaveModal = () => { renderSavedModal(readJson(STORAGE_SAVED, []), lastEval); document.getElementById('saveload-modal').showModal(); };
 const handleTransmit = () => { const r = transmitScience(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} DATA DOWNLINKED (${r.station})!`); } };
 const handleSafeMode = () => { const r = activateSafeMode(); orbitScore += r.points; spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`); };
+const handleScanAsteroid = () => { const r = scanAsteroid(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} ASTEROID ${r.id} SCANNED!`); } };
 
 function init() {
   document.getElementById('mode-campaign-btn').addEventListener('click', () => { playEquip(); missionState.sandboxMode = false; renderAll(false); });
@@ -168,6 +169,7 @@ function init() {
   document.getElementById('center-action-hud').addEventListener('click', (e) => {
     if (e.target.closest('#lch-ignite-btn')) triggerIgnition();
     else if (e.target.closest('#orb-transmit-btn')) handleTransmit();
+    else if (e.target.closest('#orb-scan-btn')) handleScanAsteroid();
     else if (e.target.closest('#orb-safemode-btn')) handleSafeMode();
   });
   document.getElementById('review-overlay').addEventListener('click', (e) => {
@@ -187,7 +189,8 @@ function init() {
     else if (e.code === 'Space' && !titleOpen) {
       if (stage === 'launch') { e.preventDefault(); triggerIgnition(); }
       else if (stage === 'orbit') { e.preventDefault(); handleTransmit(); }
-    } else if (k === 'e' && stage === 'orbit' && !titleOpen) handleSafeMode();
+    } else if (k === 'e' && stage === 'orbit' && !titleOpen) handleScanAsteroid();
+    else if (k === 'q' && stage === 'orbit' && !titleOpen) handleSafeMode();
   });
 
   document.getElementById('mel-toggle').addEventListener('click', () => { const d = document.getElementById('mel-drawer'); d.hidden = !d.hidden; codexOpen = false; applyChrome(); });

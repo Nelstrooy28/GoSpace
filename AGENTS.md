@@ -14,7 +14,8 @@
 - `js/main.js` — Single-player 4-stage state machine (Hangar -> Launchpad -> Orbit -> Debrief)
 - `js/sceneCleanroom.js` — Interactive 3D Hangar procedural spacecraft assembly & OrbitControls
 - `js/sceneLaunch.js` — Procedural 3D Launchpad, multi-stage rocket liftoff, sky-to-space ascent & fairing jettison
-- `js/sceneOrbit.js` — Unobstructed full-view 3D Earth, Moon, sun/eclipse shadow, Keplerian orbit & interactive downlinks
+- `js/sceneOrbit.js` — Unobstructed full-view 3D multi-layer Earth, Moon, Ap/Pe orbit visuals & interactive downlinks
+- `js/solarSystem.js` — Procedural Milky Way sky-dome, Sun, Solar System planets & 3D InstancedMesh asteroid belt/NEAs
 - `js/sfx.js` — Procedural Web Audio synthesizer (UI clicks, equip lock, rocket rumble, downlink ping & victory fanfare)
 - `js/ui.js` — Sci-fi HUD, title mission cards, loadout dock, Codex menu, launch tachometer & 3-star debrief
 
