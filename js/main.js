@@ -1,4 +1,4 @@
-import { SCENARIOS, createInitialState, evaluateMissionDesign } from './catalog.js';
+import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign } from './catalog.js';
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
@@ -10,7 +10,7 @@ import { SUB_TABS, renderHud, renderLoadoutDock, renderResourcesList, renderSave
 const STORAGE_ACTIVE = 'gospace_active_v1', STORAGE_SAVED = 'gospace_saved_v1';
 const readJson = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch { return fb; } };
 const writeJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
-const FOCUS_MAP = { busId: 'bus', instrumentIds: 'payload', solarId: 'solar', thermalId: 'thermal', transceiverId: 'comms' };
+const FOCUS_MAP = { busId: 'bus', instrumentIds: 'payload', solarId: 'solar', thermalId: 'thermal', transceiverId: 'comms', hullSkinId: 'bus' };
 
 let stage = 'hangar', titleOpen = true, activeSegment = 'user', activeSub = 'obj', lastEval = null;
 let missionState = (() => { const s = readJson(STORAGE_ACTIVE, null); return s?.scenarioId ? s : createInitialState('wildfiresat-l1', false); })();
@@ -239,8 +239,17 @@ function init() {
   document.getElementById('equipment-strip').addEventListener('click', (e) => {
     const btn = e.target.closest('.equip-card'); if (!btn) return;
     const { field, id, multi } = btn.dataset;
-    if (multi === '1') { const s = new Set(missionState[field] || []); if (s.has(id)) s.delete(id); else s.add(id); missionState[field] = [...s]; }
-    else missionState[field] = id;
+    if (multi === '1') {
+      const bus = CATALOG.space.buses.find((b) => b.id === missionState.busId);
+      const slots = bus?.payloadSlots || 1;
+      const cur = [...(missionState[field] || [])];
+      if (cur.includes(id)) missionState[field] = cur.filter((x) => x !== id);
+      else if (slots <= 1) missionState[field] = [id];
+      else if (cur.length >= slots) missionState[field] = [...cur.slice(-(slots - 1)), id];
+      else missionState[field] = [...cur, id];
+    } else {
+      missionState[field] = id;
+    }
     renderAll(true, FOCUS_MAP[field] || null);
     if (btn.classList.contains('compat-bad')) playWarning(); else playEquip();
   });

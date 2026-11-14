@@ -443,8 +443,8 @@ dialog button:hover {
 /* Right Interactive Holographic Contract Deck */
 .contract-col,
 #title-overlay .title-contracts {
-  width: min(490px, 41vw);
-  max-height: calc(100vh - 118px);
+  width: min(530px, 44vw);
+  max-height: calc(100vh - 96px);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -468,18 +468,20 @@ dialog button:hover {
 #contract-grid {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.55) rgba(6, 14, 30, 0.45);
 }
 
 .contract-card {
   position: relative;
   display: grid;
-  grid-template-columns: 108px 1fr;
-  gap: 11px;
+  grid-template-columns: 94px 1fr;
+  gap: 10px;
   align-items: stretch;
-  padding: 9px 12px;
+  padding: 8px 11px;
   border-radius: 10px;
   background: linear-gradient(145deg, rgba(10, 22, 46, 0.88), rgba(6, 14, 30, 0.84));
   border: 1px solid rgba(56, 189, 248, 0.38);
@@ -502,8 +504,8 @@ dialog button:hover {
 }
 
 .contract-art {
-  width: 108px;
-  min-height: 102px;
+  width: 94px;
+  min-height: 82px;
   border-radius: 7px;
   overflow: hidden;
   border: 1px solid rgba(56, 189, 248, 0.34);

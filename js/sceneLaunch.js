@@ -106,8 +106,10 @@ function addGridFinsAndLegs(parent, r, stageTopY, darkMat, alloyMat) {
 function buildRocket(missionState) {
   const tex = getLaunchTextures();
   const vId = missionState.vehicleId;
-  const isElectron = vId === 'electron', isHeavy = vId === 'falcon-heavy';
-  const r = isElectron ? 0.22 : 0.29, bH = isElectron ? 3.2 : 3.9;
+  const isElectron = vId === 'electron' || vId === 'air-drop';
+  const isHeavy = vId === 'falcon-heavy' || vId === 'twin-heavy';
+  const r = vId === 'air-drop' ? 0.18 : vId === 'electron' ? 0.22 : vId === 'rideshare-pod' ? 0.26 : vId === 'falcon-heavy' ? 0.34 : 0.29;
+  const bH = vId === 'air-drop' ? 2.75 : vId === 'electron' ? 3.2 : vId === 'rideshare-pod' ? 3.55 : vId === 'twin-heavy' ? 3.85 : vId === 'falcon-heavy' ? 4.35 : 3.9;
   rocketSpec = { r, bH, fairingBaseY: bH + 1.28, isHeavy };
 
   const hullMat = new THREE.MeshStandardMaterial({ map: isElectron ? tex.hullBlack : tex.hullWhite, metalness: 0.32, roughness: 0.42 });

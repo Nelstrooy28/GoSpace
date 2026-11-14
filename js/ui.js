@@ -3,15 +3,23 @@ import { CATALOG, OFFICIAL_RESOURCES, SCENARIOS } from './catalog.js';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const SUB_TABS = {
   user: [{ id: 'obj', label: 'Objective' }, { id: 'band', label: 'Band' }, { id: 'lat', label: 'Latency' }],
-  space: [{ id: 'bus', label: 'Bus' }, { id: 'inst', label: 'Payload' }, { id: 'solar', label: 'Solar' }, { id: 'batt', label: 'Battery' }, { id: 'therm', label: 'Thermal' }],
+  space: [
+    { id: 'bus', label: 'Bus' },
+    { id: 'inst', label: 'Payload' },
+    { id: 'solar', label: 'Solar & RTG' },
+    { id: 'therm', label: 'Thrusters & Thermal' },
+    { id: 'skin', label: 'Hull Skin' }
+  ],
   launch: [{ id: 'veh', label: 'Rocket' }, { id: 'orbit', label: 'Orbit' }],
   ground: [{ id: 'tx', label: 'Transceiver' }, { id: 'gs', label: 'Station' }]
 };
 
+const instMatchesBand = (i, bId) => i.band === bId || (i.extraBands || []).includes(bId);
+
 const cardHtml = ({ field, id, icon, name, pills, selected, ok = true, multi = false, tip = '' }) => `
   <button class="equip-card ${selected ? 'selected' : ''} ${ok ? '' : 'compat-bad'}" type="button"
     data-field="${field}" data-id="${id}" data-multi="${multi ? '1' : '0'}" data-tip="${esc(tip)}">
-    <div class="equip-head"><span>${icon} ${esc(name)}</span><span class="spill ${ok ? 'ok' : 'bad'}">${selected ? 'ON' : (ok ? 'FIT' : '!')}</span></div>
+    <div class="equip-head"><span>${icon} ${esc(name)}</span><span class="spill ${ok ? 'ok' : 'bad'}">${selected ? '✓ EQUIPPED' : (ok ? 'FIT' : '!')}</span></div>
     <div class="stat-pills">${pills.map((p) => `<span class="spill">${esc(p)}</span>`).join('')}</div>
   </button>`;
 
@@ -27,6 +35,15 @@ const CONTRACT_ART = {
     <rect x="52" y="19" width="10" height="6" rx="1.5" fill="#fbbf24" stroke="#ffffff" stroke-width="0.8"/>
     <polygon points="57,26 40,68 74,72" fill="#f97316" fill-opacity="0.16"/>
   </svg>`,
+  'aurora-l1': `<svg viewBox="0 0 110 100" aria-hidden="true">
+    <defs><radialGradient id="g-au" cx="50%" cy="68%" r="60%"><stop offset="0%" stop-color="#0e7490"/><stop offset="60%" stop-color="#0f172a"/><stop offset="100%" stop-color="#030712"/></radialGradient></defs>
+    <rect width="110" height="100" fill="#030712"/>
+    <path d="M10 34 Q36 16 58 32 T100 26" fill="none" stroke="#34d399" stroke-width="4" stroke-opacity="0.7" stroke-linecap="round"/>
+    <path d="M16 42 Q44 26 68 40 T98 34" fill="none" stroke="#a855f7" stroke-width="2.6" stroke-opacity="0.65" stroke-linecap="round"/>
+    <circle cx="55" cy="76" r="32" fill="url(#g-au)" stroke="#38bdf8" stroke-width="1.1"/>
+    <path d="M26 52 Q55 24 84 52" fill="none" stroke="#7dd3fc" stroke-width="1.2" stroke-dasharray="3 3"/>
+    <rect x="50" y="21" width="10" height="6" rx="1.5" fill="#34d399" stroke="#ffffff" stroke-width="0.8"/>
+  </svg>`,
   'ocean-l2': `<svg viewBox="0 0 110 100" aria-hidden="true">
     <defs><radialGradient id="g-oc" cx="38%" cy="38%" r="60%"><stop offset="0%" stop-color="#0ea5e9"/><stop offset="55%" stop-color="#0369a1"/><stop offset="100%" stop-color="#082f49"/></radialGradient></defs>
     <rect width="110" height="100" fill="#040a18"/>
@@ -35,6 +52,15 @@ const CONTRACT_ART = {
     <ellipse cx="55" cy="52" rx="16" ry="41" transform="rotate(14 55 52)" fill="none" stroke="#7dd3fc" stroke-width="1.3" stroke-dasharray="4 3"/>
     <polygon points="59,13 43,54 71,58" fill="#38bdf8" fill-opacity="0.24"/>
     <rect x="54" y="10" width="10" height="6" rx="1.5" fill="#e2e8f0" stroke="#38bdf8" stroke-width="0.8"/>
+  </svg>`,
+  'monsoon-l2': `<svg viewBox="0 0 110 100" aria-hidden="true">
+    <defs><radialGradient id="g-mn" cx="50%" cy="56%" r="58%"><stop offset="0%" stop-color="#1d4ed8"/><stop offset="70%" stop-color="#0f172a"/><stop offset="100%" stop-color="#040814"/></radialGradient></defs>
+    <rect width="110" height="100" fill="#040814"/>
+    <circle cx="55" cy="58" r="28" fill="url(#g-mn)" stroke="#38bdf8" stroke-width="1.2"/>
+    <path d="M40 58 Q55 42 70 58 Q55 72 40 58 Z" fill="none" stroke="#bae6fd" stroke-width="2.2" stroke-opacity="0.8"/>
+    <circle cx="55" cy="58" r="4.5" fill="#020617" stroke="#7dd3fc" stroke-width="1.2"/>
+    <polygon points="56,16 32,62 78,62" fill="#38bdf8" fill-opacity="0.22"/>
+    <rect x="47" y="12" width="18" height="5" rx="1" fill="#f59e0b" stroke="#ffffff" stroke-width="0.8"/>
   </svg>`,
   'lunar-l3': `<svg viewBox="0 0 110 100" aria-hidden="true">
     <defs><radialGradient id="g-lu" cx="42%" cy="36%" r="58%"><stop offset="0%" stop-color="#cbd5e1"/><stop offset="70%" stop-color="#64748b"/><stop offset="100%" stop-color="#1e293b"/></radialGradient></defs>
@@ -47,12 +73,24 @@ const CONTRACT_ART = {
     <path d="M14 78 Q38 14 96 34" fill="none" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="4 3"/>
     <circle cx="84" cy="27" r="3.5" fill="#fbbf24" stroke="#ffffff" stroke-width="0.9"/>
   </svg>`,
+  'asteroid-l3': `<svg viewBox="0 0 110 100" aria-hidden="true">
+    <defs><radialGradient id="g-as" cx="40%" cy="40%" r="55%"><stop offset="0%" stop-color="#94a3b8"/><stop offset="65%" stop-color="#475569"/><stop offset="100%" stop-color="#1e293b"/></radialGradient></defs>
+    <rect width="110" height="100" fill="#030712"/>
+    <polygon points="40,36 62,28 80,44 74,66 50,74 30,58" fill="url(#g-as)" stroke="#cbd5e1" stroke-width="1.1"/>
+    <circle cx="50" cy="48" r="5" fill="#334155"/><circle cx="64" cy="56" r="3.5" fill="#1e293b"/>
+    <path d="M14 76 Q46 18 96 30" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <circle cx="30" cy="36" r="4" fill="#22d3ee"/><circle cx="24" cy="44" r="6" fill="#06b6d4" fill-opacity="0.28"/>
+    <rect x="26" y="33" width="9" height="6" rx="1" fill="#fbbf24" stroke="#ffffff" stroke-width="0.8"/>
+  </svg>`,
 };
 
 const CONTRACT_META = {
-  'wildfiresat-l1': { title: 'Operation Wildfire Watch', wave: 'THERMAL IR', lv: '300kg LV', obj: 'Detect Pacific Rim wildfire hotspots from 550km LEO.' },
-  'ocean-l2': { title: 'Operation Ocean Pulse', wave: 'UV-VISIBLE', lv: '950kg LV', obj: 'Map global phytoplankton & polar ocean health in SSO.' },
-  'lunar-l3': { title: 'Operation Lunar Icebreaker', wave: 'CRYO MID-IR', lv: '4500kg LV', obj: 'Survey shadowed Lunar South Pole craters for water ice.' },
+  'wildfiresat-l1': { title: 'Arctic Wildfire Watch', wave: 'THERMAL IR', lv: '300kg LV', obj: 'Detect boreal wildfires & Arctic hotspots from 575km SSO.' },
+  'aurora-l1': { title: 'Ionosphere & Aurora Scout', wave: 'MAG-PLASMA', lv: '300kg LV', obj: 'Sample geomagnetic storms & auroral currents across polar arcs.' },
+  'ocean-l2': { title: 'Coastal Ocean & Reef Pulse', wave: 'UV-VIS + LIDAR', lv: '1100kg LV', obj: 'Measure coastal plankton, reefs & aerosols with LiDAR.' },
+  'monsoon-l2': { title: 'Monsoon & Cyclone Eye', wave: 'SAR RADAR', lv: '1100kg LV', obj: 'Pierce storm clouds day and night with phased-array SAR.' },
+  'lunar-l3': { title: 'Lunar South Pole Icebreaker', wave: 'CRYO IR + NEUTRON', lv: '5200kg LV', obj: 'Survey shadowed Lunar South Pole craters for water ice.' },
+  'asteroid-l3': { title: 'Near-Earth Asteroid Prospector', wave: 'ION + PROSPECT', lv: '5200kg LV', obj: 'Rendezvous with metallic NEAs via Xenon Ion + Spectroscopy.' },
 };
 
 export function renderTitleOverlay(sandboxMode, activeScenarioId) {
@@ -93,20 +131,23 @@ export function renderLoadoutDock(segment, subGroup, state, evaluation) {
   const sc = evaluation.scenario, bus = CATALOG.space.buses.find((b) => b.id === state.busId);
   const tabs = SUB_TABS[segment] || SUB_TABS.user;
   const activeSub = tabs.some((t) => t.id === subGroup) ? subGroup : tabs[0].id;
-  document.getElementById('sub-pills').innerHTML = tabs.map((t) => `<button class="btn-sci sub-chip ${t.id === activeSub ? 'active' : ''}" data-sub="${t.id}" type="button">${t.label}</button>`).join('');
+  document.getElementById('sub-pills').innerHTML = tabs.map((t) => {
+    const lbl = t.id === 'inst' ? `Payloads (${(state.instrumentIds || []).length}/${bus?.payloadSlots || 1} Slots)` : t.label;
+    return `<button class="btn-sci sub-chip ${t.id === activeSub ? 'active' : ''}" data-sub="${t.id}" type="button">${lbl}</button>`;
+  }).join('');
 
   let cards = [];
   if (activeSub === 'obj') cards = CATALOG.user.objectives.map((o) => cardHtml({ field: 'userObjective', id: o.id, icon: '🎯', name: o.name, selected: state.userObjective === o.id, ok: o.id === sc.targetObjective, pills: [o.band.toUpperCase()], tip: o.tip }));
   else if (activeSub === 'band') cards = CATALOG.user.wavelengths.map((w) => cardHtml({ field: 'wavelengthBand', id: w.id, icon: '🌈', name: w.name, selected: state.wavelengthBand === w.id, ok: w.id === sc.targetBand, pills: [w.id === sc.targetBand ? 'TARGET BAND' : 'ALT BAND'], tip: w.tip }));
   else if (activeSub === 'lat') cards = CATALOG.user.latencies.map((l) => cardHtml({ field: 'latencyTier', id: l.id, icon: '⏱️', name: l.name, selected: state.latencyTier === l.id, ok: l.id === sc.targetLatency, pills: [l.id === sc.targetLatency ? 'OPTIMAL' : 'TRADE'], tip: l.tip }));
-  else if (activeSub === 'bus') cards = CATALOG.space.buses.map((b) => cardHtml({ field: 'busId', id: b.id, icon: '🛰️', name: b.name, selected: state.busId === b.id, ok: true, pills: [`$${b.costM}M`, `${b.massKg}kg`, `Cap ${b.payloadCapKg}kg`], tip: b.tip }));
-  else if (activeSub === 'inst') cards = CATALOG.space.instruments.map((i) => cardHtml({ field: 'instrumentIds', id: i.id, icon: '🔭', name: i.name, multi: true, selected: state.instrumentIds.includes(i.id), ok: i.band === state.wavelengthBand && (!bus || i.classes.includes(bus.busClass)), pills: [`$${i.costM}M`, `${i.massKg}kg`, `+${i.sci} Sci`], tip: i.tip }));
-  else if (activeSub === 'solar') cards = CATALOG.space.solarArrays.map((s) => cardHtml({ field: 'solarId', id: s.id, icon: '☀️', name: s.name, selected: state.solarId === s.id, ok: true, pills: [`$${s.costM}M`, `${s.genW}W`, `${s.massKg}kg`], tip: s.tip }));
-  else if (activeSub === 'batt') cards = CATALOG.space.batteries.map((b) => cardHtml({ field: 'batteryId', id: b.id, icon: '🔋', name: b.name, selected: state.batteryId === b.id, ok: true, pills: [`$${b.costM}M`, `${b.wh}Wh`, `+${b.lifeBonus}yr`], tip: b.tip }));
-  else if (activeSub === 'therm') cards = CATALOG.space.thermalAdcs.map((t) => cardHtml({ field: 'thermalId', id: t.id, icon: '❄️', name: t.name, selected: state.thermalId === t.id, ok: state.wavelengthBand !== 'cryo-ir' || t.cryoCapable, pills: [`$${t.costM}M`, `${t.powerW}W`, t.cryoCapable ? 'CRYO' : 'STD'], tip: t.tip }));
-  else if (activeSub === 'veh') cards = CATALOG.launch.vehicles.map((v) => cardHtml({ field: 'vehicleId', id: v.id, icon: '🚀', name: v.name, selected: state.vehicleId === v.id, ok: true, pills: [`$${v.costM}M`, `Max ${v.maxPayloadKg}kg`, v.deepSpaceCapable ? 'HEAVY' : 'LEO'], tip: v.tip }));
+  else if (activeSub === 'bus') cards = CATALOG.space.buses.map((b) => cardHtml({ field: 'busId', id: b.id, icon: '🛰️', name: b.name, selected: state.busId === b.id, ok: true, pills: [`$${b.costM}M`, `${b.payloadSlots} Slot${b.payloadSlots > 1 ? 's' : ''}`, `Cap ${b.payloadCapKg}kg`], tip: b.tip }));
+  else if (activeSub === 'inst') cards = CATALOG.space.instruments.map((i) => cardHtml({ field: 'instrumentIds', id: i.id, icon: '🔭', name: i.name, multi: true, selected: state.instrumentIds.includes(i.id), ok: instMatchesBand(i, state.wavelengthBand) && (!bus || i.classes.includes(bus.busClass)), pills: [`$${i.costM}M`, `${i.massKg}kg`, `${i.powerW}W`, `+${i.sci} Sci`], tip: i.tip }));
+  else if (activeSub === 'solar') cards = CATALOG.space.solarArrays.map((s) => cardHtml({ field: 'solarId', id: s.id, icon: s.zeroEclipseLoss ? '☢️' : '☀️', name: s.name, selected: state.solarId === s.id, ok: true, pills: [`$${s.costM}M`, `${s.genW}W`, s.zeroEclipseLoss ? '0% ECLIPSE' : `${s.massKg}kg`], tip: s.tip }));
+  else if (activeSub === 'therm') cards = CATALOG.space.thermalAdcs.map((t) => cardHtml({ field: 'thermalId', id: t.id, icon: t.ionDrive ? '⚡' : '❄️', name: t.name, selected: state.thermalId === t.id, ok: (state.wavelengthBand !== 'cryo-ir' || t.cryoCapable) && (!sc.requiresIon || t.ionDrive), pills: [`$${t.costM}M`, `${t.powerW}W`, t.ionDrive ? 'ION' : (t.cryoCapable ? 'CRYO' : `+${t.lifeBonus}yr`)], tip: t.tip }));
+  else if (activeSub === 'skin') cards = CATALOG.space.hullSkins.map((k) => cardHtml({ field: 'hullSkinId', id: k.id, icon: '🎨', name: k.name, selected: (state.hullSkinId || 'gold-kapton') === k.id, ok: true, pills: ['FREE', k.colorHex.toUpperCase()], tip: k.tip }));
+  else if (activeSub === 'veh') cards = CATALOG.launch.vehicles.map((v) => cardHtml({ field: 'vehicleId', id: v.id, icon: '🚀', name: v.name, selected: state.vehicleId === v.id, ok: true, pills: [`$${v.costM}M`, `Max ${v.maxPayloadKg}kg`, v.deepSpaceCapable ? 'DEEP-SPACE' : 'LEO'], tip: v.tip }));
   else if (activeSub === 'orbit') cards = CATALOG.launch.orbits.map((o) => cardHtml({ field: 'orbitId', id: o.id, icon: '🛸', name: o.name, selected: state.orbitId === o.id, ok: o.id === sc.targetOrbit, pills: [`e=${o.e}`, `i=${o.iDeg}°`, o.deepSpace ? 'DEEP' : 'LEO'], tip: o.tip }));
-  else if (activeSub === 'tx') cards = CATALOG.ground.transceivers.map((t) => cardHtml({ field: 'transceiverId', id: t.id, icon: '📡', name: t.name, selected: state.transceiverId === t.id, ok: true, pills: [`$${t.costM}M`, `${t.mbps}Mbps`, `${t.massKg}kg`], tip: t.tip }));
+  else if (activeSub === 'tx') cards = CATALOG.ground.transceivers.map((t) => cardHtml({ field: 'transceiverId', id: t.id, icon: '📡', name: t.name, selected: state.transceiverId === t.id, ok: true, pills: [`$${t.costM}M`, `${t.mbps}Mbps`, t.deepSpace ? 'DEEP' : `${t.massKg}kg`], tip: t.tip }));
   else cards = CATALOG.ground.stations.map((g) => cardHtml({ field: 'stationId', id: g.id, icon: '🏔️', name: g.name, selected: state.stationId === g.id, ok: true, pills: [`$${g.costM}M`, `${g.passMinDay}m/d`, g.deepSpace ? 'DSN' : 'POLAR'], tip: g.tip }));
 
   document.getElementById('equipment-strip').innerHTML = cards.join('');

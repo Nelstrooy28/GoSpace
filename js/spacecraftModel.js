@@ -1,363 +1,857 @@
 import * as THREE from 'three';
 import { CATALOG } from './catalog.js';
-import { fbm2 } from './solarSystem.js';
 
-const find = (arr, id) => arr.find((x) => x.id === id) || null;
-const texCache = { kaptonBump: null, solarMap: null };
+const texCache = {};
+const cachedTexSet = new Set();
 
 export function isCachedCraftTexture(tex) {
-  return Boolean(tex && (tex === texCache.kaptonBump || tex === texCache.solarMap));
+  return cachedTexSet.has(tex);
+}
+
+function registerTex(key, canvas) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  texCache[key] = tex;
+  cachedTexSet.add(tex);
+  return tex;
 }
 
 function getCraftTextures() {
-  if (!texCache.kaptonBump) {
-    const kc = document.createElement('canvas'); kc.width = 512; kc.height = 512;
-    const kCtx = kc.getContext('2d'), img = kCtx.createImageData(512, 512), kd = img.data;
-    for (let y = 0; y < 512; y += 1) {
-      for (let x = 0; x < 512; x += 1) {
-        const idx = (y * 512 + x) * 4;
-        const c1 = fbm2(x * 0.045, y * 0.045, 4);
-        const crease = Math.abs(Math.sin(x * 0.06 + c1 * 4.5) * Math.cos(y * 0.06 - c1 * 3.8));
-        const v = Math.round(90 + crease * 155);
-        kd[idx] = v; kd[idx + 1] = v; kd[idx + 2] = v; kd[idx + 3] = 255;
-      }
-    }
-    kCtx.putImageData(img, 0, 0);
-    texCache.kaptonBump = new THREE.CanvasTexture(kc);
-    texCache.kaptonBump.wrapS = texCache.kaptonBump.wrapT = THREE.RepeatWrapping;
-  }
+  if (texCache.kapton) return texCache;
 
-  if (!texCache.solarMap) {
-    const sc = document.createElement('canvas'); sc.width = 512; sc.height = 512;
-    const sCtx = sc.getContext('2d');
-    sCtx.fillStyle = '#071a4a';
-    sCtx.fillRect(0, 0, 512, 512);
-    const cols = 4, rows = 8, cw = 512 / cols, ch = 512 / rows;
-    for (let r = 0; r < rows; r += 1) {
-      for (let c = 0; c < cols; c += 1) {
-        const x = c * cw + 4, y = r * ch + 3, w = cw - 8, h = ch - 6;
-        const g = sCtx.createLinearGradient(x, y, x + w, y + h);
-        g.addColorStop(0, '#0f3478'); g.addColorStop(0.5, '#1749a6'); g.addColorStop(1, '#0c2d68');
-        sCtx.fillStyle = g;
-        sCtx.fillRect(x, y, w, h);
-        sCtx.strokeStyle = 'rgba(186,230,253,0.45)';
-        sCtx.lineWidth = 1.4;
-        sCtx.strokeRect(x, y, w, h);
-        sCtx.fillStyle = 'rgba(203,213,225,0.32)';
-        for (let f = 1; f < 4; f += 1) sCtx.fillRect(x, y + (h * f) / 4, w, 1);
-        sCtx.fillRect(x + w * 0.5 - 1, y, 2, h);
-      }
-    }
-    texCache.solarMap = new THREE.CanvasTexture(sc);
-    texCache.solarMap.colorSpace = THREE.SRGBColorSpace;
+  const kc = document.createElement('canvas');
+  kc.width = kc.height = 512;
+  const kctx = kc.getContext('2d');
+  kctx.fillStyle = '#d18a12';
+  kctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 420; i++) {
+    const x = (Math.sin(i * 12.9898) * 0.5 + 0.5) * 512;
+    const y = (Math.cos(i * 78.233) * 0.5 + 0.5) * 512;
+    const w = 14 + (i % 30);
+    const h = 10 + ((i * 7) % 24);
+    kctx.fillStyle = i % 3 === 0 ? 'rgba(255,212,92,0.34)' : i % 3 === 1 ? 'rgba(130,68,6,0.34)' : 'rgba(245,172,40,0.28)';
+    kctx.beginPath();
+    kctx.moveTo(x, y);
+    kctx.lineTo(x + w, y + (i % 9) - 4);
+    kctx.lineTo(x + w * 0.5, y + h);
+    kctx.closePath();
+    kctx.fill();
   }
+  kctx.strokeStyle = 'rgba(255,235,150,0.18)';
+  kctx.lineWidth = 1.1;
+  for (let s = 64; s < 512; s += 128) {
+    kctx.beginPath(); kctx.moveTo(0, s); kctx.lineTo(512, s); kctx.stroke();
+    kctx.beginPath(); kctx.moveTo(s, 0); kctx.lineTo(s, 512); kctx.stroke();
+  }
+  registerTex('kapton', kc);
+
+  const kb = document.createElement('canvas');
+  kb.width = kb.height = 512;
+  const bctx = kb.getContext('2d');
+  bctx.fillStyle = '#808080';
+  bctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 560; i++) {
+    const x = (Math.sin(i * 41.2) * 0.5 + 0.5) * 512;
+    const y = (Math.cos(i * 19.7) * 0.5 + 0.5) * 512;
+    const g = 92 + (i % 90);
+    bctx.fillStyle = `rgb(${g},${g},${g})`;
+    bctx.beginPath();
+    bctx.moveTo(x, y);
+    bctx.lineTo(x + 22, y + ((i % 7) - 3) * 4);
+    bctx.lineTo(x + 9, y + 20);
+    bctx.closePath();
+    bctx.fill();
+  }
+  const bumpTex = new THREE.CanvasTexture(kb);
+  bumpTex.wrapS = THREE.RepeatWrapping;
+  bumpTex.wrapT = THREE.RepeatWrapping;
+  texCache.kaptonBump = bumpTex;
+  cachedTexSet.add(bumpTex);
+
+  const cc = document.createElement('canvas');
+  cc.width = cc.height = 256;
+  const cctx = cc.getContext('2d');
+  cctx.fillStyle = '#1b2432';
+  cctx.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 256; y += 8) {
+    for (let x = 0; x < 256; x += 8) {
+      cctx.fillStyle = ((x + y) / 8) % 2 === 0 ? '#243043' : '#141c28';
+      cctx.fillRect(x, y, 7, 7);
+    }
+  }
+  registerTex('carbon', cc);
+
+  const wc = document.createElement('canvas');
+  wc.width = wc.height = 256;
+  const wctx = wc.getContext('2d');
+  wctx.fillStyle = '#e7edf5';
+  wctx.fillRect(0, 0, 256, 256);
+  wctx.strokeStyle = 'rgba(148,163,184,0.22)';
+  wctx.lineWidth = 1;
+  for (let p = 0; p < 256; p += 16) {
+    wctx.beginPath(); wctx.moveTo(p, 0); wctx.lineTo(p, 256); wctx.stroke();
+    wctx.beginPath(); wctx.moveTo(0, p); wctx.lineTo(256, p); wctx.stroke();
+  }
+  registerTex('betaCloth', wc);
+
+  const sc = document.createElement('canvas');
+  sc.width = sc.height = 512;
+  const sctx = sc.getContext('2d');
+  sctx.fillStyle = '#071a3e';
+  sctx.fillRect(0, 0, 512, 512);
+  for (let y = 4; y < 512; y += 32) {
+    for (let x = 4; x < 512; x += 64) {
+      const grad = sctx.createLinearGradient(x, y, x + 58, y + 26);
+      grad.addColorStop(0, '#0c2f6e');
+      grad.addColorStop(0.5, '#13499f');
+      grad.addColorStop(1, '#092356');
+      sctx.fillStyle = grad;
+      sctx.fillRect(x, y, 56, 24);
+      sctx.fillStyle = 'rgba(186,230,253,0.45)';
+      sctx.fillRect(x + 27, y, 2, 24);
+      sctx.fillRect(x, y + 11, 56, 1);
+    }
+  }
+  sctx.strokeStyle = '#94a3b8';
+  sctx.lineWidth = 3;
+  sctx.strokeRect(2, 2, 508, 508);
+  registerTex('solar', sc);
+
+  const sarC = document.createElement('canvas');
+  sarC.width = sarC.height = 256;
+  const sarCtx = sarC.getContext('2d');
+  sarCtx.fillStyle = '#334155';
+  sarCtx.fillRect(0, 0, 256, 256);
+  for (let y = 8; y < 256; y += 32) {
+    for (let x = 8; x < 256; x += 32) {
+      sarCtx.fillStyle = '#94a3b8';
+      sarCtx.fillRect(x, y, 24, 24);
+      sarCtx.strokeStyle = '#cbd5e1';
+      sarCtx.strokeRect(x + 3, y + 3, 18, 18);
+    }
+  }
+  registerTex('sarTile', sarC);
+
+  const lc = document.createElement('canvas');
+  lc.width = 256; lc.height = 64;
+  const lctx = lc.getContext('2d');
+  lctx.fillStyle = '#0f172a';
+  lctx.fillRect(0, 0, 256, 64);
+  lctx.strokeStyle = '#f59e0b';
+  lctx.lineWidth = 3;
+  lctx.strokeRect(3, 3, 250, 58);
+  lctx.fillStyle = '#f8fafc';
+  lctx.font = '700 28px Orbitron, sans-serif';
+  lctx.textAlign = 'center';
+  lctx.fillText('GOSPACE', 128, 42);
+  registerTex('logo', lc);
+
   return texCache;
 }
 
-function makeMats(envScale) {
+function makeHullMaterial(skinId, tex, envMapIntensity) {
+  if (skinId === 'silver-teflon') {
+    return new THREE.MeshStandardMaterial({
+      color: 0xdbeafe,
+      bumpMap: tex.kaptonBump,
+      bumpScale: 0.012,
+      metalness: 0.86,
+      roughness: 0.24,
+      envMapIntensity
+    });
+  }
+  if (skinId === 'matte-carbon') {
+    return new THREE.MeshStandardMaterial({
+      map: tex.carbon,
+      bumpMap: tex.carbon,
+      bumpScale: 0.008,
+      metalness: 0.24,
+      roughness: 0.62,
+      envMapIntensity: envMapIntensity * 0.75
+    });
+  }
+  if (skinId === 'white-beta') {
+    return new THREE.MeshStandardMaterial({
+      map: tex.betaCloth,
+      bumpMap: tex.betaCloth,
+      bumpScale: 0.006,
+      metalness: 0.12,
+      roughness: 0.56,
+      envMapIntensity: envMapIntensity * 0.85
+    });
+  }
+  return new THREE.MeshStandardMaterial({
+    map: tex.kapton,
+    bumpMap: tex.kaptonBump,
+    bumpScale: 0.022,
+    metalness: 0.78,
+    roughness: 0.36,
+    envMapIntensity
+  });
+}
+
+function createSharedMats(skinId, envMapIntensity) {
   const tex = getCraftTextures();
-  const std = (color, metalness, roughness, baseEnv = 1.05, extra = {}) =>
-    new THREE.MeshStandardMaterial({ color, metalness, roughness, envMapIntensity: baseEnv * envScale, ...extra });
   return {
-    gold: std(0xebb328, 0.85, 0.32, 1.2, { bumpMap: tex.kaptonBump, bumpScale: 0.024 }),
-    rail: std(0x283244, 0.65, 0.42, 1.0),
-    alloy: std(0xa8b5c7, 0.78, 0.32, 1.15),
-    bronze: std(0xc96a1b, 0.76, 0.34, 1.1),
-    white: std(0xe2e8f0, 0.16, 0.48, 0.9),
-    solar: std(0x1d4ed8, 0.5, 0.25, 1.15, { map: tex.solarMap, emissive: 0x091d4a, emissiveIntensity: 0.08 }),
-    lens: std(0x0284c7, 0.7, 0.08, 1.2, { emissive: 0x0369a1, emissiveIntensity: 0.16 }),
-    hdrCyan: std(0x38bdf8, 0.55, 0.32, 1.1),
-    shield: std(0xcbd5e1, 0.74, 0.34, 1.1, { side: THREE.DoubleSide }),
-    dish: std(0xe2e8f0, 0.42, 0.38, 1.0, { side: THREE.DoubleSide }),
-    batt: std(0x0f766e, 0.52, 0.36, 0.95),
-    warn: new THREE.MeshStandardMaterial({ color: 0xef4444, wireframe: true, transparent: true, opacity: 0.85 })
+    tex,
+    hull: makeHullMaterial(skinId, tex, envMapIntensity),
+    goldFoil: new THREE.MeshStandardMaterial({
+      map: tex.kapton, bumpMap: tex.kaptonBump, bumpScale: 0.02,
+      metalness: 0.8, roughness: 0.35, envMapIntensity
+    }),
+    alum: new THREE.MeshStandardMaterial({ color: 0xd8e3f0, metalness: 0.84, roughness: 0.26, envMapIntensity }),
+    darkMetal: new THREE.MeshStandardMaterial({ color: 0x263244, metalness: 0.72, roughness: 0.36, envMapIntensity }),
+    carbonStrut: new THREE.MeshStandardMaterial({ map: tex.carbon, metalness: 0.3, roughness: 0.52, envMapIntensity }),
+    copper: new THREE.MeshStandardMaterial({ color: 0xd97736, metalness: 0.82, roughness: 0.28, envMapIntensity }),
+    solar: new THREE.MeshStandardMaterial({ map: tex.solar, metalness: 0.55, roughness: 0.2, envMapIntensity: envMapIntensity * 1.15 }),
+    sarFace: new THREE.MeshStandardMaterial({ map: tex.sarTile, metalness: 0.68, roughness: 0.32, envMapIntensity }),
+    lens: new THREE.MeshPhysicalMaterial({ color: 0x164e63, metalness: 0.1, roughness: 0.06, clearcoat: 1.0, reflectivity: 1.0, envMapIntensity: envMapIntensity * 1.3 }),
+    whiteCeramic: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.14, roughness: 0.45, envMapIntensity }),
+    logoMat: new THREE.MeshStandardMaterial({ map: tex.logo, roughness: 0.4, metalness: 0.2, envMapIntensity }),
+    cyanGlow: new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x06b6d4, emissiveIntensity: 1.8, roughness: 0.2 }),
+    amberGlow: new THREE.MeshStandardMaterial({ color: 0xfb923c, emissive: 0xea580c, emissiveIntensity: 1.5, roughness: 0.3 }),
+    laserGlow: new THREE.MeshStandardMaterial({ color: 0x34d399, emissive: 0x10b981, emissiveIntensity: 1.6, roughness: 0.2 })
   };
 }
 
-export function buildSpacecraftModel(missionState, options = {}) {
-  const {
-    showWarnings = true,
-    deployProgress = 1,
-    envMapIntensity = 1.0,
-    castShadow = true,
-    receiveShadow = true
-  } = options;
+function getBusDims(busId) {
+  switch (busId) {
+    case '1u-nanocube': return { shape: 'box', w: 0.42, h: 0.42, d: 0.42 };
+    case '3u-cubesat': return { shape: 'box', w: 0.44, h: 0.94, d: 0.44 };
+    case '6u-cubesat': return { shape: 'box', w: 0.72, h: 0.96, d: 0.44 };
+    case '12u-cubesat': return { shape: 'box', w: 0.78, h: 1.06, d: 0.70 };
+    case 'espa-smallsat': return { shape: 'cyl', segs: 8, w: 1.08, h: 1.04, d: 1.08 };
+    case 'hex-orbiter': return { shape: 'cyl', segs: 6, w: 1.24, h: 1.12, d: 1.24 };
+    case 'flagship-bus': return { shape: 'cyl', segs: 8, w: 1.56, h: 1.34, d: 1.56 };
+    default: return { shape: 'box', w: 0.72, h: 0.96, d: 0.44 };
+  }
+}
 
-  const root = new THREE.Group();
-  const mats = makeMats(envMapIntensity);
-  const animParts = [];
-  const pulseMeshes = [];
-  const deployHooks = [];
-  let meshCount = 0;
-  let explodeTarget = 0;
-  let explodeCur = 0;
+function addBusMesh(busGroup, busId, dims, mats) {
+  const { shape, segs, w, h, d } = dims;
+  if (shape === 'box') {
+    const core = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats.hull);
+    core.castShadow = core.receiveShadow = true;
+    busGroup.add(core);
 
-  const addPart = (parent, geo, mat, pos = [0, 0, 0], rot = [0, 0, 0]) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(...pos);
-    m.rotation.set(...rot);
-    m.castShadow = castShadow;
-    m.receiveShadow = receiveShadow;
-    parent.add(m);
-    meshCount += 1;
+    const railGeo = new THREE.BoxGeometry(0.042, h + 0.045, 0.042);
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const rail = new THREE.Mesh(railGeo, mats.alum);
+        rail.position.set(sx * (w / 2 + 0.004), 0, sz * (d / 2 + 0.004));
+        busGroup.add(rail);
+      }
+    }
+    const frameGeo = new THREE.BoxGeometry(w + 0.055, 0.045, d + 0.055);
+    for (const sy of [-1, 1]) {
+      const cap = new THREE.Mesh(frameGeo, mats.alum);
+      cap.position.y = sy * (h / 2);
+      busGroup.add(cap);
+    }
+    if (busId === '12u-cubesat') {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.06, d + 0.04), mats.darkMetal);
+      busGroup.add(rib);
+    }
+  } else {
+    const rad = w * 0.5;
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad * 1.03, h, segs), mats.hull);
+    core.castShadow = core.receiveShadow = true;
+    busGroup.add(core);
+
+    const topCollar = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.04, rad * 1.04, 0.06, segs), mats.alum);
+    topCollar.position.y = h / 2 - 0.02;
+    const botCollar = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.06, rad * 1.09, 0.09, segs), mats.darkMetal);
+    botCollar.position.y = -h / 2 + 0.04;
+    const midBand = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.03, rad * 1.03, 0.07, segs), mats.darkMetal);
+    busGroup.add(topCollar, botCollar, midBand);
+
+    for (let i = 0; i < segs; i++) {
+      const a = (i / segs) * Math.PI * 2;
+      const strut = new THREE.Mesh(new THREE.BoxGeometry(0.038, h - 0.04, 0.038), mats.alum);
+      strut.position.set(Math.sin(a) * rad, 0, Math.cos(a) * rad);
+      strut.rotation.y = a;
+      busGroup.add(strut);
+    }
+
+    if (busId === 'flagship-bus') {
+      for (const sx of [-1, 1]) {
+        const vault = new THREE.Mesh(new THREE.BoxGeometry(0.32, h * 0.55, 0.34), mats.carbonStrut);
+        vault.position.set(sx * (rad * 0.92), -0.05, 0);
+        busGroup.add(vault);
+      }
+    }
+  }
+
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w * 0.62, 0.56), 0.14), mats.logoMat);
+  plate.position.set(0, -h * 0.2, d / 2 + 0.015);
+  busGroup.add(plate);
+}
+
+function buildInstrumentMesh(instId, mats, deployState) {
+  const g = new THREE.Group();
+  const baseBox = (bw, bh, bd, mat = mats.darkMetal) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat);
+    m.castShadow = true;
     return m;
   };
 
-  const regAnim = (obj, basePos, offset) => {
-    obj.position.set(...basePos);
-    const base = new THREE.Vector3(...basePos);
-    animParts.push({ obj, base, exp: base.clone().add(new THREE.Vector3(...offset)) });
-  };
-
-  // 1. Spacecraft Bus & Internal Reaction Wheels + Corner RCS Quads
-  const busMeta = find(CATALOG.space.buses, missionState.busId);
-  const busGroup = new THREE.Group();
-  const rwa = new THREE.Group();
-  [[-0.14, 0.08, 0], [0.14, 0.08, 0], [0, -0.08, 0.14]].forEach(([x, y, z], i) => {
-    addPart(rwa, new THREE.CylinderGeometry(0.11, 0.11, 0.07, 16), mats.alloy, [x, y, z], i === 2 ? [Math.PI / 2, 0, 0] : [0, 0, Math.PI / 2]);
-  });
-  addPart(rwa, new THREE.BoxGeometry(0.24, 0.18, 0.22), mats.rail, [0, -0.08, -0.1]);
-  regAnim(rwa, [0, 0, 0], [0, 0.1, 0.95]);
-  busGroup.add(rwa);
-
-  let dims;
-  if (missionState.busId === 'espa-smallsat') {
-    addPart(busGroup, new THREE.CylinderGeometry(0.92, 0.92, 1.38, 8), mats.alloy);
-    addPart(busGroup, new THREE.CylinderGeometry(0.84, 0.84, 0.95, 8), mats.gold);
-    addPart(busGroup, new THREE.TorusGeometry(0.9, 0.055, 10, 32), mats.rail, [0, -0.68, 0], [Math.PI / 2, 0, 0]);
-    dims = { halfW: 0.92, halfH: 0.7, halfD: 0.92 };
-  } else if (missionState.busId === 'flagship-bus') {
-    addPart(busGroup, new THREE.CylinderGeometry(1.15, 1.28, 1.6, 6), mats.gold);
-    addPart(busGroup, new THREE.CylinderGeometry(1.22, 1.22, 0.16, 6), mats.rail, [0, 0.72, 0]);
-    for (let k = 0; k < 4; k += 1) {
-      addPart(busGroup, new THREE.CylinderGeometry(1.75 + k * 0.22, 1.75 + k * 0.22, 0.025, 5), mats.shield, [0, -0.78 - k * 0.12, 0]);
+  if (instId === 'ir-bolometer') {
+    g.add(baseBox(0.34, 0.22, 0.30, mats.darkMetal));
+    for (const sx of [-0.08, 0.08]) {
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.078, 0.18, 20), mats.copper);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(sx, 0.02, 0.18);
+      const optic = new THREE.Mesh(new THREE.CylinderGeometry(0.054, 0.054, 0.03, 20), mats.lens);
+      optic.rotation.x = Math.PI / 2;
+      optic.position.set(sx, 0.02, 0.265);
+      g.add(barrel, optic);
     }
-    dims = { halfW: 1.25, halfH: 0.82, halfD: 1.25 };
-  } else {
-    dims = missionState.busId === '3u-cubesat' ? { halfW: 0.34, halfH: 0.72, halfD: 0.34 } : { halfW: 0.62, halfH: 0.72, halfD: 0.36 };
-    addPart(busGroup, new THREE.BoxGeometry(dims.halfW * 1.88, dims.halfH * 1.9, dims.halfD * 1.88), mats.gold);
-    const rx = dims.halfW * 0.94, rz = dims.halfD * 0.94;
-    [[-rx, -rz], [rx, -rz], [-rx, rz], [rx, rz]].forEach(([x, z]) => addPart(busGroup, new THREE.BoxGeometry(0.08, dims.halfH * 2.04, 0.08), mats.rail, [x, 0, z]));
-    addPart(busGroup, new THREE.BoxGeometry(dims.halfW * 2.02, 0.08, dims.halfD * 2.02), mats.rail, [0, dims.halfH, 0]);
-    addPart(busGroup, new THREE.BoxGeometry(dims.halfW * 2.02, 0.08, dims.halfD * 2.02), mats.rail, [0, -dims.halfH, 0]);
-  }
-  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
-    const cx = sx * dims.halfW * 0.86, cz = sz * dims.halfD * 0.86;
-    addPart(busGroup, new THREE.BoxGeometry(0.08, 0.08, 0.08), mats.rail, [cx, dims.halfH * 0.86, cz]);
-    addPart(busGroup, new THREE.ConeGeometry(0.032, 0.08, 8), mats.bronze, [cx + sx * 0.055, dims.halfH * 0.86, cz], [0, 0, -sx * Math.PI / 2]);
-  });
-  root.add(busGroup);
-
-  // 2. Solar Arrays (supports smooth folded-inside-fairing -> deployed wings animation)
-  const solarWrap = new THREE.Group();
-  const solarId = missionState.solarId;
-  if (solarId === 'body-mounted') {
-    [-1, 1].forEach((dir) => {
-      const wing = new THREE.Group();
-      addPart(wing, new THREE.BoxGeometry(0.05, dims.halfH * 1.55, dims.halfD * 1.55), mats.solar);
-      regAnim(wing, [dir * (dims.halfW + 0.04), 0, 0], [dir * 0.65, 0, 0]);
-      solarWrap.add(wing);
+    const radFin = baseBox(0.38, 0.025, 0.24, mats.alum);
+    radFin.position.y = 0.13;
+    g.add(radFin);
+  } else if (instId === 'arctic-multispec') {
+    g.add(baseBox(0.46, 0.16, 0.24, mats.alum));
+    const slitColors = [0x38bdf8, 0x34d399, 0xf59e0b, 0xf87171];
+    slitColors.forEach((col, i) => {
+      const slit = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.08, 0.05),
+        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.35, metalness: 0.4, roughness: 0.15 })
+      );
+      slit.position.set(-0.15 + i * 0.1, 0, 0.13);
+      g.add(slit);
     });
+  } else if (instId === 'oci-hyperspec') {
+    const body = baseBox(0.42, 0.28, 0.34, mats.whiteCeramic);
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.28, 24), mats.darkMetal);
+    drum.rotation.z = Math.PI / 2;
+    drum.position.set(0, 0.05, 0.18);
+    const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.11, 0.18, 16, 1, true), mats.goldFoil);
+    hood.material.side = THREE.DoubleSide;
+    hood.rotation.x = Math.PI / 2;
+    hood.position.set(0, 0.05, 0.32);
+    const glass = new THREE.Mesh(new THREE.CircleGeometry(0.11, 20), mats.lens);
+    glass.position.set(0, 0.05, 0.29);
+    g.add(body, drum, hood, glass);
+  } else if (instId === 'sar-wing') {
+    const yoke = baseBox(0.26, 0.10, 0.22, mats.alum);
+    const hinge = new THREE.Group();
+    hinge.position.set(0, 0.05, 0.11);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.05, 0.56), mats.sarFace);
+    panel.position.set(0, 0, 0.32);
+    panel.castShadow = true;
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.50, 0.035, 0.60), mats.alum);
+    frame.position.copy(panel.position);
+    frame.position.y -= 0.015;
+    hinge.add(panel, frame);
+    g.add(yoke, hinge);
+    deployState.sarHinges.push(hinge);
+  } else if (instId === 'lidar-cloud') {
+    g.add(baseBox(0.36, 0.22, 0.32, mats.carbonStrut));
+    const rxBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.10, 0.24, 24), mats.alum);
+    rxBarrel.rotation.x = Math.PI / 2;
+    rxBarrel.position.set(-0.07, 0.02, 0.20);
+    const rxLens = new THREE.Mesh(new THREE.CircleGeometry(0.105, 22), mats.lens);
+    rxLens.position.set(-0.07, 0.02, 0.322);
+    const txBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.22, 18), mats.darkMetal);
+    txBarrel.rotation.x = Math.PI / 2;
+    txBarrel.position.set(0.12, 0.04, 0.19);
+    const laserRing = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.012, 10, 20), mats.laserGlow);
+    laserRing.position.set(0.12, 0.04, 0.305);
+    g.add(rxBarrel, rxLens, txBarrel, laserRing);
+  } else if (instId === 'cryo-ir-mapper') {
+    const baffle = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.25, 0.58, 24), mats.darkMetal);
+    baffle.position.y = 0.26;
+    baffle.castShadow = true;
+    const shroud = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.31, 0.22, 24), mats.whiteCeramic);
+    shroud.position.y = 0.56;
+    const mirror = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 6), mats.goldFoil);
+    mirror.position.y = 0.52;
+    const trip = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 12), mats.alum);
+    trip.position.y = 0.66;
+    g.add(baffle, shroud, mirror, trip);
+  } else if (instId === 'boom-mag') {
+    const canister = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.18, 16), mats.alum);
+    g.add(canister);
+    const ext = new THREE.Group();
+    const len = 1.25;
+    for (let i = 0; i < 6; i++) {
+      const y0 = (i / 6) * len;
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, len / 6 + 0.01, 6), mats.carbonStrut);
+      seg.position.y = y0 + len / 12;
+      ext.add(seg);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.008, 8, 6), mats.alum);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = y0 + len / 6;
+      ext.add(ring);
+    }
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), mats.goldFoil);
+    tip.position.y = len + 0.08;
+    const flux = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 14), mats.cyanGlow);
+    flux.position.set(0, len + 0.18, 0);
+    ext.add(tip, flux);
+    g.add(ext);
+    deployState.booms.push(ext);
+  } else if (instId === 'neutron-spec') {
+    g.add(baseBox(0.32, 0.14, 0.22, mats.darkMetal));
+    for (const sx of [-0.11, 0.11]) {
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.26, 6), mats.goldFoil);
+      can.position.set(sx, 0.16, 0);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.082, 0.03, 6), mats.copper);
+      cap.position.set(sx, 0.29, 0);
+      g.add(can, cap);
+    }
+  } else if (instId === 'plasma-analyzer') {
+    const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.14, 20), mats.alum);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), mats.goldFoil);
+    dome.position.y = 0.07;
+    g.add(hat, dome);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const petal = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.02, 0.11), mats.copper);
+      petal.position.set(Math.sin(a) * 0.17, 0.04, Math.cos(a) * 0.17);
+      petal.rotation.y = a;
+      petal.rotation.x = 0.3;
+      g.add(petal);
+    }
   } else {
-    const panels = solarId === 'high-eff-gimbal' ? 3 : 2;
-    const pw = solarId === 'high-eff-gimbal' ? 1.15 : 0.78;
-    const ph = solarId === 'high-eff-gimbal' ? 0.96 : 0.64;
-    [-1, 1].forEach((dir) => {
-      const wing = new THREE.Group();
-      addPart(wing, new THREE.CylinderGeometry(0.04, 0.04, 0.48, 12), mats.alloy, [dir * 0.24, 0, 0], [0, 0, Math.PI / 2]);
-      addPart(wing, new THREE.BoxGeometry(0.12, 0.14, 0.14), mats.rail, [dir * 0.08, 0, 0]);
-      const segs = [];
-      for (let p = 0; p < panels; p += 1) {
-        const seg = new THREE.Group();
-        addPart(seg, new THREE.BoxGeometry(pw, 0.04, ph), mats.solar, [0, 0, 0]);
-        addPart(seg, new THREE.BoxGeometry(pw + 0.03, 0.025, ph + 0.03), mats.rail, [0, -0.022, 0]);
-        wing.add(seg);
-        segs.push({ seg, cxFull: dir * (0.5 + p * (pw + 0.06) + pw * 0.5), cxStowed: dir * (0.28 + p * 0.05) });
+    // optical-spyglass (plus fallback)
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.56, 24), mats.carbonStrut);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.z = 0.20;
+    const baffleRing = new THREE.Mesh(new THREE.TorusGeometry(0.165, 0.022, 12, 24), mats.alum);
+    baffleRing.position.z = 0.48;
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.145, 24), mats.lens);
+    lens.position.z = 0.475;
+    g.add(barrel, baffleRing, lens);
+  }
+  return g;
+}
+
+function mountPayloads(payloadGroup, instIds, bus, dims, mats, deployState) {
+  const slots = bus?.payloadSlots || 1;
+  const active = (instIds || []).slice(0, Math.max(slots, 3));
+  const { w, h, d } = dims;
+
+  active.forEach((id, idx) => {
+    const inst = buildInstrumentMesh(id, mats, deployState);
+    if (idx === 0) {
+      // Top zenith / forward deck (unobstructed pedestal side)
+      inst.position.set(0, h * 0.5 + 0.11, d * 0.08);
+      if (id === 'sar-wing') {
+        inst.position.set(0, h * 0.12, d * 0.5 + 0.05);
       }
-      regAnim(wing, [dir * dims.halfW, 0.08, 0], [dir * 1.1, 0, 0]);
-      solarWrap.add(wing);
-      deployHooks.push((t) => {
-        wing.rotation.z = dir * Math.PI * 0.485 * (1 - t);
-        segs.forEach(({ seg, cxFull, cxStowed }) => {
-          seg.position.x = THREE.MathUtils.lerp(cxStowed, cxFull, t);
-          seg.scale.x = 0.52 + 0.48 * t;
-        });
-      });
-    });
-  }
-  root.add(solarWrap);
-
-  // 3. Science Payload Deck (+Y)
-  const payloadGroup = new THREE.Group();
-  const instIds = missionState.instrumentIds || [];
-  instIds.forEach((instId, idx) => {
-    const inst = find(CATALOG.space.instruments, instId);
-    if (!inst) return;
-    const pod = new THREE.Group();
-    pod.position.set(instIds.length === 1 ? 0 : (idx - (instIds.length - 1) / 2) * 0.7, 0, 0);
-    if (instId === 'ir-bolometer' || instId === 'cryo-ir-mapper') {
-      const s = instId === 'cryo-ir-mapper' ? 1.42 : 0.88;
-      addPart(pod, new THREE.CylinderGeometry(0.24 * s, 0.27 * s, 0.62 * s, 24), mats.white, [0, 0.31 * s, 0]);
-      addPart(pod, new THREE.CylinderGeometry(0.26 * s, 0.24 * s, 0.16 * s, 24, 1, true), mats.rail, [0, 0.66 * s, 0]);
-      addPart(pod, new THREE.TorusGeometry(0.21 * s, 0.025 * s, 8, 24), mats.alloy, [0, 0.61 * s, 0], [Math.PI / 2, 0, 0]);
-      addPart(pod, new THREE.CylinderGeometry(0.18 * s, 0.18 * s, 0.05 * s, 24), mats.lens, [0, 0.59 * s, 0]);
-    } else if (instId === 'arctic-multispec' || instId === 'oci-hyperspec') {
-      const s = instId === 'oci-hyperspec' ? 1.38 : 0.84;
-      addPart(pod, new THREE.BoxGeometry(0.48 * s, 0.36 * s, 0.44 * s), mats.white, [0, 0.18 * s, 0]);
-      addPart(pod, new THREE.CylinderGeometry(0.12 * s, 0.14 * s, 0.18 * s, 18), mats.rail, [0, 0.24 * s, 0.24 * s], [Math.PI / 2, 0, 0]);
-      addPart(pod, new THREE.CylinderGeometry(0.095 * s, 0.095 * s, 0.04 * s, 18), mats.lens, [0, 0.24 * s, 0.32 * s], [Math.PI / 2, 0, 0]);
-    } else if (instId === 'sar-altimeter') {
-      addPart(pod, new THREE.CylinderGeometry(0.036, 0.036, 0.48, 12), mats.alloy, [0, 0.24, 0]);
-      const paddle = new THREE.Group();
-      paddle.position.set(0, 0.48, 0);
-      addPart(paddle, new THREE.BoxGeometry(0.68, 0.06, 0.34), mats.gold, [0, 0, 0]);
-      addPart(paddle, new THREE.BoxGeometry(0.62, 0.02, 0.06), mats.rail, [0, 0.04, 0.08]);
-      addPart(paddle, new THREE.BoxGeometry(0.62, 0.02, 0.06), mats.rail, [0, 0.04, -0.08]);
-      addPart(paddle, new THREE.ConeGeometry(0.075, 0.14, 14), mats.bronze, [0, 0.11, 0], [Math.PI, 0, 0]);
-      pod.add(paddle);
-      deployHooks.push((t) => { paddle.rotation.z = -Math.PI * 0.44 * (1 - t); });
+    } else if (idx === 1) {
+      // Forward +Z face instrument bay
+      if (id === 'boom-mag') {
+        inst.position.set(w * 0.24, h * 0.46, -d * 0.25);
+        inst.rotation.z = -0.38;
+        inst.rotation.x = -0.25;
+      } else if (id === 'sar-wing') {
+        inst.position.set(0, -h * 0.06, d * 0.5 + 0.06);
+      } else {
+        inst.position.set(0, h * 0.14, d * 0.5 + 0.10);
+      }
     } else {
-      addPart(pod, new THREE.BoxGeometry(0.42, 0.16, 0.32), mats.gold, [0, 0.1, 0]);
-      addPart(pod, new THREE.CylinderGeometry(0.07, 0.07, 0.46, 14), mats.alloy, [-0.1, 0.34, 0]);
-      addPart(pod, new THREE.CylinderGeometry(0.07, 0.07, 0.46, 14), mats.alloy, [0.1, 0.34, 0]);
-      addPart(pod, new THREE.CylinderGeometry(0.055, 0.055, 0.06, 12), mats.lens, [0, 0.21, 0.14], [Math.PI / 2, 0, 0]);
+      // 3rd hardpoint: upper-aft / angled boom bay away from ±X wings
+      if (id === 'boom-mag') {
+        inst.position.set(-w * 0.22, h * 0.46, -d * 0.28);
+        inst.rotation.z = 0.36;
+        inst.rotation.x = -0.28;
+      } else if (id === 'sar-wing') {
+        inst.position.set(0, h * 0.06, -d * 0.5 - 0.06);
+        inst.rotation.y = Math.PI;
+      } else {
+        inst.position.set(0, h * 0.16, -d * 0.5 - 0.10);
+        inst.rotation.y = Math.PI;
+      }
     }
-    if (showWarnings && (inst.band !== missionState.wavelengthBand || (busMeta && !inst.classes.includes(busMeta.busClass)))) {
-      pulseMeshes.push(addPart(pod, new THREE.BoxGeometry(0.68, 0.74, 0.68), mats.warn.clone(), [0, 0.37, 0]));
-    }
-    payloadGroup.add(pod);
+    payloadGroup.add(inst);
   });
-  regAnim(payloadGroup, [0, dims.halfH + 0.02, 0], [0, 1.05, 0]);
-  root.add(payloadGroup);
+}
 
-  // 4. Ground Comms Array (+Y deck)
+function makeWingPanel(length, width, mats, copperBack = false) {
+  const wg = new THREE.Group();
+  const front = new THREE.Mesh(new THREE.BoxGeometry(length, 0.022, width), mats.solar);
+  front.castShadow = front.receiveShadow = true;
+  const backMat = copperBack ? mats.copper : mats.carbonStrut;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(length + 0.02, 0.016, width + 0.02), backMat);
+  back.position.y = -0.012;
+  wg.add(front, back);
+  return wg;
+}
+
+function buildPowerSystem(solarGroup, solarId, dims, mats, deployState) {
+  const { w, h, d } = dims;
+  const attachX = w * 0.5 + 0.04;
+
+  if (solarId === 'body-mounted') {
+    for (const sx of [-1, 1]) {
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.025, h * 0.72, d * 0.72), mats.solar);
+      plate.position.set(sx * (w * 0.5 + 0.018), 0, 0);
+      solarGroup.add(plate);
+    }
+    return;
+  }
+
+  if (solarId === 'rtg-nuclear') {
+    for (const sx of [-1, 1]) {
+      const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.26, 10), mats.alum);
+      mount.rotation.z = sx * 1.15;
+      mount.position.set(sx * (attachX + 0.08), -h * 0.18, -d * 0.16);
+      const can = new THREE.Group();
+      can.position.set(sx * (attachX + 0.28), -h * 0.28, -d * 0.22);
+      can.rotation.z = sx * 0.42;
+      can.rotation.x = -0.25;
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.14, 0.56, 16), mats.darkMetal);
+      const glowRing = new THREE.Mesh(new THREE.CylinderGeometry(0.136, 0.136, 0.34, 16), mats.amberGlow);
+      can.add(body, glowRing);
+      for (let f = 0; f < 8; f++) {
+        const a = (f / 8) * Math.PI * 2;
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.54, 0.10), mats.darkMetal);
+        fin.position.set(Math.sin(a) * 0.17, 0, Math.cos(a) * 0.17);
+        fin.rotation.y = a;
+        can.add(fin);
+      }
+      solarGroup.add(mount, can);
+      deployState.rtgGlows.push(glowRing);
+    }
+    return;
+  }
+
+  if (solarId === 'quad-xwing') {
+    const bankAngles = [0.46, -0.46];
+    for (const sx of [-1, 1]) {
+      for (const tilt of bankAngles) {
+        const hinge = new THREE.Group();
+        hinge.position.set(sx * attachX, 0, 0);
+        const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.18, 8), mats.alum);
+        yoke.rotation.z = Math.PI / 2;
+        yoke.position.x = sx * 0.09;
+        const panel = makeWingPanel(1.38, 0.40, mats, false);
+        panel.position.set(sx * 0.86, 0, 0);
+        hinge.add(yoke, panel);
+        solarGroup.add(hinge);
+        deployState.wings.push({ group: hinge, side: sx, baseTiltX: tilt, deployedZ: 0 });
+      }
+    }
+    return;
+  }
+
+  if (solarId === 'rollout-blanket') {
+    for (const sx of [-1, 1]) {
+      const hinge = new THREE.Group();
+      hinge.position.set(sx * attachX, 0.02, 0);
+      for (const bz of [-0.26, 0.26]) {
+        const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 2.05, 8), mats.carbonStrut);
+        boom.rotation.z = Math.PI / 2;
+        boom.position.set(sx * 1.04, 0, bz);
+        hinge.add(boom);
+      }
+      const blanket = makeWingPanel(1.92, 0.56, mats, true);
+      blanket.position.set(sx * 1.02, 0, 0);
+      const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.62, 14), mats.goldFoil);
+      roller.rotation.x = Math.PI / 2;
+      roller.position.set(sx * 2.02, 0, 0);
+      hinge.add(blanket, roller);
+      solarGroup.add(hinge);
+      deployState.wings.push({ group: hinge, side: sx, baseTiltX: 0.22, deployedZ: 0 });
+    }
+    return;
+  }
+
+  const segCount = solarId === 'high-eff-gimbal' ? 3 : 2;
+  const segLen = solarId === 'high-eff-gimbal' ? 0.66 : 0.58;
+  const segW = solarId === 'high-eff-gimbal' ? 0.62 : 0.44;
+  for (const sx of [-1, 1]) {
+    const hinge = new THREE.Group();
+    hinge.position.set(sx * attachX, 0, 0);
+    const gimbal = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.20, 12), mats.alum);
+    gimbal.rotation.z = Math.PI / 2;
+    gimbal.position.x = sx * 0.10;
+    hinge.add(gimbal);
+    for (let k = 0; k < segCount; k++) {
+      const p = makeWingPanel(segLen, segW, mats, false);
+      p.position.x = sx * (0.20 + segLen * 0.5 + k * (segLen + 0.03));
+      hinge.add(p);
+    }
+    solarGroup.add(hinge);
+    deployState.wings.push({ group: hinge, side: sx, baseTiltX: 0.24, deployedZ: 0 });
+  }
+}
+
+function buildCommsSystem(commsGroup, txId, dims, mats, deployState) {
+  const { w, h, d } = dims;
+  const basePos = new THREE.Vector3(-w * 0.28, h * 0.5 + 0.02, -d * 0.18);
+
+  if (txId === 'uhf') {
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI * 0.25;
+      const pivot = new THREE.Group();
+      pivot.position.set(Math.sin(a) * (w * 0.34), h * 0.5, Math.cos(a) * (d * 0.34));
+      pivot.rotation.y = a;
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.011, 0.52, 8), mats.alum);
+      rod.position.y = 0.26;
+      pivot.add(rod);
+      commsGroup.add(pivot);
+      deployState.whips.push(pivot);
+    }
+    return;
+  }
+
+  if (txId === 's-band') {
+    const patch = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.18, 0.045, 6), mats.whiteCeramic);
+    patch.position.set(w * 0.24, h * 0.5 + 0.03, d * 0.14);
+    const copperRim = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.052, 6), mats.copper);
+    copperRim.position.copy(patch.position);
+    commsGroup.add(patch, copperRim);
+    return;
+  }
+
+  if (txId === 'sx-band') {
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.18, 12), mats.alum);
+    mast.position.copy(basePos).add(new THREE.Vector3(0, 0.08, 0));
+    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.05, 0.22, 20, 1, true), mats.copper);
+    horn.material.side = THREE.DoubleSide;
+    horn.position.copy(basePos).add(new THREE.Vector3(0, 0.24, 0));
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.016, 10, 20), mats.alum);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.copy(basePos).add(new THREE.Vector3(0, 0.35, 0));
+    commsGroup.add(mast, horn, collar);
+    return;
+  }
+
+  if (txId === 'ka-mesh') {
+    const root = new THREE.Group();
+    root.position.copy(basePos).add(new THREE.Vector3(-0.08, 0.16, -0.04));
+    root.rotation.set(-0.28, 0, 0.22);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.24, 10), mats.alum);
+    mast.position.y = -0.08;
+    root.add(mast);
+
+    const meshGroup = new THREE.Group();
+    const dishMat = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b, metalness: 0.72, roughness: 0.32, transparent: true, opacity: 0.72, wireframe: false, side: THREE.DoubleSide
+    });
+    const bowl = new THREE.Mesh(new THREE.LatheGeometry([
+      new THREE.Vector2(0.04, 0.0),
+      new THREE.Vector2(0.24, 0.05),
+      new THREE.Vector2(0.46, 0.18)
+    ], 24), dishMat);
+    meshGroup.add(bowl);
+    for (let r = 0; r < 12; r++) {
+      const a = (r / 12) * Math.PI * 2;
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.014, 0.46), mats.carbonStrut);
+      rib.position.set(Math.sin(a) * 0.23, 0.08, Math.cos(a) * 0.23);
+      rib.rotation.y = a;
+      rib.rotation.x = -0.34;
+      meshGroup.add(rib);
+    }
+    const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.028, 0.22, 12), mats.goldFoil);
+    feed.position.y = 0.24;
+    meshGroup.add(feed);
+    root.add(meshGroup);
+    commsGroup.add(root);
+    deployState.dishGroups.push(meshGroup);
+    return;
+  }
+
+  // ka-optical: precision laser gimbal turret
+  const turretBase = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.12, 16), mats.darkMetal);
+  turretBase.position.copy(basePos).add(new THREE.Vector3(0, 0.06, 0));
+  const yoke = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.09), mats.alum);
+  yoke.position.copy(basePos).add(new THREE.Vector3(0, 0.18, 0));
+  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.22, 20), mats.whiteCeramic);
+  head.rotation.x = Math.PI * 0.35;
+  head.position.copy(basePos).add(new THREE.Vector3(0, 0.22, 0.04));
+  const laserPort = new THREE.Mesh(new THREE.CircleGeometry(0.068, 20), mats.lens);
+  laserPort.rotation.x = -Math.PI * 0.15;
+  laserPort.position.copy(basePos).add(new THREE.Vector3(0, 0.28, 0.14));
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 10), mats.cyanGlow);
+  beacon.position.copy(laserPort.position).add(new THREE.Vector3(0, 0.01, 0.01));
+  commsGroup.add(turretBase, yoke, head, laserPort, beacon);
+}
+
+function buildThermalPropulsion(thermGroup, thermId, dims, mats, deployState) {
+  const { w, h, d } = dims;
+
+  if (thermId === 'cryocooler-st') {
+    const shieldRoot = new THREE.Group();
+    shieldRoot.position.set(0, -h * 0.42, 0);
+    for (let layer = 0; layer < 4; layer++) {
+      const scale = 1.0 - layer * 0.07;
+      const kite = new THREE.Mesh(
+        new THREE.BoxGeometry(w * 1.48 * scale, 0.012, d * 1.65 * scale),
+        layer === 0 ? mats.goldFoil : mats.alum
+      );
+      kite.rotation.y = Math.PI * 0.25;
+      kite.position.y = -layer * 0.055;
+      shieldRoot.add(kite);
+      deployState.sunshieldLayers.push({ mesh: kite, layer });
+    }
+    const radWing = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.42, 0.03), mats.whiteCeramic);
+    radWing.position.set(0, 0.15, -d * 0.56);
+    thermGroup.add(shieldRoot, radWing);
+    return;
+  }
+
+  if (thermId === 'xenon-ion') {
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.14, 24), mats.darkMetal);
+    collar.rotation.x = Math.PI * 0.5;
+    collar.position.set(0, -h * 0.30, -d * 0.5 - 0.06);
+    const hallRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 14, 28), mats.cyanGlow);
+    hallRing.position.set(0, -h * 0.30, -d * 0.5 - 0.14);
+    const plume = new THREE.Mesh(
+      new THREE.ConeGeometry(0.20, 0.55, 20, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.38, side: THREE.DoubleSide })
+    );
+    plume.rotation.x = -Math.PI * 0.5;
+    plume.position.set(0, -h * 0.30, -d * 0.5 - 0.42);
+    const xenonTank = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), mats.copper);
+    xenonTank.position.set(w * 0.24, -h * 0.24, -d * 0.42);
+    thermGroup.add(collar, hallRing, plume, xenonTank);
+    deployState.ionGlows.push({ ring: hallRing, plume });
+    return;
+  }
+
+  if (thermId === 'green-monoprop') {
+    const tank = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), mats.alum);
+    tank.position.set(0, -h * 0.22, -d * 0.48);
+    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.14, 0.22, 18), mats.darkMetal);
+    bell.rotation.x = Math.PI * 0.5;
+    bell.position.set(0, -h * 0.32, -d * 0.62);
+    thermGroup.add(tank, bell);
+    return;
+  }
+
+  if (thermId === 'cold-gas-rcs') {
+    const tank = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 14), mats.alum);
+    tank.position.set(0, -h * 0.26, -d * 0.45);
+    thermGroup.add(tank);
+    for (const sx of [-1, 1]) {
+      const quad = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.10), mats.darkMetal);
+      quad.position.set(sx * (w * 0.44), -h * 0.34, d * 0.42);
+      thermGroup.add(quad);
+    }
+    return;
+  }
+
+  // passive-mag louvers
+  const louver = new THREE.Mesh(new THREE.BoxGeometry(w * 0.48, 0.20, 0.03), mats.darkMetal);
+  louver.position.set(0, -h * 0.18, -d * 0.5 - 0.02);
+  thermGroup.add(louver);
+}
+
+/**
+ * Shared procedural 3D spacecraft factory used by Hangar, Launch Fairing, and Orbit.
+ * Reads live missionState across bus, multi-slot payloads, solar/RTG, prop/thermal, comms, and hullSkinId.
+ */
+export function buildSpacecraftModel(missionState, options = {}) {
+  const { deployProgress = 1, envMapIntensity = 1.0 } = options;
+  const bus = CATALOG.space.buses.find((b) => b.id === missionState.busId) || CATALOG.space.buses[2];
+  const dims = getBusDims(bus.id);
+  const mats = createSharedMats(missionState.hullSkinId || 'gold-kapton', envMapIntensity);
+
+  const group = new THREE.Group();
+  const busGroup = new THREE.Group();
+  const payloadGroup = new THREE.Group();
+  const solarGroup = new THREE.Group();
   const commsGroup = new THREE.Group();
-  if (missionState.transceiverId === 'uhf') {
-    const whips = [];
-    [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]].forEach(([x, z]) => {
-      const m = addPart(commsGroup, new THREE.CylinderGeometry(0.014, 0.014, 0.85, 8), mats.alloy, [x, 0.32, z], [z * 1.4, 0, -x * 1.4]);
-      whips.push({ m, x, z });
+  const thermalGroup = new THREE.Group();
+  const batteryGroup = new THREE.Group();
+
+  const battBox = new THREE.Mesh(new THREE.BoxGeometry(dims.w * 0.38, dims.h * 0.24, 0.10), mats.carbonStrut);
+  battBox.position.set(0, -dims.h * 0.12, -dims.d * 0.46);
+  batteryGroup.add(battBox);
+
+  const deployState = { wings: [], booms: [], sarHinges: [], whips: [], dishGroups: [], sunshieldLayers: [], ionGlows: [], rtgGlows: [] };
+
+  addBusMesh(busGroup, bus.id, dims, mats);
+  mountPayloads(payloadGroup, missionState.instrumentIds, bus, dims, mats, deployState);
+  buildPowerSystem(solarGroup, missionState.solarId, dims, mats, deployState);
+  buildCommsSystem(commsGroup, missionState.transceiverId, dims, mats, deployState);
+  buildThermalPropulsion(thermalGroup, missionState.thermalId, dims, mats, deployState);
+
+  group.add(busGroup, payloadGroup, solarGroup, commsGroup, thermalGroup, batteryGroup);
+
+  function setDeployProgress(t) {
+    const k = THREE.MathUtils.clamp(t, 0, 1);
+    deployState.wings.forEach((w) => {
+      w.group.rotation.z = w.side * (1 - k) * 1.48;
+      w.group.rotation.x = THREE.MathUtils.lerp(0, w.baseTiltX, k);
     });
-    deployHooks.push((t) => {
-      const splay = 0.15 + 1.25 * t;
-      whips.forEach(({ m, x, z }) => { m.rotation.set(z * splay, 0, -x * splay); });
+    deployState.booms.forEach((b) => {
+      b.scale.y = THREE.MathUtils.lerp(0.14, 1.0, k);
     });
-  } else if (missionState.transceiverId === 'sx-band') {
-    addPart(commsGroup, new THREE.BoxGeometry(0.38, 0.06, 0.38), mats.white, [0, 0.03, 0]);
-    addPart(commsGroup, new THREE.ConeGeometry(0.12, 0.24, 16), mats.gold, [0, 0.17, 0]);
-  } else {
-    const dishHead = new THREE.Group();
-    addPart(dishHead, new THREE.CylinderGeometry(0.038, 0.045, 0.36, 12), mats.alloy, [0, 0.18, 0]);
-    addPart(dishHead, new THREE.SphereGeometry(0.56, 28, 14, 0, Math.PI * 2, 2.12, 0.98), mats.dish, [0, 0.78, 0], [Math.PI, 0, 0]);
-    for (let r = 0; r < 6; r += 1) {
-      addPart(dishHead, new THREE.BoxGeometry(0.95, 0.015, 0.015), mats.alloy, [0, 0.36, 0], [0, (r * Math.PI) / 6, 0]);
-    }
-    for (let s = 0; s < 3; s += 1) {
-      const a = (s * Math.PI * 2) / 3;
-      addPart(dishHead, new THREE.CylinderGeometry(0.012, 0.012, 0.42, 8), mats.alloy, [Math.cos(a) * 0.22, 0.46, Math.sin(a) * 0.22], [Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55]);
-    }
-    addPart(dishHead, new THREE.SphereGeometry(0.045, 12, 10), mats.hdrCyan, [0, 0.64, 0]);
-    commsGroup.add(dishHead);
-    deployHooks.push((t) => {
-      dishHead.rotation.x = -0.52 * (1 - t);
-      dishHead.scale.setScalar(0.66 + 0.34 * t);
+    deployState.sarHinges.forEach((h) => {
+      h.rotation.x = THREE.MathUtils.lerp(-1.45, 0.28, k);
+    });
+    deployState.whips.forEach((p) => {
+      p.rotation.x = THREE.MathUtils.lerp(0.12, 0.85, k);
+    });
+    deployState.dishGroups.forEach((d) => {
+      const s = THREE.MathUtils.lerp(0.28, 1.0, k);
+      d.scale.set(s, 1, s);
+    });
+    deployState.sunshieldLayers.forEach((s) => {
+      const xy = THREE.MathUtils.lerp(0.26, 1.0, k);
+      s.mesh.scale.set(xy, 1, xy);
+      s.mesh.position.y = -s.layer * THREE.MathUtils.lerp(0.015, 0.06, k);
+    });
+    deployState.ionGlows.forEach((g) => {
+      g.plume.visible = k > 0.5;
     });
   }
-  regAnim(commsGroup, [0, dims.halfH + 0.05, dims.halfD * 0.55], [0, 1.45, 0.72]);
-  root.add(commsGroup);
 
-  // 5. Battery Pack Module (mounted on aft/lower bus wall)
-  const battGroup = new THREE.Group();
-  if (missionState.batteryId === 'rad-hard-pack') {
-    addPart(battGroup, new THREE.BoxGeometry(dims.halfW * 0.82, 0.36, 0.16), mats.gold, [0, 0, 0]);
-    for (let f = -2; f <= 2; f += 1) {
-      addPart(battGroup, new THREE.BoxGeometry(0.04, 0.38, 0.19), mats.rail, [f * dims.halfW * 0.14, 0, 0]);
-    }
-  } else if (missionState.batteryId === 'li-ion-dual') {
-    [-0.14, 0.14].forEach((bx) => addPart(battGroup, new THREE.BoxGeometry(0.22, 0.32, 0.12), mats.batt, [bx, 0, 0]));
-    addPart(battGroup, new THREE.BoxGeometry(0.46, 0.05, 0.14), mats.bronze, [0, 0.17, 0]);
-  } else {
-    addPart(battGroup, new THREE.BoxGeometry(0.26, 0.22, 0.09), mats.batt, [0, 0, 0]);
-    addPart(battGroup, new THREE.BoxGeometry(0.22, 0.04, 0.1), mats.alloy, [0, 0.11, 0]);
-  }
-  regAnim(battGroup, [0, -dims.halfH * 0.25, -dims.halfD - 0.05], [0, -0.3, -0.85]);
-  root.add(battGroup);
-
-  // 6. Propulsion + Thermal Louvers + Dual Star Trackers (-Y / +Z)
-  const propGroup = new THREE.Group();
-  (missionState.busId === 'flagship-bus' ? [-0.36, 0.36] : [0]).forEach((nx) => {
-    addPart(propGroup, new THREE.CylinderGeometry(0.1, 0.24, 0.36, 20), mats.rail, [nx, -0.18, 0]);
-    addPart(propGroup, new THREE.TorusGeometry(0.22, 0.018, 8, 20), mats.bronze, [nx, -0.34, 0], [Math.PI / 2, 0, 0]);
-  });
-
-  if (missionState.thermalId === 'cryocooler-st') {
-    addPart(propGroup, new THREE.BoxGeometry(dims.halfW * 0.96, 0.44, 0.08), mats.white, [0, 0.26, -dims.halfD - 0.06]);
-    addPart(propGroup, new THREE.CylinderGeometry(0.11, 0.11, 0.36, 16), mats.gold, [dims.halfW * 0.56, dims.halfH + 0.14, -dims.halfD * 0.55]);
-    addPart(propGroup, new THREE.TorusGeometry(0.12, 0.02, 8, 16), mats.bronze, [dims.halfW * 0.56, dims.halfH + 0.26, -dims.halfD * 0.55], [Math.PI / 2, 0, 0]);
-  } else if (missionState.thermalId === 'rw-louver') {
-    addPart(propGroup, new THREE.BoxGeometry(dims.halfW * 0.92, 0.42, 0.06), mats.rail, [0, 0.25, -dims.halfD - 0.05]);
-    for (let l = -1; l <= 1; l += 1) {
-      addPart(propGroup, new THREE.BoxGeometry(dims.halfW * 0.86, 0.07, 0.04), mats.white, [0, 0.25 + l * 0.12, -dims.halfD - 0.08], [0.35, 0, 0]);
-    }
-  } else {
-    addPart(propGroup, new THREE.BoxGeometry(dims.halfW * 0.86, 0.36, 0.05), mats.white, [0, 0.24, -dims.halfD - 0.05]);
-    addPart(propGroup, new THREE.CylinderGeometry(0.02, 0.02, dims.halfW * 0.9, 8), mats.bronze, [0, 0.44, -dims.halfD - 0.06], [0, 0, Math.PI / 2]);
+  function setExploded(amount) {
+    const raw = typeof amount === 'boolean' ? (amount ? 1 : 0) : Number(amount || 0);
+    const a = THREE.MathUtils.clamp(raw, 0, 1) * 0.72;
+    payloadGroup.position.set(0, a * 0.55, a * 0.35);
+    solarGroup.position.set(0, 0, 0);
+    deployState.wings.forEach((w) => { w.group.position.x = w.side * (dims.w * 0.5 + 0.04 + a * 0.55); });
+    commsGroup.position.set(-a * 0.35, a * 0.65, -a * 0.25);
+    thermalGroup.position.set(0, -a * 0.45, -a * 0.55);
+    batteryGroup.position.set(0, 0, -a * 0.42);
   }
 
-  const stSize = missionState.thermalId === 'cryocooler-st' ? 1.45 : 1.0;
-  [-1, 1].forEach((sx) => {
-    addPart(propGroup, new THREE.ConeGeometry(0.085 * stSize, 0.24 * stSize, 14), mats.rail, [sx * dims.halfW * 0.52, dims.halfH * 1.55, dims.halfD + 0.08], [Math.PI / 3, sx * 0.25, 0]);
-    addPart(propGroup, new THREE.CylinderGeometry(0.045 * stSize, 0.045 * stSize, 0.04 * stSize, 12), mats.lens, [sx * dims.halfW * 0.52, dims.halfH * 1.55, dims.halfD + 0.08], [Math.PI / 3, sx * 0.25, 0]);
-  });
-  regAnim(propGroup, [0, -dims.halfH - 0.02, 0], [0, -0.95, 0]);
-  root.add(propGroup);
+  function update(_dt, elapsed = 0) {
+    const pulse = 1.3 + Math.sin(elapsed * 4.5) * 0.45;
+    deployState.ionGlows.forEach((g) => {
+      g.ring.material.emissiveIntensity = pulse * 1.4;
+      g.plume.scale.set(1, 0.92 + Math.sin(elapsed * 12) * 0.12, 1);
+    });
+    deployState.rtgGlows.forEach((r) => {
+      r.material.emissiveIntensity = 1.2 + Math.sin(elapsed * 2.2) * 0.35;
+    });
+  }
 
-  const setDeployProgress = (t) => {
-    const c = THREE.MathUtils.clamp(t, 0, 1);
-    deployHooks.forEach((fn) => fn(c));
-  };
   setDeployProgress(deployProgress);
 
-  const applyExplode = (alpha) => {
-    animParts.forEach((p) => p.obj.position.lerpVectors(p.base, p.exp, alpha));
-  };
+  let meshCount = 0;
+  group.traverse((obj) => {
+    if (obj.isMesh) meshCount += 1;
+  });
 
-  const setExploded = (amount, immediate = false) => {
-    explodeTarget = typeof amount === 'boolean' ? (amount ? 1 : 0) : THREE.MathUtils.clamp(amount, 0, 1);
-    if (immediate) {
-      explodeCur = explodeTarget;
-      applyExplode(explodeCur);
-    }
-  };
-
-  const update = (dt = 0.016, elapsed = 0) => {
-    if (Math.abs(explodeCur - explodeTarget) > 0.0005) {
-      explodeCur = THREE.MathUtils.lerp(explodeCur, explodeTarget, Math.min(1, dt * 7));
-      applyExplode(explodeCur);
-    }
-    pulseMeshes.forEach((m) => { m.material.opacity = 0.4 + 0.45 * Math.abs(Math.sin(elapsed * 4)); });
-  };
-
-  const dispose = () => {
-    root.traverse((obj) => {
+  function dispose() {
+    group.traverse((obj) => {
       if (obj.geometry) obj.geometry.dispose();
       if (obj.material) {
-        (Array.isArray(obj.material) ? obj.material : [obj.material]).forEach((m) => {
-          ['map', 'bumpMap', 'emissiveMap'].forEach((k) => {
-            if (m[k] && !isCachedCraftTexture(m[k])) m[k].dispose();
-          });
+        const list = Array.isArray(obj.material) ? obj.material : [obj.material];
+        list.forEach((m) => {
+          if (m.map && !cachedTexSet.has(m.map)) m.map.dispose();
+          if (m.bumpMap && !cachedTexSet.has(m.bumpMap)) m.bumpMap.dispose();
           m.dispose();
         });
       }
     });
-  };
+  }
 
   return {
-    group: root,
-    parts: { bus: busGroup, solar: solarWrap, payload: payloadGroup, comms: commsGroup, thermal: propGroup, battery: battGroup },
-    dims,
+    group,
+    parts: { bus: busGroup, payload: payloadGroup, solar: solarGroup, comms: commsGroup, thermal: thermalGroup, battery: batteryGroup, ...deployState },
+    dims: { ...dims, halfH: dims.h * 0.5 },
     meshCount,
-    pulseMeshes,
     setExploded,
     setDeployProgress,
     update,
