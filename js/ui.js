@@ -332,7 +332,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <h2 class="debrief-title">${esc(scenario.name)}</h2>
         <div class="debrief-sub">${esc(orbitElements.name)} · Hull ${hullFinal}% · ${resolvedCount} Anomalies Resolved</div>
       </div>
-      <button id="rev-close-btn" class="debrief-close-btn" type="button">✕ CLOSE / KEEP FLYING [ESC]</button>
+      <button id="rev-close-btn" class="debrief-close-btn" type="button">✕ CLOSE [ESC]</button>
     </div>
 
     <div class="debrief-hero-band">
@@ -382,8 +382,6 @@ export function renderStageHud(stage, state, ev, opts) {
     <div class="debrief-footer-nav">
       <button id="rev-menu-btn" class="debrief-cta" type="button">🏠 BACK TO MENU</button>
       <button id="rev-next-btn" class="debrief-cta is-primary" type="button">▶ NEXT MISSION</button>
-      <button id="rev-back-btn" class="debrief-cta" type="button">🛠️ TWEAK IN HANGAR</button>
-      <button id="rev-export-btn" class="debrief-cta" type="button">📥 EXPORT TRAJECTORY</button>
     </div>
   </div>`;
 

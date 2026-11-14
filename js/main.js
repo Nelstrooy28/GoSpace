@@ -346,14 +346,6 @@ function init() {
       stage = 'hangar';
       orbitSessionDirty = true;
       renderAll(true);
-    } else if (e.target.closest('#rev-export-btn')) {
-      exportMissionVizJSON(missionState, lastEval);
-    } else if (e.target.closest('#rev-save-btn')) {
-      openSaveModal();
-    } else if (e.target.closest('#rev-back-btn')) {
-      playEquip();
-      orbitSessionDirty = true;
-      setStage('hangar');
     } else if (e.target.closest('#rev-next-btn')) {
       playEquip();
       orbitSessionDirty = true;
