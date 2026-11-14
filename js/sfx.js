@@ -89,6 +89,18 @@ export function playVictoryFanfare() {
   });
 }
 
+export function playStarChime(idx = 0) {
+  const freqs = [587.33, 783.99, 1046.5];
+  const f = freqs[Math.min(2, Math.max(0, idx))];
+  tone(f, f * 1.02, 0.18, 'triangle', 0.085, 0);
+  tone(f * 1.5, f * 1.5, 0.14, 'sine', 0.045, 0.04);
+}
+
+export function playRankStamp() {
+  tone(150, 62, 0.22, 'sawtooth', 0.09, 0);
+  tone(440, 880, 0.16, 'triangle', 0.06, 0.03);
+}
+
 export function playStageSep() {
   tone(160, 48, 0.22, 'sawtooth', 0.11, 0);
   tone(820, 290, 0.14, 'triangle', 0.07, 0.03);

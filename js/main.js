@@ -2,7 +2,7 @@ import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign } from '.
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { activateSafeMode, mountOrbit, mountShowcase, repairActiveHazard, scanAsteroid, seekOrbitToPass, setOrbitCameraMode, setOrbitTimeWarp, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
+import { activateSafeMode, mountOrbit, mountShowcase, repairActiveHazard, scanAsteroid, seekOrbitToPass, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
 import { isMuted, playEquip, playHover, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
 import { SUB_TABS, renderHud, renderLoadoutDock, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
@@ -16,7 +16,7 @@ let stage = 'hangar', titleOpen = true, activeSegment = 'user', activeSub = 'obj
 let missionState = (() => { const s = readJson(STORAGE_ACTIVE, null); return s?.scenarioId ? s : createInitialState('wildfiresat-l1', false); })();
 let activeScene = null, hudHidden = false, codexOpen = false;
 let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 25, orbitCam = 'full';
-let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0;
+let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0, orbitSessionDirty = true;
 
 function unmountAll() {
   if (activeScene === 'hangar') unmountCleanroom();
@@ -51,10 +51,37 @@ function spawnPopup(text) {
   setTimeout(() => el.remove(), 1450);
 }
 
-function setStage(nextStage) {
+function setStage(nextStage, keepOrbit = false) {
+  const prevStage = stage;
   stage = nextStage; codexOpen = false;
-  if (stage === 'review') playVictoryFanfare();
-  renderAll();
+  if (stage === 'review' && prevStage !== 'review') playVictoryFanfare();
+  if (stage === 'orbit' && prevStage === 'review') setOrbitVictoryMode(false, orbitCam);
+  renderAll(!keepOrbit);
+}
+
+function mountLiveOrbit(vp, isVictory = false) {
+  unmountAll(); orbitTelemetry = null; orbitScore = 0; orbitSessionDirty = false;
+  mountOrbit(vp, missionState, lastEval, (t) => {
+    orbitTelemetry = t; orbitScore = t.missionScore || 0; orbitWarp = t.timeWarp ?? orbitWarp; updateOrbitOverlay(t);
+    if (window.__MISSION_DEBUG__) { window.__MISSION_DEBUG__.orbitTelemetry = t; window.__MISSION_DEBUG__.orbitScore = orbitScore; }
+    notifyTutorialState();
+  }, {
+    victory: isVictory,
+    onHazardEvent: (ev) => {
+      if (ev.type === 'trigger') {
+        orbitWarp = ev.timeWarp ?? 1;
+        spawnPopup(`🚨 ${ev.icon} ANOMALY DETECTED · WARP 1x`);
+      } else if (ev.type === 'resolve') {
+        orbitScore += ev.bonus || 75;
+        spawnPopup('+75 FLIGHT DIRECTOR BONUS · SYSTEMS NOMINAL!');
+      } else if (ev.type === 'expire') {
+        spawnPopup(`💥 HULL IMPACT -${ev.hullLoss}% · MISSED REPAIR`);
+      }
+    }
+  });
+  activeScene = 'orbit';
+  if (!isVictory) { setOrbitTimeWarp(orbitWarp); setOrbitCameraMode(orbitCam); }
+  else setOrbitTimeWarp(1);
 }
 
 function applyChrome() {
@@ -88,11 +115,13 @@ function renderAll(rebuildScene = true, focusTag = null) {
       activeScene = 'showcase';
     }
   } else if (stage === 'hangar') {
+    orbitSessionDirty = true;
     if (activeScene !== 'hangar') {
       unmountAll(); mountCleanroom(vp, missionState);
       activeScene = 'hangar'; setAutoRotate(autoRotate); setExploded(exploded);
     } else if (rebuildScene) updateSpacecraft(missionState, focusTag);
   } else if (stage === 'launch') {
+    orbitSessionDirty = true;
     if (activeScene !== 'launch' || rebuildScene) {
       unmountAll(); launchTelemetry = null;
       mountLaunch(vp, missionState, (t) => {
@@ -103,33 +132,28 @@ function renderAll(rebuildScene = true, focusTag = null) {
       activeScene = 'launch'; setLaunchCamera(launchCam);
     }
   } else if (stage === 'orbit') {
-    if (activeScene !== 'orbit' || rebuildScene) {
-      unmountAll(); orbitTelemetry = null; orbitScore = 0;
-      mountOrbit(vp, missionState, lastEval, (t) => {
-        orbitTelemetry = t; orbitScore = t.missionScore || 0; orbitWarp = t.timeWarp ?? orbitWarp; updateOrbitOverlay(t);
-        if (window.__MISSION_DEBUG__) { window.__MISSION_DEBUG__.orbitTelemetry = t; window.__MISSION_DEBUG__.orbitScore = orbitScore; }
-        notifyTutorialState();
-      }, {
-        onHazardEvent: (ev) => {
-          if (ev.type === 'trigger') {
-            orbitWarp = ev.timeWarp ?? 1;
-            spawnPopup(`🚨 ${ev.icon} ANOMALY DETECTED · WARP 1x`);
-          } else if (ev.type === 'resolve') {
-            orbitScore += ev.bonus || 75;
-            spawnPopup('+75 FLIGHT DIRECTOR BONUS · SYSTEMS NOMINAL!');
-          } else if (ev.type === 'expire') {
-            spawnPopup(`💥 HULL IMPACT -${ev.hullLoss}% · MISSED REPAIR`);
-          }
-        }
-      });
-      activeScene = 'orbit'; setOrbitTimeWarp(orbitWarp); setOrbitCameraMode(orbitCam);
+    if (activeScene !== 'orbit' || orbitSessionDirty) {
+      mountLiveOrbit(vp, false);
+    }
+  } else if (stage === 'review') {
+    if (activeScene !== 'orbit' || orbitSessionDirty) {
+      mountLiveOrbit(vp, true);
+    } else {
+      setOrbitVictoryMode(true, orbitCam);
+      setOrbitTimeWarp(1);
     }
   } else unmountAll();
 
   renderStageHud(stage, missionState, lastEval, {
     autoRotate, exploded, meshCount: getMeshCount(), launchCam, orbitCam, orbitWarp, orbitScore,
     anomaliesResolved: orbitTelemetry?.anomaliesResolved || 0,
-    hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100
+    hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100,
+    downlinkCount: orbitTelemetry?.downlinkCount || 0,
+    asteroidsScanned: orbitTelemetry?.asteroidsScanned || 0,
+    downlinkPts: orbitTelemetry?.downlinkPts,
+    anomalyPts: orbitTelemetry?.anomalyPts,
+    scanPts: orbitTelemetry?.scanPts,
+    batterySoc: orbitTelemetry?.batterySoc
   });
   updateDebug(lastEval);
   notifyTutorialState();
@@ -299,6 +323,7 @@ function init() {
     else if (e.target.closest('[data-cam]')) { orbitCam = e.target.closest('[data-cam]').dataset.cam; setOrbitCameraMode(orbitCam); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore, hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100 }); }
     else if (e.target.closest('[data-warp]')) { orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp); setOrbitTimeWarp(orbitWarp); renderStageHud(stage, missionState, lastEval, { orbitCam, orbitWarp, orbitScore, hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100 }); }
     else if (e.target.closest('#orb-test-hazard-btn')) triggerTestHazard();
+    else if (e.target.closest('#orb-debrief-btn')) { playEquip(); setStage('review', true); }
   });
   document.getElementById('hazard-alert-hud').addEventListener('click', (e) => {
     if (e.target.closest('#hazard-repair-btn')) handleRepairHazard(null);
@@ -310,18 +335,44 @@ function init() {
     else if (e.target.closest('#orb-safemode-btn')) handleSafeMode();
   });
   document.getElementById('review-overlay').addEventListener('click', (e) => {
-    if (e.target.closest('#rev-export-btn')) exportMissionVizJSON(missionState, lastEval);
-    else if (e.target.closest('#rev-save-btn')) openSaveModal();
-    else if (e.target.closest('#rev-back-btn')) setStage('hangar');
-    else if (e.target.closest('#rev-next-btn')) {
+    if (e.target.closest('#rev-close-btn')) {
+      playEquip();
+      setStage('orbit', true);
+      setOrbitTimeWarp(orbitWarp || 1);
+    } else if (e.target.closest('#rev-menu-btn')) {
+      playEquip();
+      triggerWarpFlash();
+      titleOpen = true;
+      stage = 'hangar';
+      orbitSessionDirty = true;
+      renderAll(true);
+    } else if (e.target.closest('#rev-export-btn')) {
+      exportMissionVizJSON(missionState, lastEval);
+    } else if (e.target.closest('#rev-save-btn')) {
+      openSaveModal();
+    } else if (e.target.closest('#rev-back-btn')) {
+      playEquip();
+      orbitSessionDirty = true;
+      setStage('hangar');
+    } else if (e.target.closest('#rev-next-btn')) {
+      playEquip();
+      orbitSessionDirty = true;
       const idx = (SCENARIOS.findIndex((s) => s.id === missionState.scenarioId) + 1) % SCENARIOS.length;
-      missionState = createInitialState(SCENARIOS[idx].id, missionState.sandboxMode); setStage('hangar');
+      missionState = createInitialState(SCENARIOS[idx].id, missionState.sandboxMode);
+      setStage('hangar');
     }
   });
 
   window.addEventListener('keydown', (e) => {
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
     const k = e.key.toLowerCase();
+    if (e.key === 'Escape' && stage === 'review' && !titleOpen) {
+      e.preventDefault();
+      playEquip();
+      setStage('orbit', true);
+      setOrbitTimeWarp(orbitWarp || 1);
+      return;
+    }
     if (k === 'h' && !titleOpen) { hudHidden = !hudHidden; applyChrome(); updateDebug(lastEval); }
     else if (e.code === 'Space' && !titleOpen) {
       if (stage === 'launch') { e.preventDefault(); triggerIgnition(); }

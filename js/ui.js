@@ -1,4 +1,14 @@
 import { CATALOG, OFFICIAL_RESOURCES, SCENARIOS } from './catalog.js';
+import { playRankStamp, playStarChime } from './sfx.js';
+
+let debriefTimers = [];
+let debriefRaf = 0;
+
+function cancelDebriefAnim() {
+  debriefTimers.forEach((id) => clearTimeout(id));
+  debriefTimers = [];
+  if (debriefRaf) { cancelAnimationFrame(debriefRaf); debriefRaf = 0; }
+}
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const SUB_TABS = {
@@ -199,6 +209,7 @@ export function renderStageHud(stage, state, ev, opts) {
 
   const hBox = document.getElementById('hazard-alert-hud');
   if (hBox && stage !== 'orbit') { hBox.hidden = true; hBox.innerHTML = ''; }
+  if (stage !== 'review') { cancelDebriefAnim(); rev.dataset.rendered = ''; }
   if (stage === 'hangar') {
     hud.innerHTML = `<div class="stage-card plate">
       <div class="card-head"><span>HANGAR CAMERA</span><span class="badge-tag">${opts.meshCount} PARTS</span></div>
@@ -245,6 +256,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.orbitWarp === 100 ? 'is-on' : ''}" data-warp="100" type="button">100x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
         <button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Test Hazard</button>
+        <button id="orb-debrief-btn" class="btn-sci active" type="button">🏆 View Debrief</button>
       </div>
       <div class="hull-meter-row">
         <div class="hull-meter-head"><span>HULL INTEGRITY</span><span id="orb-hull-pct">${opts.hullIntegrity ?? 100}%</span></div>
@@ -258,21 +270,167 @@ export function renderStageHud(stage, state, ev, opts) {
   }
   hud.innerHTML = ''; actions.innerHTML = '';
   const { scenario, orbitElements, metrics, missionMatch, cmlLevel, sandboxMode } = ev;
-  const oScore = opts.orbitScore || 0, resolvedCount = opts.anomaliesResolved || 0, hullFinal = opts.hullIntegrity ?? 100;
-  const totalScore = metrics.scienceScore * 10 + oScore + (cmlLevel === 4 ? 250 : 0);
-  const starCount = (cmlLevel === 4 || sandboxMode) && metrics.scienceScore >= 85 && oScore >= 50 ? 3 : (cmlLevel >= 3 ? 2 : 1);
-  const rank = starCount === 3 ? 'FLIGHT DIRECTOR' : (starCount === 2 ? 'SENIOR ENGINEER' : 'CADET');
-  rev.innerHTML = `<div class="vp-card plate">
-    <div class="card-head"><span>FLIGHT READINESS DEBRIEF</span><span class="badge-tag">${rank} · ${totalScore} PTS</span></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
-      <div><h2 style="margin:0;font-size:20px">${esc(scenario.name)}</h2><div style="color:var(--muted);font-size:14px">${esc(orbitElements.name)} · Orbit Bonus +${oScore} pts · Anomalies Resolved: ${resolvedCount} · Hull ${hullFinal}%</div></div>
-      <div class="stars-reveal">${'★'.repeat(starCount)}${'☆'.repeat(3 - starCount)}</div>
+  const oScore = opts.orbitScore || 0;
+  const resolvedCount = opts.anomaliesResolved || 0;
+  const hullFinal = opts.hullIntegrity ?? 100;
+  const downlinkCount = opts.downlinkCount || 0;
+  const asteroidsScanned = opts.asteroidsScanned || 0;
+  const downlinkPts = opts.downlinkPts ?? downlinkCount * 50;
+  const anomalyPts = opts.anomalyPts ?? resolvedCount * 75;
+  const scanPts = opts.scanPts ?? Math.max(0, oScore - downlinkPts - anomalyPts);
+  const budgetEfficiency = !sandboxMode && metrics.budget.usedM <= metrics.budget.limitM
+    ? Math.round((metrics.budget.limitM - metrics.budget.usedM) * 4)
+    : 0;
+  const engPts = metrics.scienceScore * 10 + (cmlLevel === 4 ? 250 : 0) + budgetEfficiency;
+  const totalScore = downlinkPts + anomalyPts + scanPts + engPts;
+
+  const starCount = (cmlLevel === 4 || sandboxMode) && metrics.scienceScore >= 85 && (oScore >= 50 || resolvedCount > 0)
+    ? 3
+    : (cmlLevel >= 3 ? 2 : 1);
+  const rankMeta = starCount === 3 && totalScore >= 1350
+    ? { label: 'S-RANK // FLIGHT DIRECTOR', cls: 'rank-s', tip: '' }
+    : starCount === 3
+      ? { label: 'A-RANK // MISSION COMMANDER', cls: 'rank-a', tip: '' }
+      : starCount === 2
+        ? { label: 'B-RANK // SYSTEMS ENGINEER', cls: 'rank-b', tip: 'Reach CML 4 with >=85% Science and >=50 Orbit Ops pts for 3 stars.' }
+        : { label: 'MISSION AT RISK', cls: 'rank-risk', tip: 'Fix yellow warnings in Hangar (CML 4) and downlink science in Orbit to hit 3 stars!' };
+
+  const busObj = CATALOG.space.buses.find((b) => b.id === state.busId);
+  const bandObj = CATALOG.user.wavelengths.find((w) => w.id === state.wavelengthBand);
+  const ribbons = [];
+  if (hullFinal >= 100) ribbons.push({ icon: '🛡️', label: 'Flawless Hull (100%)' });
+  if (resolvedCount >= 1) ribbons.push({ icon: '⚡', label: 'Crisis Responder' });
+  if (!sandboxMode && metrics.budget.usedM <= metrics.budget.limitM * 0.9) ribbons.push({ icon: '💎', label: 'Under-Budget Ace' });
+  if (asteroidsScanned >= 1) ribbons.push({ icon: '☄️', label: 'Asteroid Hunter' });
+  if (downlinkCount >= 1) ribbons.push({ icon: '📡', label: 'Deep-Space Broadcaster' });
+  if (metrics.powerMargin >= 10 && (state.solarId === 'rtg-nuclear' || state.solarId === 'high-eff-gimbal' || (opts.batterySoc ?? 84) >= 50)) {
+    ribbons.push({ icon: '🔋', label: 'Eclipse Survivor' });
+  }
+  if (!ribbons.length) ribbons.push({ icon: '🛠️', label: 'Concept Architect' });
+
+  const starSvg = (lit, idx) => `<svg class="debrief-star ${lit ? 'lit' : 'unlit'}" data-star-idx="${idx}" viewBox="0 0 64 64" aria-hidden="true">
+    <polygon points="32,4 40.5,22 60,24.5 45.5,38 49.2,58 32,48.2 14.8,58 18.5,38 4,24.5 23.5,22" />
+  </svg>`;
+
+  const confettiHtml = starCount === 3
+    ? `<div class="debrief-confetti" aria-hidden="true">${Array.from({ length: 24 }, (_, i) => {
+        const angle = (i / 24) * 360;
+        const dist = 65 + (i % 4) * 28;
+        const col = i % 3 === 0 ? '#fbbf24' : (i % 3 === 1 ? '#38bdf8' : '#34d399');
+        return `<span class="confetti-bit" style="--tx:${Math.cos(angle * Math.PI / 180) * dist}px;--ty:${Math.sin(angle * Math.PI / 180) * dist - 14}px;--rot:${(i * 47) % 360}deg;--col:${col};--delay:${(i % 5) * 45}ms"></span>`;
+      }).join('')}</div>`
+    : '';
+
+  if (rev.dataset.rendered === '1') return;
+  rev.dataset.rendered = '1';
+  cancelDebriefAnim();
+
+  rev.innerHTML = `<div class="debrief-showcase plate">
+    <div class="debrief-topbar">
+      <div class="debrief-brand">
+        <span class="debrief-kicker">GOSPACE MISSION DEBRIEF</span>
+        <h2 class="debrief-title">${esc(scenario.name)}</h2>
+        <div class="debrief-sub">${esc(orbitElements.name)} · Hull ${hullFinal}% · ${resolvedCount} Anomalies Resolved</div>
+      </div>
+      <button id="rev-close-btn" class="debrief-close-btn" type="button">✕ CLOSE / KEEP FLYING [ESC]</button>
     </div>
-    <div class="collectible-card"><span style="font-size:28px">🏆</span><div><div class="badge-tag" style="display:inline-block;margin-bottom:4px">REAL-WORLD SPACECRAFT MATCH · ${esc(missionMatch.tag || 'SPACECRAFT')}</div>
-      <div style="font-weight:700;font-size:16px">${esc(missionMatch.name)}</div><div style="font-size:14px;color:var(--muted)">${esc(missionMatch.detail)}</div></div></div>
-    <div style="font-family:var(--font-hud);font-size:14px;color:var(--cyan);margin-top:10px">MISSION DESIGN TELEMETRY</div>
-    <div class="vp-grid" style="margin:6px 0 12px">${getGaugeRows(ev).map((g) => `<div class="vp-stat"><div style="font-size:13.5px;color:var(--muted)">${g.label}</div><div style="font-family:var(--font-hud);font-size:16px">${esc(g.val)}</div></div>`).join('')}<div class="vp-stat"><div style="font-size:13.5px;color:var(--muted)">Anomalies</div><div style="font-family:var(--font-hud);font-size:16px">${resolvedCount} Resolved · Hull ${hullFinal}%</div></div></div>
-    <div class="btn-row"><button id="rev-next-btn" class="btn-sci active" type="button">🔄 Play Next Mission</button><button id="rev-back-btn" class="btn-sci" type="button">🛠️ Tweak Build</button><button id="rev-export-btn" class="btn-sci" type="button">📥 Export 3D Trajectory JSON</button><button id="rev-save-btn" class="btn-sci" type="button">💾 Save</button></div></div>`;
+
+    <div class="debrief-hero-band">
+      <div class="debrief-stars-wrap">
+        <div class="debrief-stars-row">${starSvg(starCount >= 1, 0)}${starSvg(starCount >= 2, 1)}${starSvg(starCount >= 3, 2)}</div>
+        ${confettiHtml}
+      </div>
+      <div id="debrief-rank-crest" class="rank-crest ${rankMeta.cls}">${esc(rankMeta.label)}</div>
+      <div class="debrief-total-pill">
+        <span class="debrief-total-lbl">TOTAL SCORE</span>
+        <span id="debrief-total-num" class="debrief-total-num">0</span>
+      </div>
+    </div>
+    ${rankMeta.tip ? `<div class="debrief-risk-tip">💡 ${esc(rankMeta.tip)}</div>` : ''}
+
+    <div class="debrief-main-grid">
+      <section class="debrief-panel">
+        <div class="debrief-sec-head">SCORE BREAKDOWN &amp; TELEMETRY</div>
+        <div class="score-rows">
+          <div class="score-row"><span>📡 Science Data Downlinked</span><strong>+${downlinkPts} PTS</strong></div>
+          <div class="score-row"><span>🛠️ Space Anomalies Repaired</span><strong>+${anomalyPts} PTS</strong></div>
+          <div class="score-row"><span>☄️ Asteroid &amp; Deep-Space Scans</span><strong>+${scanPts} PTS</strong></div>
+          <div class="score-row"><span>💰 Engineering &amp; Budget Efficiency</span><strong>+${engPts} PTS</strong></div>
+        </div>
+        <div class="debrief-sec-head" style="margin-top:10px">EARNED MISSION RIBBONS</div>
+        <div class="ribbons-shelf">${ribbons.map((r) => `<span class="medal-chip">${r.icon} ${esc(r.label)}</span>`).join('')}</div>
+      </section>
+
+      <section class="holo-card" id="debrief-holo-card">
+        <div class="holo-glint" aria-hidden="true"></div>
+        <div class="holo-head">UNLOCKED SPACECRAFT ARCHIVE · ${esc(missionMatch.tag || 'ORBITER')}</div>
+        <div class="holo-name">🏆 ${esc(missionMatch.name)}</div>
+        <p class="holo-detail">${esc(missionMatch.detail)}</p>
+        <div class="holo-pills">
+          <span class="holo-pill">🛰️ Orbit: ${esc(orbitElements.name.split('(')[0].trim())}</span>
+          <span class="holo-pill">🔭 Band: ${esc(bandObj?.name || state.wavelengthBand)}</span>
+          <span class="holo-pill">🧰 Bus: ${esc(busObj?.name || state.busId)}</span>
+        </div>
+        <div class="holo-telemetry-mini">
+          <span>Budget $${metrics.budget.usedM}M</span>
+          <span>Power ${metrics.powerMargin}%</span>
+          <span>Science ${metrics.scienceScore}%</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="debrief-footer-nav">
+      <button id="rev-menu-btn" class="debrief-cta" type="button">🏠 BACK TO MENU</button>
+      <button id="rev-next-btn" class="debrief-cta is-primary" type="button">▶ NEXT MISSION</button>
+      <button id="rev-back-btn" class="debrief-cta" type="button">🛠️ TWEAK IN HANGAR</button>
+      <button id="rev-export-btn" class="debrief-cta" type="button">📥 EXPORT TRAJECTORY</button>
+    </div>
+  </div>`;
+
+  // Sequenced star slam with rising chimes (250ms stagger)
+  for (let i = 0; i < 3; i += 1) {
+    const tId = setTimeout(() => {
+      const starEl = rev.querySelector(`[data-star-idx="${i}"]`);
+      if (starEl) starEl.classList.add('is-slammed');
+      if (i < starCount) playStarChime(i);
+    }, 140 + i * 250);
+    debriefTimers.push(tId);
+  }
+
+  // Confetti burst + rank crest stamp
+  const stampId = setTimeout(() => {
+    rev.querySelector('.debrief-confetti')?.classList.add('is-bursting');
+    document.getElementById('debrief-rank-crest')?.classList.add('is-stamped');
+    playRankStamp();
+  }, 780);
+  debriefTimers.push(stampId);
+
+  // Rolling score counter over 900ms
+  const scoreEl = document.getElementById('debrief-total-num');
+  const startMs = performance.now();
+  const durMs = 900;
+  const tickScore = (nowMs) => {
+    const p = Math.min(1, (nowMs - startMs) / durMs);
+    const eased = 1 - ((1 - p) ** 3);
+    if (scoreEl) scoreEl.textContent = String(Math.round(totalScore * eased));
+    if (p < 1) debriefRaf = requestAnimationFrame(tickScore);
+    else debriefRaf = 0;
+  };
+  debriefRaf = requestAnimationFrame(tickScore);
+
+  // Subtle 3D mouse tilt on holographic twin card
+  const holo = document.getElementById('debrief-holo-card');
+  if (holo) {
+    holo.addEventListener('mousemove', (evMove) => {
+      const r = holo.getBoundingClientRect();
+      const nx = (evMove.clientX - r.left) / Math.max(r.width, 1) - 0.5;
+      const ny = (evMove.clientY - r.top) / Math.max(r.height, 1) - 0.5;
+      holo.style.transform = `perspective(800px) rotateY(${(nx * 10).toFixed(2)}deg) rotateX(${(-ny * 9).toFixed(2)}deg)`;
+    });
+    holo.addEventListener('mouseleave', () => {
+      holo.style.transform = 'perspective(800px) rotateY(0deg) rotateX(0deg)';
+    });
+  }
 }
 
 export function updateLaunchOverlay(t) {

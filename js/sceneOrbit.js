@@ -21,10 +21,11 @@ let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = n
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, beamHalo = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
 let gsNodes = [], gsPulseRing = null, orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
-let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false;
+let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false;
 let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, fitDist = 7.2, sunElapsed = 0;
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
+let downlinkPts = 0, anomalyPts = 0, scanPts = 0;
 let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
 let hazardEventCb = null, hazardFx = null, dodgeT = 0, heaterGlowT = 0, repairSweepT = 0, sparkFlashUntil = 0;
 
@@ -428,12 +429,21 @@ function getPresetPose(mode) {
       target: trackCenter.clone()
     };
   }
-  if (mode === 'chase' && satMesh) {
-    const chaseDist = Math.max(0.44, satFitR * 3.0);
+  if ((mode === 'chase' || mode === 'victory') && satMesh) {
+    const chaseDist = Math.max(0.44, satFitR * (mode === 'victory' ? 2.75 : 3.0));
     const radial = tmpSat.length() > 0.1 ? tmpSat.clone().normalize() : new THREE.Vector3(1, 0.2, 1).normalize();
     const tang = tmpNext.clone().sub(tmpSat);
     const fwd = tang.lengthSq() > 1e-6 ? tang.normalize() : new THREE.Vector3(0, 0, 1);
     const side = new THREE.Vector3().crossVectors(radial, fwd).normalize();
+    if (mode === 'victory') {
+      const sunBlend = side.clone().multiplyScalar(0.75).addScaledVector(SUN_DIR, 0.45).normalize();
+      const camPos = tmpSat.clone()
+        .addScaledVector(radial, chaseDist * 0.42)
+        .addScaledVector(fwd, chaseDist * 0.62)
+        .addScaledVector(sunBlend, chaseDist * 0.78);
+      const targetPos = tmpSat.clone().addScaledVector(radial, -satFitR * 0.12);
+      return { pos: camPos, target: targetPos };
+    }
     const camPos = tmpSat.clone()
       .addScaledVector(radial, chaseDist * 0.52)
       .addScaledVector(fwd, chaseDist * 0.58)
@@ -670,16 +680,22 @@ function animate() {
     } else targetReticle.visible = false;
   }
 
+  if ((cameraMode === 'chase' || cameraMode === 'victory') && controls && hasPrevSat) {
+    tmpNorm.copy(tmpSat).sub(prevSat);
+    if (camTween.active) {
+      camTween.fromPos.add(tmpNorm); camTween.toPos.add(tmpNorm);
+      camTween.fromTarget.add(tmpNorm); camTween.toTarget.add(tmpNorm);
+    } else {
+      camera.position.add(tmpNorm);
+      controls.target.add(tmpNorm);
+    }
+  }
   if (camTween.active && camera && controls) {
     camTween.t = Math.min(1, camTween.t + realDt / camTween.dur);
     const e = camTween.t < 0.5 ? 4 * camTween.t ** 3 : 1 - ((-2 * camTween.t + 2) ** 3) / 2;
     camera.position.lerpVectors(camTween.fromPos, camTween.toPos, e);
     controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, e);
     if (camTween.t >= 1) camTween.active = false;
-  } else if (cameraMode === 'chase' && controls && hasPrevSat) {
-    tmpNorm.copy(tmpSat).sub(prevSat);
-    camera.position.add(tmpNorm);
-    controls.target.add(tmpNorm);
   }
   prevSat.copy(tmpSat); hasPrevSat = true;
 
@@ -699,7 +715,7 @@ function animate() {
   updateOrbitHazards(realDt, {
     inEclipse: prop.inEclipse,
     timeWarp,
-    tutorialActive: isTutorialActive()
+    tutorialActive: isTutorialActive() || victoryMode
   });
   const hazardSnap = getHazardSnapshot();
   const activeHaz = hazardSnap.activeHazard;
@@ -707,6 +723,8 @@ function animate() {
 
   if (satModel) {
     satModel.update?.(realDt, sunElapsed);
+    if (victoryMode) satModel.group.rotation.y += realDt * 0.28;
+    else satModel.group.rotation.y = 0;
     if (dodgeT > 0) {
       dodgeT = Math.max(0, dodgeT - realDt * 0.9);
       satModel.group.position.x = Math.sin(dodgeT * Math.PI) * satFitR * 2.2;
@@ -820,6 +838,7 @@ function animate() {
       inEclipse: prop.inEclipse, stormActive, safeModeActive, inLineOfSight,
       batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
       linkedStation: activeStationName, missionScore, downlinkCount, flareMitigated, asteroidsScanned,
+      downlinkPts, anomalyPts, scanPts,
       hullIntegrity: hazardSnap.hullIntegrity,
       anomaliesResolved: hazardSnap.anomaliesResolved,
       anomaliesMissed: hazardSnap.anomaliesMissed,
@@ -834,6 +853,12 @@ function animate() {
 
 export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); };
 export const setOrbitCameraMode = (m) => { cameraMode = m; startCameraTween(m, false); };
+export function setOrbitVictoryMode(enabled, restoreCam = 'chase') {
+  victoryMode = Boolean(enabled);
+  const nextMode = victoryMode ? 'victory' : (restoreCam || 'chase');
+  cameraMode = nextMode;
+  startCameraTween(nextMode, false);
+}
 export function seekOrbitToPass(leadSeconds = 110) {
   if (!orbitEl || !earthGroup || !gsNodes.length) return false;
   const activeGs = gsNodes.find((g) => g.active) || gsNodes[0];
@@ -874,12 +899,12 @@ export function transmitScience() {
   if (!inLineOfSight) return { ok: false, points: 0, station: 'None' };
   const xfer = Math.max(0.15, Math.min(bufferGb, 1.4));
   bufferGb = Math.max(0, bufferGb - xfer); downlinkedGb += xfer;
-  downlinkCount += 1; missionScore += 50; beamBoostUntil = performance.now() + 900;
+  downlinkCount += 1; downlinkPts += 50; missionScore += 50; beamBoostUntil = performance.now() + 900;
   playDownlinkPing(); return { ok: true, points: 50, station: activeStationName };
 }
 export function activateSafeMode() {
   safeModeUntil = performance.now() + 6500; batterySoc = Math.min(100, batterySoc + 8);
-  const pts = hazardNow ? 75 : 25; missionScore += pts;
+  const pts = hazardNow ? 75 : 25; anomalyPts += pts; missionScore += pts;
   if (hazardNow) flareMitigated += 1;
   playSafeMode(); return { ok: true, points: pts, hazard: hazardNow };
 }
@@ -887,18 +912,21 @@ export function scanAsteroid() {
   if (!spaceEnv) return { ok: false, points: 0 };
   const { target } = spaceEnv.findNearestTarget(tmpSat);
   scanTarget = target; scanUntil = performance.now() + 1400;
-  asteroidsScanned += 1; missionScore += target.points;
+  asteroidsScanned += 1; scanPts += target.points; missionScore += target.points;
   playDownlinkPing(); return { ok: true, points: target.points, id: target.id, isComet: target.isComet };
 }
 
 export function mountOrbit(container, missionState, evaluation, onTelemetry, options = {}) {
   unmountOrbit();
   showcaseMode = Boolean(options.showcase);
+  victoryMode = Boolean(options.victory);
   stateRef = missionState; evalRef = evaluation; telemetryCb = onTelemetry; hazardEventCb = options.onHazardEvent || null;
   simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
   stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
-  missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0; lastAutoFlare = 14; lastHudMs = 0;
+  missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
+  downlinkPts = 0; anomalyPts = 0; scanPts = 0; lastAutoFlare = 14; lastHudMs = 0;
   dodgeT = 0; heaterGlowT = 0; repairSweepT = 0; sparkFlashUntil = 0;
+  if (victoryMode) cameraMode = 'victory';
   camTween.active = false; watchCometNext = false;
   parallaxTarget.set(0, 0); parallaxCur.set(0, 0);
 
@@ -911,6 +939,7 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
         hazardEventCb?.({ type: 'trigger', timeWarp, ...hazard });
       },
       onResolve: (res) => {
+        anomalyPts += res.bonus;
         missionScore += res.bonus;
         flareMitigated += 1;
         if (res.kind === 'cme') stormUntil = 0;
@@ -989,6 +1018,7 @@ export function mountShowcase(container, missionState) {
 export function unmountOrbit() {
   if (parallaxHandler) { window.removeEventListener('mousemove', parallaxHandler); parallaxHandler = null; }
   showcaseMode = false;
+  victoryMode = false;
   if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }
