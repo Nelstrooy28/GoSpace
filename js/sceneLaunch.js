@@ -1,21 +1,22 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createBloomComposer, fbm2 } from './solarSystem.js';
+import { createBloomComposer } from './solarSystem.js';
+import { createSpaceportScenery, isCachedSceneryTexture } from './spaceportScenery.js';
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
 import { playCountdownBeep, playStageSep, startRocketRumbling, stopRocketRumbling } from './sfx.js';
 
 let renderer = null, bloomComp = null, scene = null, camera = null, controls = null, resizeObserver = null, rafId = 0;
-let rocketGroup = null, coreGroup = null, stage2Group = null, fairingL = null, fairingR = null, launchCraft = null;
-let sideBoosters = [], arms = [], clamps = [], mastBeacons = [];
+let rocketGroup = null, coreGroup = null, stage2Group = null, fairingL = null, fairingR = null, launchCraft = null, scenery = null;
+let sideBoosters = [], arms = [], clamps = [];
 let flames = [], sideFlames = [], mvacPlume = null, engineBells = [], mvacBell = null, vaporCone = null;
-let puffs = [], sparks = [], oceanMat = null, skyMat = null, starMat = null, trenchLight = null, floodLight = null;
+let puffs = [], sparks = [], trenchLight = null;
 let camMode = 'trench', rocketSpec = null, lastRocketY = 0;
 let ignitedCmd = false, igniteElapsed = 0, lastBeep = -1, rumbleOn = false, padClock = 0;
 let becoDone = false, mecoDone = false, fairingDone = false, completed = false, lastHudMs = 0;
 let updateCb = null, completeCb = null;
 
 const clock = new THREE.Clock();
-const launchTexCache = { ready: false, hullWhite: null, hullBlack: null, fairing: null, horizon: null };
+const launchTexCache = { ready: false, hullWhite: null, hullBlack: null, fairing: null };
 
 function getLaunchTextures() {
   if (launchTexCache.ready) return launchTexCache;
@@ -44,26 +45,9 @@ function getLaunchTextures() {
   fCtx.fillStyle = '#0f172a'; fCtx.font = 'bold 34px sans-serif'; fCtx.textAlign = 'center';
   fCtx.fillText('GOSPACE', 256, 225);
 
-  const hc = document.createElement('canvas'); hc.width = 1024; hc.height = 512;
-  const hCtx = hc.getContext('2d'), hImg = hCtx.createImageData(1024, 512), hd = hImg.data;
-  for (let y = 0; y < 512; y += 1) {
-    const v = y / 512;
-    for (let x = 0; x < 1024; x += 1) {
-      const u = x / 1024, idx = (y * 1024 + x) * 4;
-      const n = fbm2(u * 9, v * 5, 4);
-      const land = n > 0.54;
-      hd[idx] = land ? Math.round(48 + n * 48) : 9;
-      hd[idx + 1] = land ? Math.round(98 + n * 45) : Math.round(38 + (1 - n) * 32);
-      hd[idx + 2] = land ? Math.round(52 + n * 24) : Math.round(92 + (1 - n) * 58);
-      hd[idx + 3] = 255;
-    }
-  }
-  hCtx.putImageData(hImg, 0, 0);
-
   launchTexCache.hullWhite = makeHull('#f1f5f9', '#0f172a', '#0f172a');
   launchTexCache.hullBlack = makeHull('#18181b', '#94a3b8', '#e2e8f0');
   launchTexCache.fairing = Object.assign(new THREE.CanvasTexture(fc), { colorSpace: THREE.SRGBColorSpace });
-  launchTexCache.horizon = Object.assign(new THREE.CanvasTexture(hc), { colorSpace: THREE.SRGBColorSpace });
   launchTexCache.ready = true;
   return launchTexCache;
 }
@@ -72,51 +56,6 @@ function addMesh(parent, geo, mat, pos = [0, 0, 0], rot = [0, 0, 0]) {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(...pos); m.rotation.set(...rot); parent.add(m);
   return m;
-}
-
-function makeSkyDomeMaterial() {
-  return new THREE.ShaderMaterial({
-    uniforms: { uClimb: { value: 0 } },
-    vertexShader: `
-      varying vec3 vDir;
-      void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
-    `,
-    fragmentShader: `
-      uniform float uClimb; varying vec3 vDir;
-      void main() {
-        float h = clamp(vDir.y, -0.1, 1.0);
-        vec3 dayH = vec3(0.46, 0.72, 0.94), dayZ = vec3(0.06, 0.25, 0.56);
-        vec3 midH = vec3(0.16, 0.24, 0.52), midZ = vec3(0.02, 0.04, 0.14);
-        vec3 spc = vec3(0.01, 0.015, 0.04);
-        vec3 day = mix(dayH, dayZ, pow(max(0.0, h), 0.55));
-        vec3 mid = mix(midH, midZ, pow(max(0.0, h), 0.5));
-        vec3 col = uClimb < 0.5 ? mix(day, mid, uClimb * 2.0) : mix(mid, spc, (uClimb - 0.5) * 2.0);
-        gl_FragColor = vec4(col, 1.0);
-      }
-    `,
-    side: THREE.BackSide, depthWrite: false
-  });
-}
-
-function makeOceanMaterial() {
-  return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uFade: { value: 1 } },
-    vertexShader: `
-      varying vec3 vWPos;
-      void main() { vec4 wp = modelMatrix * vec4(position, 1.0); vWPos = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }
-    `,
-    fragmentShader: `
-      uniform float uTime; uniform float uFade; varying vec3 vWPos;
-      void main() {
-        float w1 = sin(vWPos.x * 0.45 + uTime * 1.4) * cos(vWPos.z * 0.4 + uTime * 1.1);
-        float glint = pow(clamp(w1 * 0.5 + 0.5, 0.0, 1.0), 6.0);
-        vec3 deep = vec3(0.02, 0.12, 0.26), surf = vec3(0.06, 0.28, 0.48);
-        vec3 col = mix(deep, surf, 0.35 + w1 * 0.25) + vec3(0.35, 0.65, 0.85) * glint * 0.35;
-        gl_FragColor = vec4(col, uFade);
-      }
-    `,
-    transparent: true
-  });
 }
 
 function createPlumeAssembly(r, height) {
@@ -264,40 +203,16 @@ function buildRocket(missionState) {
 }
 
 function buildSpaceportAndHorizon() {
-  const tex = getLaunchTextures();
-  skyMat = makeSkyDomeMaterial();
-  scene.add(new THREE.Mesh(new THREE.SphereGeometry(520, 32, 24), skyMat));
+  scenery = createSpaceportScenery(scene);
 
-  // Rippling Coastal Ocean & Peninsula Cape
-  oceanMat = makeOceanMaterial();
-  const ocean = new THREE.Mesh(new THREE.RingGeometry(18, 320, 64), oceanMat);
-  ocean.rotation.x = -Math.PI / 2; ocean.position.y = -1.15; scene.add(ocean);
-
-  const peninsula = new THREE.Mesh(new THREE.CylinderGeometry(28, 36, 0.6, 24), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.92 }));
-  peninsula.position.y = -1.1; scene.add(peninsula);
-
-  // Curved Earth Horizon Globe far below (revealed once climbing high into space)
-  const earthHoriz = new THREE.Mesh(
-    new THREE.SphereGeometry(180, 64, 36),
-    new THREE.MeshStandardMaterial({ map: tex.horizon, roughness: 0.55, metalness: 0.1 })
-  );
-  earthHoriz.position.set(0, -183.6, 0);
-  const limb = new THREE.Mesh(
-    new THREE.SphereGeometry(182.2, 48, 32),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.14, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false })
-  );
-  limb.position.copy(earthHoriz.position);
-  scene.add(earthHoriz, limb);
-
-  // Concrete Octagonal Launch Mount, Flame Trench & Crawlerway
+  // Concrete Octagonal Launch Mount, Flame Trench & Deflector
   const concrete = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.88 });
   const darkSlate = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
   const steel = new THREE.MeshStandardMaterial({ color: 0xb91c1c, metalness: 0.6, roughness: 0.42 });
   const silver = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.72, roughness: 0.3 });
 
-  addMesh(scene, new THREE.BoxGeometry(24, 0.25, 4.4), concrete, [-15, -0.78, 0]); // Crawlerway road
   addMesh(scene, new THREE.CylinderGeometry(9.6, 12.2, 1.35, 8), concrete, [0, -0.58, 0]);
-  addMesh(scene, new THREE.BoxGeometry(2.4, 0.48, 18.5), darkSlate, [0, 0.02, 0]); // North-South Flame Trench
+  addMesh(scene, new THREE.BoxGeometry(2.4, 0.48, 18.5), darkSlate, [0, 0.02, 0]);
   const deflector = addMesh(scene, new THREE.CylinderGeometry(0.95, 1.65, 2.2, 4), darkSlate, [0, -0.15, 0], [0, Math.PI / 4, 0]);
   deflector.scale.set(1.2, 0.45, 2.0);
 
@@ -323,7 +238,7 @@ function buildSpaceportAndHorizon() {
     addMesh(scene, new THREE.CylinderGeometry(0.022, 0.022, 1.42, 6), steel, [towerX, ty - tierH * 0.5, -colOff], [0, 0, -Math.PI / 4]);
   }
   addMesh(scene, new THREE.BoxGeometry(0.32, 6.8, 0.32), darkSlate, [towerX, 3.4, 0]);
-  addMesh(scene, new THREE.BoxGeometry(2.1, 0.18, 0.28), steel, [towerX + 0.5, 7.15, 0]); // Hammerhead crane
+  addMesh(scene, new THREE.BoxGeometry(2.1, 0.18, 0.28), steel, [towerX + 0.5, 7.15, 0]);
 
   // 2 Umbilical Swing Arms + 1 Payload Access Arm
   [2.3, 3.8, 5.15].forEach((ay, idx) => {
@@ -332,22 +247,7 @@ function buildSpaceportAndHorizon() {
     scene.add(pv); arms.push(pv);
   });
 
-  // 4 Perimeter Lightning Masts + Cryogenic LOX/CH4 Tank Farm & Pipelines
-  [[-6.8, -6.8], [6.8, -6.8], [-6.8, 6.8], [6.8, 6.8]].forEach(([mx, mz]) => {
-    addMesh(scene, new THREE.CylinderGeometry(0.05, 0.16, 10.6, 8), silver, [mx, 5.1, mz]);
-    mastBeacons.push(addMesh(scene, new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff3b3b }), [mx, 10.55, mz]));
-  });
-  [[-11.5, -9.8], [-7.6, -11.4]].forEach(([tx, tz]) => {
-    addMesh(scene, new THREE.SphereGeometry(1.55, 24, 18), silver, [tx, 1.85, tz]);
-    addMesh(scene, new THREE.CylinderGeometry(0.12, 0.12, 1.6, 8), darkSlate, [tx, 0.3, tz]);
-  });
-  addMesh(scene, new THREE.CylinderGeometry(0.08, 0.08, 12.2, 8), silver, [-6.5, 0.22, -5.8], [0, 0.72, Math.PI / 2]);
-
-  // Lighting: Pad Floodlight & Trench Flame Light
-  floodLight = new THREE.SpotLight(0xfffbeb, 24, 34, Math.PI / 4, 0.45);
-  floodLight.position.set(6.5, 8.2, 7.5); floodLight.target.position.set(0, 2.8, 0);
-  scene.add(floodLight, floodLight.target);
-  trenchLight = new THREE.PointLight(0xf97316, 0, 32); trenchLight.position.set(0, 0.9, 1.4);
+  trenchLight = new THREE.PointLight(0xf97316, 0, 36); trenchLight.position.set(0, 0.9, 1.4);
   scene.add(trenchLight);
 
   // 72 Steam/Smoke Puffs & 40 Ember/Sep Sparks
@@ -362,15 +262,6 @@ function buildSpaceportAndHorizon() {
     const sm = new THREE.Mesh(sparkGeo, sparkMat); sm.visible = false; scene.add(sm);
     sparks.push({ m: sm, vx: 0, vy: 0, vz: 0, life: 0 });
   }
-
-  const starPos = new Float32Array(1200 * 3);
-  for (let i = 0; i < 1200; i += 1) {
-    const u = Math.random() * 2 - 1, phi = Math.random() * Math.PI * 2, r = 440, s = Math.sqrt(1 - u * u);
-    starPos[i * 3] = r * s * Math.cos(phi); starPos[i * 3 + 1] = Math.abs(r * u) + 5; starPos[i * 3 + 2] = r * s * Math.sin(phi);
-  }
-  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  starMat = new THREE.PointsMaterial({ color: 0xe2e8f0, size: 1.8, sizeAttenuation: false, transparent: true, opacity: 0 });
-  scene.add(new THREE.Points(sg, starMat));
 }
 
 function triggerSparkBurst(yWorld, count = 28, speed = 3.2) {
@@ -424,16 +315,6 @@ function animate() {
   padClock += dt;
   if (ignitedCmd) igniteElapsed += dt;
   const elapsed = ignitedCmd ? igniteElapsed : 0;
-
-  if (oceanMat) {
-    oceanMat.uniforms.uTime.value = padClock;
-    oceanMat.uniforms.uFade.value = THREE.MathUtils.clamp(1 - (rocketGroup.position.y - 16) / 38, 0, 1);
-  }
-  const skyT = THREE.MathUtils.clamp((elapsed - 3.6) / 6.2, 0, 1);
-  if (skyMat) skyMat.uniforms.uClimb.value = skyT;
-  if (starMat) starMat.opacity = THREE.MathUtils.clamp((elapsed - 5.2) / 3.8, 0, 1);
-  const bOn = (Math.sin(padClock * 5.0) * 0.5 + 0.5) > 0.35;
-  mastBeacons.forEach((b) => { b.visible = bOn; });
 
   if (ignitedCmd) {
     const beepIdx = elapsed < 0.8 ? 0 : (elapsed < 1.6 ? 1 : (elapsed < 2.4 ? 2 : (elapsed < 3.0 ? 3 : -1)));
@@ -554,6 +435,7 @@ function animate() {
 
   const maxQShake = elapsed >= 5.8 && elapsed <= 7.5 ? 0.065 : 0;
   const vib = ignitedCmd && elapsed >= 2.2 && elapsed < 9.4 ? Math.max(0.032, maxQShake) : 0;
+  scenery?.update(dt, elapsed, padClock, rocketGroup.position.y, s1Active && elapsed < 7.2 ? 1.0 : 0.0);
   updateCameras(dt, rocketGroup.position.y, prevRy, vib, elapsed);
 
   const now = performance.now();
@@ -603,8 +485,9 @@ export function mountLaunch(container, missionState, onUpdate, onComplete) {
 
   bloomComp = createBloomComposer(renderer, scene, camera, w, h, { strength: 0.65, radius: 0.46, threshold: 0.76 });
 
-  scene.add(new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 0.88));
-  const sun = new THREE.DirectionalLight(0xfffbeb, 2.1); sun.position.set(16, 22, 14); scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.85));
+  const sun = new THREE.DirectionalLight(0xfff1d6, 2.2); sun.position.set(16, 20, 14); scene.add(sun);
+  const sunsetRim = new THREE.DirectionalLight(0xff9e5e, 1.35); sunsetRim.position.set(-28, 7, -42); scene.add(sunsetRim);
 
   buildSpaceportAndHorizon();
   buildRocket(missionState);
@@ -629,13 +512,14 @@ export function unmountLaunch() {
   if (controls) { controls.dispose(); controls = null; }
   if (bloomComp) { bloomComp.dispose(); bloomComp = null; }
   if (launchCraft) { launchCraft.dispose(); launchCraft = null; }
+  if (scenery) { scenery.dispose(); scenery = null; }
   if (scene) {
     const cached = new Set(Object.values(launchTexCache).filter((v) => v && typeof v === 'object'));
     scene.traverse((o) => {
       if (o.geometry) o.geometry.dispose();
       if (o.material) {
         (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-          ['map', 'bumpMap', 'emissiveMap'].forEach((k) => { if (m[k] && !cached.has(m[k]) && !isCachedCraftTexture(m[k])) m[k].dispose(); });
+          ['map', 'bumpMap', 'emissiveMap'].forEach((k) => { if (m[k] && !cached.has(m[k]) && !isCachedCraftTexture(m[k]) && !isCachedSceneryTexture(m[k])) m[k].dispose(); });
           m.dispose();
         });
       }
@@ -643,8 +527,8 @@ export function unmountLaunch() {
     scene = null;
   }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
-  rocketGroup = coreGroup = stage2Group = fairingL = fairingR = launchCraft = null;
-  mvacPlume = mvacBell = vaporCone = oceanMat = skyMat = starMat = trenchLight = floodLight = rocketSpec = null;
-  sideBoosters = []; arms = []; clamps = []; mastBeacons = []; flames = []; sideFlames = [];
+  rocketGroup = coreGroup = stage2Group = fairingL = fairingR = launchCraft = scenery = null;
+  mvacPlume = mvacBell = vaporCone = trenchLight = rocketSpec = null;
+  sideBoosters = []; arms = []; clamps = []; flames = []; sideFlames = [];
   engineBells = []; puffs = []; sparks = [];
 }
