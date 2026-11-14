@@ -193,6 +193,11 @@ export function renderHud(ev, stage) {
     return `<div class="gm-item"><div class="gm-top"><span>${g.key}</span><b>${esc(g.val)}</b></div><div class="seg-meter">${cells}</div></div>`;
   }).join('');
 
+  const autoBtn = document.getElementById('autobuild-btn');
+  if (autoBtn) {
+    autoBtn.hidden = stage !== 'hangar';
+    autoBtn.classList.toggle('is-complete', cmlLevel === 4);
+  }
   const cta = document.getElementById('launch-cta-btn');
   cta.classList.toggle('is-ready', stage === 'hangar' && (cmlLevel === 4 || sandboxMode));
   cta.textContent = stage === 'hangar' ? '🚀 ROLL OUT TO PAD' : (stage === 'launch' ? 'SKIP TO ORBIT >>' : (stage === 'orbit' ? '🏁 COMPLETE MISSION' : '🔄 HANGAR'));
@@ -209,6 +214,8 @@ export function renderStageHud(stage, state, ev, opts) {
 
   const hBox = document.getElementById('hazard-alert-hud');
   if (hBox && stage !== 'orbit') { hBox.hidden = true; hBox.innerHTML = ''; }
+  const pip = document.getElementById('sensor-cam-pip');
+  if (pip) pip.hidden = stage !== 'orbit' || !opts.sensorCamOpen;
   if (stage !== 'review') { cancelDebriefAnim(); rev.dataset.rendered = ''; }
   if (stage === 'hangar') {
     hud.innerHTML = `<div class="stage-card plate">
@@ -257,6 +264,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.orbitWarp === 100 ? 'is-on' : ''}" data-warp="100" type="button">100x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
         <button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Test Hazard</button>
+        <button id="orb-sensorcam-btn" class="btn-sci ${opts.sensorCamOpen ? 'is-on' : ''}" type="button">📷 Sensor Cam [C]</button>
         <button id="hud-mission-guide-btn" class="btn-sci guide-pill" type="button">📋 Mission Guide</button>
         <button id="orb-debrief-btn" class="btn-sci active" type="button">🏆 View Debrief</button>
       </div>

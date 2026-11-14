@@ -246,6 +246,21 @@ const PRESETS = {
   'asteroid-l3': { userObjective: 'asteroid-prospect', wavelengthBand: 'deep-spec', latencyTier: 'archival', busId: 'flagship-bus', instrumentIds: ['optical-spyglass', 'arctic-multispec', 'neutron-spec'], solarId: 'rtg-nuclear', batteryId: 'rad-hard-pack', thermalId: 'xenon-ion', hullSkinId: 'gold-kapton', vehicleId: 'falcon-heavy', orbitId: 'lunar-transfer', transceiverId: 'ka-optical', stationId: 'dsn' }
 };
 
+const OPTIMAL_LOADOUTS = {
+  'wildfiresat-l1': { userObjective: 'wildfire-ir', wavelengthBand: 'ir', latencyTier: 'realtime', busId: '6u-cubesat', instrumentIds: ['ir-bolometer', 'arctic-multispec'], solarId: 'deployable-wings', batteryId: 'li-ion-compact', thermalId: 'passive-mag', hullSkinId: 'gold-kapton', vehicleId: 'electron', orbitId: 'sso-leo', transceiverId: 'sx-band', stationId: 'inuvik' },
+  'aurora-l1': { userObjective: 'aurora-mag', wavelengthBand: 'mag-plasma', latencyTier: 'realtime', busId: '6u-cubesat', instrumentIds: ['boom-mag', 'plasma-analyzer'], solarId: 'deployable-wings', batteryId: 'li-ion-compact', thermalId: 'cold-gas-rcs', hullSkinId: 'silver-teflon', vehicleId: 'electron', orbitId: 'polar-leo', transceiverId: 's-band', stationId: 'inuvik' },
+  'ocean-l2': { userObjective: 'ocean-color', wavelengthBand: 'uv-vis', latencyTier: 'daily', busId: 'espa-smallsat', instrumentIds: ['oci-hyperspec', 'lidar-cloud'], solarId: 'rollout-blanket', batteryId: 'li-ion-dual', thermalId: 'green-monoprop', hullSkinId: 'white-beta', vehicleId: 'falcon9-csli', orbitId: 'polar-leo', transceiverId: 'ka-mesh', stationId: 'nsn' },
+  'monsoon-l2': { userObjective: 'cyclone-sar', wavelengthBand: 'rf-sar', latencyTier: 'realtime', busId: 'espa-smallsat', instrumentIds: ['sar-wing'], solarId: 'high-eff-gimbal', batteryId: 'li-ion-dual', thermalId: 'green-monoprop', hullSkinId: 'matte-carbon', vehicleId: 'falcon9-csli', orbitId: 'sso-leo', transceiverId: 'ka-mesh', stationId: 'nsn' },
+  'lunar-l3': { userObjective: 'lunar-volatiles', wavelengthBand: 'cryo-ir', latencyTier: 'archival', busId: 'flagship-bus', instrumentIds: ['cryo-ir-mapper', 'neutron-spec'], solarId: 'high-eff-gimbal', batteryId: 'rad-hard-pack', thermalId: 'cryocooler-st', hullSkinId: 'silver-teflon', vehicleId: 'falcon-heavy', orbitId: 'lunar-transfer', transceiverId: 'ka-optical', stationId: 'dsn' },
+  'asteroid-l3': { userObjective: 'asteroid-prospect', wavelengthBand: 'deep-spec', latencyTier: 'archival', busId: 'flagship-bus', instrumentIds: ['optical-spyglass', 'arctic-multispec', 'plasma-analyzer'], solarId: 'high-eff-gimbal', batteryId: 'rad-hard-pack', thermalId: 'xenon-ion', hullSkinId: 'gold-kapton', vehicleId: 'falcon-heavy', orbitId: 'lunar-transfer', transceiverId: 'ka-optical', stationId: 'dsn' }
+};
+
+export function getOptimalLoadoutForMission(missionId) {
+  const key = OPTIMAL_LOADOUTS[missionId] ? missionId : 'wildfiresat-l1';
+  const build = OPTIMAL_LOADOUTS[key];
+  return { ...build, instrumentIds: [...build.instrumentIds] };
+}
+
 export function createInitialState(scenarioId = 'wildfiresat-l1', sandboxMode = false) {
   return { scenarioId, sandboxMode, ...(PRESETS[scenarioId] || PRESETS['wildfiresat-l1']) };
 }

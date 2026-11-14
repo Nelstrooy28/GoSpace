@@ -134,6 +134,17 @@
       <div id="center-action-hud" class="center-action-hud"></div>
       <div id="review-overlay" class="review-overlay" hidden></div>
       <div id="briefing-overlay" class="briefing-overlay" hidden></div>
+      <aside id="sensor-cam-pip" class="sensor-cam-pip plate" aria-label="Satellite Payload Sensor Cam" hidden>
+        <div class="sensor-pip-head">
+          <span id="sensor-pip-title" class="sensor-pip-title">📷 THERMAL IR · FLIR</span>
+          <span class="sensor-pip-head-right">
+            <span id="sensor-pip-light" class="sensor-pip-light">SUNLIT</span>
+            <button id="sensor-cam-close-btn" class="sensor-pip-close" type="button" aria-label="Close Sensor Cam">✕</button>
+          </span>
+        </div>
+        <canvas id="sensor-cam-canvas" width="296" height="168"></canvas>
+        <div id="sensor-pip-telem" class="sensor-pip-telem">0.0°N 0.0°E · NOMINAL</div>
+      </aside>
       <section id="mel-drawer" class="mel-drawer plate" hidden>
         <div class="drawer-head"><strong>MASTER EQUIPMENT LIST</strong><span id="mel-summary-meta" class="badge-tag">0 items</span></div>
         <div id="mel-body" class="mel-body"></div>
@@ -156,6 +167,7 @@
 
       <div id="status-cta-bar" class="status-cta-bar plate">
         <div id="resource-gauges" class="gauges-mini"></div>
+        <button id="autobuild-btn" class="btn-autobuild" type="button" title="Equip verified CML-4 winning build">🪄 Auto-Build</button>
         <button id="launch-cta-btn" class="btn-rollout" type="button">🚀 ROLL OUT TO PAD</button>
       </div>
     </footer>

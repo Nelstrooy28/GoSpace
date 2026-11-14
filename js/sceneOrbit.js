@@ -21,9 +21,9 @@ let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = n
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, beamHalo = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
 let gsNodes = [], gsPulseRing = null, orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
-let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false;
+let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false, sensorCamEnabled = false;
 let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
-let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, fitDist = 7.2, sunElapsed = 0;
+let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs = 0, fitDist = 7.2, sunElapsed = 0;
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
 let downlinkPts = 0, anomalyPts = 0, scanPts = 0;
 let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
@@ -830,11 +830,25 @@ function animate() {
     if (scanLine.visible) scanLine.geometry.setFromPoints([tmpSat, scanTarget.mesh.position]);
   }
 
+  const ry = earthGroup ? earthGroup.rotation.y : 0;
+  const cosR = Math.cos(-ry), sinR = Math.sin(-ry);
+  const lx = tmpSat.x * cosR + tmpSat.z * sinR;
+  const lz = -tmpSat.x * sinR + tmpSat.z * cosR;
+  const rLen = Math.hypot(tmpSat.x, tmpSat.y, tmpSat.z) || 1;
+  const latDeg = (Math.asin(Math.max(-1, Math.min(1, tmpSat.y / rLen))) * 180) / Math.PI;
+  const lonDeg = (Math.atan2(lx, lz) * 180) / Math.PI;
+
+  if (sensorCamEnabled && now - lastCamMs > 30) {
+    lastCamMs = now;
+    drawSensorCamFeed(latDeg, lonDeg, prop.inEclipse, stormActive, sunElapsed, simTime);
+  }
+
   if (telemetryCb && now - lastHudMs > 120) {
     lastHudMs = now;
     const nearest = spaceEnv?.findNearestTarget(tmpSat);
     telemetryCb({
       altitudeKm: Math.round(prop.altitudeKm), speedKms: Number(prop.speedKms.toFixed(2)),
+      latDeg: Number(latDeg.toFixed(1)), lonDeg: Number(lonDeg.toFixed(1)),
       inEclipse: prop.inEclipse, stormActive, safeModeActive, inLineOfSight,
       batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
       linkedStation: activeStationName, missionScore, downlinkCount, flareMitigated, asteroidsScanned,
@@ -844,16 +858,264 @@ function animate() {
       anomaliesMissed: hazardSnap.anomaliesMissed,
       hazardState: hazardSnap,
       nearestNeaId: nearest?.target.id || '', nearestNeaDist: nearest ? Number(nearest.dist.toFixed(1)) : 99,
-      timeWarp, briefingPaused, simTime: Number(simTime.toFixed(1)), cameraMode, fitDist: Number(fitDist.toFixed(1))
+      timeWarp, briefingPaused, sensorCamEnabled, sensorCamMode: getSensorCamMode(stateRef).mode,
+      simTime: Number(simTime.toFixed(1)), cameraMode, fitDist: Number(fitDist.toFixed(1))
     });
   }
   controls.update();
   bloomComp ? bloomComp.composer.render() : renderer.render(scene, camera);
 }
 
+export function getSensorCamMode(missionState = stateRef) {
+  const ids = missionState?.instrumentIds || [];
+  const band = missionState?.wavelengthBand || '';
+  const has = (id) => ids.includes(id);
+  if (has('sar-wing') || band === 'rf-sar') return { mode: 'sar', label: 'SAR RADAR' };
+  if (has('ir-bolometer') || has('cryo-ir-mapper') || band === 'ir' || band === 'cryo-ir') {
+    return { mode: 'thermal', label: (has('cryo-ir-mapper') || band === 'cryo-ir') ? 'CRYO IR FLIR' : 'THERMAL FLIR' };
+  }
+  if (has('oci-hyperspec') || has('optical-spyglass') || has('arctic-multispec') || band === 'uv-vis' || band === 'deep-spec') {
+    return { mode: 'hyperspec', label: band === 'deep-spec' ? 'OPTICAL SPEC' : 'HYPERSPEC UV' };
+  }
+  if (has('lidar-cloud')) return { mode: 'sar', label: 'LIDAR SWEEP' };
+  if (has('neutron-spec') || has('boom-mag') || has('plasma-analyzer') || band === 'mag-plasma') {
+    return { mode: 'flux', label: has('neutron-spec') ? 'NEUTRON FLUX' : 'MAG-AURORA' };
+  }
+  return { mode: 'hyperspec', label: 'OPTICAL CAM' };
+}
+
+function formatLatLon(latDeg, lonDeg) {
+  const ns = latDeg >= 0 ? 'N' : 'S';
+  const ew = lonDeg >= 0 ? 'E' : 'W';
+  return `${Math.abs(latDeg).toFixed(1)}°${ns} ${Math.abs(lonDeg).toFixed(1)}°${ew}`;
+}
+
+function drawSensorCamFeed(latDeg, lonDeg, inEclipse, stormActive, tReal, tSim) {
+  const canvas = document.getElementById('sensor-cam-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const w = canvas.width, h = canvas.height;
+  const spec = getSensorCamMode(stateRef);
+  const mode = spec.mode;
+  const phase = tSim * 0.004 + lonDeg * 0.08 + latDeg * 0.05;
+  let telemText = formatLatLon(latDeg, lonDeg);
+
+  const titleEl = document.getElementById('sensor-pip-title');
+  if (titleEl) titleEl.textContent = `📷 ${spec.label}`;
+  const lightEl = document.getElementById('sensor-pip-light');
+  if (lightEl) {
+    lightEl.textContent = stormActive ? 'SOLAR STORM' : (inEclipse ? 'ECLIPSE' : 'SUNLIT');
+    lightEl.classList.toggle('is-eclipse', Boolean(inEclipse));
+  }
+
+  ctx.clearRect(0, 0, w, h);
+
+  if (mode === 'thermal') {
+    const isCryo = stateRef?.wavelengthBand === 'cryo-ir' || (stateRef?.instrumentIds || []).includes('cryo-ir-mapper');
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    if (isCryo) {
+      grad.addColorStop(0, '#070b24'); grad.addColorStop(0.55, '#1e1b4b'); grad.addColorStop(1, '#311042');
+    } else {
+      grad.addColorStop(0, inEclipse ? '#090418' : '#18082b');
+      grad.addColorStop(0.55, inEclipse ? '#2d0b3a' : '#4a1246');
+      grad.addColorStop(1, '#120722');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    for (let y = 0; y < h; y += 6) {
+      const n = Math.sin(y * 0.08 + phase * 1.1) * 18 + Math.cos(y * 0.04 - phase * 0.7) * 12;
+      ctx.fillStyle = isCryo ? 'rgba(99, 102, 241, 0.14)' : 'rgba(217, 70, 239, 0.12)';
+      ctx.fillRect(0, y, w * (0.45 + n * 0.01), 3);
+    }
+
+    const cx = w * 0.5 + Math.sin(phase * 0.8) * 52;
+    const cy = h * 0.5 + Math.cos(phase * 0.65) * 32;
+    const spots = [
+      { x: cx, y: cy, r: 44 + Math.sin(tReal * 4) * 4 },
+      { x: (cx + 95) % w, y: (cy + 46) % h, r: 28 },
+      { x: (cx + 210) % w, y: (cy + 115) % h, r: 22 }
+    ];
+    spots.forEach((sp, idx) => {
+      const rg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, sp.r);
+      if (isCryo && idx > 0) {
+        rg.addColorStop(0, '#a5f3fc'); rg.addColorStop(0.35, 'rgba(56, 189, 248, 0.65)'); rg.addColorStop(1, 'rgba(15, 23, 42, 0)');
+      } else {
+        rg.addColorStop(0, '#fef08a');
+        rg.addColorStop(0.28, '#f97316');
+        rg.addColorStop(0.65, 'rgba(220, 38, 38, 0.65)');
+        rg.addColorStop(1, 'rgba(88, 28, 135, 0)');
+      }
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2); ctx.fill();
+    });
+
+    ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.3;
+    ctx.strokeRect(cx - 16, cy - 16, 32, 32);
+    const peakK = isCryo
+      ? Math.round(92 + Math.sin(phase) * 14)
+      : Math.round((inEclipse ? 465 : 590) + Math.sin(phase * 2) * 38);
+    ctx.fillStyle = 'rgba(10, 8, 24, 0.82)';
+    ctx.fillRect(8, 8, 128, 22);
+    ctx.fillStyle = '#fef08a';
+    ctx.font = '700 12px Orbitron, sans-serif';
+    ctx.fillText(`PEAK ${peakK} K`, 14, 23);
+    telemText = `${formatLatLon(latDeg, lonDeg)} · ${peakK} K FLIR`;
+  } else if (mode === 'sar') {
+    ctx.fillStyle = '#03120e';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.42)';
+    ctx.lineWidth = 1.2;
+    for (let row = 0; row < 12; row += 1) {
+      const baseY = row * 14 + ((tReal * 24) % 14);
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 8) {
+        const ridge = Math.sin(x * 0.035 + row * 0.7 + phase) * 9 + Math.cos(x * 0.08 - row * 0.4) * 4;
+        if (x === 0) ctx.moveTo(x, baseY + ridge);
+        else ctx.lineTo(x, baseY + ridge);
+      }
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = inEclipse ? 'rgba(148, 163, 184, 0.14)' : 'rgba(226, 232, 240, 0.18)';
+    for (let i = 0; i < 4; i += 1) {
+      const clX = ((i * 88 + tReal * 18) % (w + 60)) - 30;
+      const clY = 30 + ((i * 39) % (h - 50));
+      ctx.beginPath(); ctx.ellipse(clX, clY, 46, 16, 0.2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    const sweepY = ((tReal * 110) % (h + 24)) - 12;
+    const sweepGrad = ctx.createLinearGradient(0, sweepY - 26, 0, sweepY + 4);
+    sweepGrad.addColorStop(0, 'rgba(16, 185, 129, 0)');
+    sweepGrad.addColorStop(0.85, 'rgba(52, 211, 153, 0.42)');
+    sweepGrad.addColorStop(1, '#6ee7b7');
+    ctx.fillStyle = sweepGrad;
+    ctx.fillRect(0, sweepY - 26, w, 30);
+
+    ctx.strokeStyle = 'rgba(52, 211, 153, 0.26)';
+    [34, 68].forEach((r) => { ctx.beginPath(); ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2); ctx.stroke(); });
+
+    const dbVal = (-6.2 - Math.abs(Math.sin(phase) * 5.4)).toFixed(1);
+    ctx.fillStyle = 'rgba(3, 18, 14, 0.85)';
+    ctx.fillRect(8, 8, 156, 22);
+    ctx.fillStyle = '#6ee7b7';
+    ctx.font = '700 12px Orbitron, sans-serif';
+    ctx.fillText(`SIGMA ${dbVal} dB`, 14, 23);
+    telemText = `${formatLatLon(latDeg, lonDeg)} · ${dbVal} dB`;
+  } else if (mode === 'hyperspec') {
+    const dim = inEclipse ? 0.34 : 1.0;
+    const oceanGrad = ctx.createLinearGradient(0, 0, w, h);
+    oceanGrad.addColorStop(0, inEclipse ? '#030b1f' : '#0c4a6e');
+    oceanGrad.addColorStop(0.55, inEclipse ? '#061630' : '#0284c7');
+    oceanGrad.addColorStop(1, inEclipse ? '#081b2a' : '#0f766e');
+    ctx.fillStyle = oceanGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    for (let i = 0; i < 6; i += 1) {
+      const ex = ((i * 58 + tReal * 22 + lonDeg * 1.4) % (w + 60)) - 30;
+      const ey = 32 + Math.sin(phase + i * 1.3) * 32 + 34;
+      const rg = ctx.createRadialGradient(ex, ey, 4, ex, ey, 42);
+      rg.addColorStop(0, `rgba(52, 211, 153, ${(0.52 * dim).toFixed(2)})`);
+      rg.addColorStop(0.55, `rgba(34, 211, 238, ${(0.28 * dim).toFixed(2)})`);
+      rg.addColorStop(1, 'rgba(14, 165, 233, 0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(ex, ey, 42, 0, Math.PI * 2); ctx.fill();
+    }
+
+    if (inEclipse) {
+      ctx.fillStyle = 'rgba(253, 224, 71, 0.72)';
+      for (let i = 0; i < 14; i += 1) {
+        const lx = ((i * 47 + Math.round(phase * 25)) % (w - 20)) + 10;
+        const ly = ((i * 31 + 19) % (h - 48)) + 10;
+        ctx.fillRect(lx, ly, 2.2, 2.2);
+      }
+    }
+
+    ctx.fillStyle = 'rgba(4, 12, 28, 0.85)';
+    ctx.fillRect(0, h - 34, w, 34);
+    const hues = [265, 245, 225, 200, 180, 160, 140, 115, 85, 58, 40, 22, 5];
+    hues.forEach((hue, idx) => {
+      const barW = (w - 24) / hues.length;
+      const mag = 6 + (0.5 + 0.5 * Math.sin(phase * 1.7 + idx * 0.65)) * 16;
+      ctx.fillStyle = `hsl(${hue}, 88%, 58%)`;
+      ctx.fillRect(12 + idx * barW, h - 14 - mag, barW - 2, mag);
+    });
+    ctx.fillStyle = '#bae6fd';
+    ctx.font = '700 11px Orbitron, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('400 nm', 12, h - 4);
+    ctx.textAlign = 'center';
+    ctx.fillText('SPECTRAL BANDS', w / 2, h - 4);
+    ctx.textAlign = 'right';
+    ctx.fillText('890 nm', w - 12, h - 4);
+    ctx.textAlign = 'left';
+    const peakNm = Math.round(525 + Math.sin(phase) * 75);
+    telemText = `${formatLatLon(latDeg, lonDeg)} · ${peakNm} nm PEAK`;
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#09061f');
+    grad.addColorStop(0.55, '#190e3d');
+    grad.addColorStop(1, '#061028');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    const fx = w * 0.5 + Math.sin(phase * 0.7) * 28;
+    const fy = h * 0.5 + Math.cos(phase * 0.55) * 18;
+    [24, 48, 72].forEach((r, idx) => {
+      ctx.strokeStyle = idx % 2 === 0 ? 'rgba(56, 189, 248, 0.42)' : 'rgba(192, 132, 252, 0.36)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.ellipse(fx, fy, r * 1.4, r * 0.8, Math.sin(tReal * 0.4) * 0.18, 0, Math.PI * 2); ctx.stroke();
+    });
+
+    for (let layer = 0; layer < 2; layer += 1) {
+      ctx.strokeStyle = layer === 0 ? '#34d399' : '#c084fc';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 6) {
+        const y = h * 0.46 + Math.sin(x * 0.045 + tReal * 2.4 + layer * 1.4) * 18 + Math.cos(x * 0.02 - phase) * 10;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    const nT = Math.round(41800 + Math.sin(phase * 1.6) * 4200);
+    ctx.fillStyle = 'rgba(12, 8, 34, 0.85)';
+    ctx.fillRect(8, 8, 148, 22);
+    ctx.fillStyle = '#e879f9';
+    ctx.font = '700 12px Orbitron, sans-serif';
+    ctx.fillText(`FLUX ${nT} nT`, 14, 23);
+    telemText = `${formatLatLon(latDeg, lonDeg)} · ${nT} nT`;
+  }
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 14, h / 2); ctx.lineTo(w / 2 - 4, h / 2);
+  ctx.moveTo(w / 2 + 4, h / 2); ctx.lineTo(w / 2 + 14, h / 2);
+  ctx.moveTo(w / 2, h / 2 - 14); ctx.lineTo(w / 2, h / 2 - 4);
+  ctx.moveTo(w / 2, h / 2 + 4); ctx.lineTo(w / 2, h / 2 + 14);
+  ctx.stroke();
+
+  if (stormActive) {
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.16)';
+    for (let i = 0; i < 16; i += 1) {
+      ctx.fillRect((Math.sin(tReal * 41 + i * 7) * 0.5 + 0.5) * w, (i * 11) % h, 18, 2);
+    }
+  }
+
+  const telemEl = document.getElementById('sensor-pip-telem');
+  if (telemEl) telemEl.textContent = telemText;
+}
+
 export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); };
 export const setOrbitBriefingPaused = (paused) => { briefingPaused = Boolean(paused); };
 export const isOrbitBriefingPaused = () => briefingPaused;
+export const setSensorCamEnabled = (enabled) => {
+  sensorCamEnabled = Boolean(enabled);
+  if (sensorCamEnabled) lastCamMs = 0;
+};
 export const setOrbitCameraMode = (m) => { cameraMode = m; startCameraTween(m, false); };
 export function setOrbitVictoryMode(enabled, restoreCam = 'chase') {
   victoryMode = Boolean(enabled);
@@ -927,7 +1189,8 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
   stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
-  downlinkPts = 0; anomalyPts = 0; scanPts = 0; lastAutoFlare = 14; lastHudMs = 0;
+  downlinkPts = 0; anomalyPts = 0; scanPts = 0; lastAutoFlare = 14; lastHudMs = 0; lastCamMs = 0;
+  sensorCamEnabled = Boolean(options.sensorCam);
   dodgeT = 0; heaterGlowT = 0; repairSweepT = 0; sparkFlashUntil = 0;
   if (victoryMode) cameraMode = 'victory';
   camTween.active = false; watchCometNext = false;
@@ -1023,6 +1286,7 @@ export function unmountOrbit() {
   showcaseMode = false;
   victoryMode = false;
   briefingPaused = false;
+  sensorCamEnabled = false;
   if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }

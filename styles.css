@@ -1322,6 +1322,33 @@ dialog button:hover {
 }
 
 #launch-cta-btn,
+.btn-autobuild {
+  flex: 0 0 auto;
+  width: auto;
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 11px 15px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(14, 116, 144, 0.65));
+  border: 1.5px solid #34d399;
+  color: #ecfdf5;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.35);
+  transition: transform 0.14s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.btn-autobuild:hover {
+  transform: translateY(-1px);
+  border-color: #fde68a;
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.58);
+}
+
+.btn-autobuild.is-complete {
+  border-color: rgba(110, 231, 183, 0.65);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+}
+
 .btn-rollout {
   flex: 0 0 auto;
   width: auto;
@@ -1348,7 +1375,8 @@ dialog button:hover {
 #hud-layer:has(#review-overlay:not([hidden])) #comms-banner,
 #hud-layer:has(#review-overlay:not([hidden])) #stage-hud,
 #hud-layer:has(#review-overlay:not([hidden])) #center-action-hud,
-#hud-layer:has(#review-overlay:not([hidden])) #hazard-alert-hud {
+#hud-layer:has(#review-overlay:not([hidden])) #hazard-alert-hud,
+#hud-layer:has(#review-overlay:not([hidden])) #sensor-cam-pip {
   display: none !important;
 }
 
@@ -1772,6 +1800,11 @@ dialog button:hover {
 /* ================================================================
    ORBITAL INSERTION BRIEFING POP-UP GUIDE & HUD PILL
    ================================================================ */
+button.guide-pill,
+#stage-hud button#orb-sensorcam-btn {
+  font-size: 14px;
+}
+
 button.guide-pill {
   background: linear-gradient(135deg, rgba(14, 116, 144, 0.55), rgba(30, 58, 138, 0.68));
   border-color: rgba(125, 211, 252, 0.72);
@@ -2009,6 +2042,107 @@ button.guide-pill:hover {
   box-shadow: 0 0 32px rgba(251, 191, 36, 0.55);
 }
 
+/* ================================================================
+   SATELLITE EYE LIVE PAYLOAD SENSOR CAM (ORBIT CORNER PiP)
+   ================================================================ */
+#sensor-cam-pip,
+.sensor-cam-pip {
+  position: fixed;
+  bottom: 78px;
+  left: 14px;
+  width: 356px;
+  z-index: 27;
+  padding: 9px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+  border: 1.5px solid rgba(56, 189, 248, 0.62);
+  border-top: 3px solid #22d3ee;
+  background: linear-gradient(155deg, rgba(8, 19, 42, 0.92), rgba(4, 10, 24, 0.94));
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(34, 211, 238, 0.22);
+}
+
+.sensor-pip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.sensor-pip-title {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: #e0f2fe;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sensor-pip-head-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sensor-pip-light {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(16, 185, 129, 0.22);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #a7f3d0;
+}
+
+.sensor-pip-light.is-eclipse {
+  background: rgba(99, 102, 241, 0.26);
+  border-color: rgba(165, 180, 252, 0.55);
+  color: #c7d2fe;
+}
+
+#sensor-cam-pip button.sensor-pip-close {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  background: rgba(15, 29, 58, 0.9);
+  border: 1px solid rgba(125, 211, 252, 0.55);
+  color: #f0f9ff;
+}
+
+#sensor-cam-pip button.sensor-pip-close:hover {
+  border-color: #fde68a;
+  background: rgba(14, 116, 144, 0.9);
+}
+
+#sensor-cam-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: #030712;
+}
+
+.sensor-pip-telem {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 600;
+  color: #bae6fd;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
 .card-head {
   display: flex;
   justify-content: space-between;
@@ -2181,7 +2315,34 @@ dialog h3 {
   #hangar-loadout { padding: 7px 10px; gap: 6px; }
   #equipment-strip > *, .equip-card, .eq-card { flex: 1 0 220px; min-height: 62px; max-height: 98px; padding: 7px 10px; }
   #status-cta-bar { padding: 6px 9px; }
-  #launch-cta-btn, .btn-rollout { padding: 9px 14px; min-width: 185px; }
+  #launch-cta-btn, .btn-autobuild {
+  flex: 0 0 auto;
+  width: auto;
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 11px 15px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(14, 116, 144, 0.65));
+  border: 1.5px solid #34d399;
+  color: #ecfdf5;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.35);
+  transition: transform 0.14s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.btn-autobuild:hover {
+  transform: translateY(-1px);
+  border-color: #fde68a;
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.58);
+}
+
+.btn-autobuild.is-complete {
+  border-color: rgba(110, 231, 183, 0.65);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+}
+
+.btn-rollout { padding: 9px 14px; min-width: 185px; }
 }
 
 /* ================================================================
@@ -2427,6 +2588,8 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 #title-overlay[hidden],
 #review-overlay[hidden],
 #briefing-overlay[hidden],
+#sensor-cam-pip[hidden],
+#autobuild-btn[hidden],
 #codex-menu[hidden],
 #hud-restore-btn[hidden],
 #center-action-hud [hidden],
