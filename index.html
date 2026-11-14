@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GoSpace — 3D Space Mission Architect</title>
+  <title>GoSpace — 3D Space Mission Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Orbitron:wght@600;700;900&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230284c7'/><text x='16' y='21' font-size='14' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='white'>GS</text></svg>" />
   <link rel="stylesheet" href="./styles.css" />
   <script type="importmap">
@@ -17,102 +20,109 @@
 </head>
 <body>
   <div id="viewport-container" class="viewport-bg" data-stage="hangar"></div>
+  <div id="score-popups" class="score-popups" aria-live="polite"></div>
+  <div id="game-tooltip" class="game-tooltip plate" hidden></div>
+  <button id="hud-restore-btn" class="hud-restore plate btn-sci" type="button" hidden>SHOW HUD [H]</button>
 
-  <button id="hud-restore-btn" class="hud-restore glass" type="button" hidden>Show HUD [H]</button>
+  <section id="title-overlay" class="title-overlay">
+    <div class="title-card plate">
+      <div class="title-eyebrow">NASA / CSA INTERACTIVE MISSION SIMULATOR</div>
+      <h1 class="game-logo">GOSPACE</h1>
+      <p class="title-sub">Architect real orbital spacecraft, launch rockets from the pad, and command live ground downlinks.</p>
+      <div class="mode-switch" role="group" aria-label="Game Mode">
+        <button id="mode-campaign-btn" class="btn-sci mode-btn active" type="button">PLAY CAMPAIGN</button>
+        <button id="mode-sandbox-btn" class="btn-sci mode-btn" type="button">SANDBOX FREEPLAY</button>
+      </div>
+      <div id="contract-grid" class="contract-grid"></div>
+    </div>
+  </section>
 
   <div id="hud-layer" class="hud-layer">
-    <header class="hud-top glass">
-      <div class="brand">
+    <header id="hud-top" class="hud-top plate">
+      <div class="brand-cluster">
         <span class="brand-mark" aria-hidden="true">GS</span>
-        <div>
-          <h1 class="brand-title">GoSpace</h1>
-          <span id="scenario-badge" class="pill">Level 1</span>
+        <button id="active-mission-pill" class="btn-sci mission-chip" type="button" title="Switch Mission Contract">
+          <span class="brand-name">GOSPACE</span>
+          <span id="scenario-badge" class="badge-tag">L1</span>
+        </button>
+        <nav id="stage-switcher" class="stage-bar" aria-label="Mission Stages">
+          <button class="stage-btn active" data-stage="hangar" type="button">1. HANGAR</button>
+          <button class="stage-btn" data-stage="launch" type="button">2. PAD</button>
+          <button class="stage-btn" data-stage="orbit" type="button">3. ORBIT</button>
+          <button class="stage-btn" data-stage="review" type="button">4. DEBRIEF</button>
+        </nav>
+      </div>
+
+      <div id="cml-xp-bar" class="cml-nodes" title="JPL Concept Maturity Level (CML 1 to CML 4)">
+        <div class="node-dots" id="cml-dots">
+          <span class="cnode">1</span><span class="cnode">2</span><span class="cnode">3</span><span class="cnode">4</span>
         </div>
+        <span id="cml-badge" class="cml-text">CML 1 · CONCEPT</span>
       </div>
 
-      <select id="scenario-select" aria-label="Select mission scenario"></select>
-
-      <div class="cml-xp" title="JPL Concept Maturity Level (CML 1 to CML 4)">
-        <div id="cml-badge" class="cml-badge cml-1">CML 1 · Concept</div>
-        <div class="cml-xp-track"><div id="cml-xp-fill" class="cml-xp-fill"></div></div>
-      </div>
-
-      <nav class="stage-bar" id="stage-switcher" aria-label="Mission Stages">
-        <button class="stage-btn active" data-stage="hangar" type="button">1. Hangar</button>
-        <button class="stage-btn" data-stage="launch" type="button">2. Launchpad</button>
-        <button class="stage-btn" data-stage="orbit" type="button">3. Orbit</button>
-        <button class="stage-btn" data-stage="review" type="button">4. Debrief</button>
-      </nav>
-
-      <div class="topbar-actions">
-        <label class="sandbox-toggle" title="Sandbox Mode waives budget & launcher mass caps">
-          <input type="checkbox" id="sandbox-toggle" />
-          <span>Sandbox</span>
-        </label>
-        <button id="save-load-btn" class="btn btn-secondary" type="button">Save</button>
-        <button id="resources-btn" class="btn btn-secondary" type="button">NASA/CSA (7)</button>
-        <button id="export-json-btn" class="btn btn-secondary" type="button">Export JSON</button>
-        <button id="toggle-hud-btn" class="btn btn-secondary" type="button" title="Toggle Full View [H]">Full View [H]</button>
+      <div class="topbar-utils">
+        <button id="mute-btn" class="btn-sci icon-btn" type="button" title="Toggle Audio">🔊</button>
+        <button id="toggle-hud-btn" class="btn-sci" type="button" title="Hide HUD [H]">[H]</button>
+        <button id="menu-btn" class="btn-sci" type="button" aria-expanded="false">⚙️ Menu / Codex</button>
       </div>
     </header>
 
+    <aside id="codex-menu" class="codex-menu plate" hidden>
+      <label class="codex-row"><input type="checkbox" id="sandbox-toggle" /><span>Sandbox Freeplay</span></label>
+      <button id="save-load-btn" class="btn-sci" type="button">💾 Save / Compare Builds</button>
+      <button id="mel-toggle" class="btn-sci" type="button" aria-expanded="false">📋 Master Equipment List</button>
+      <button id="resources-btn" class="btn-sci" type="button">📚 NASA / CSA Codex (7)</button>
+      <button id="export-json-btn" class="btn-sci" type="button">📥 Export Mission Viz JSON</button>
+      <button id="reopen-title-btn" class="btn-sci" type="button">🗺️ Mission Contracts</button>
+    </aside>
+
     <div class="hud-mid">
-      <button id="drawer-reopen-btn" class="drawer-reopen glass btn" type="button" hidden>Hangar Builder ›</button>
-
-      <aside id="hangar-drawer" class="hangar-drawer glass" aria-label="Spacecraft Hangar">
-        <div class="drawer-head">
-          <strong>Spacecraft Hangar</strong>
-          <button id="drawer-toggle" class="btn btn-secondary" type="button">Collapse ‹</button>
-        </div>
-        <div class="segment-tabs" id="segment-tabs" role="tablist">
-          <button class="seg-tab active" data-segment="user" type="button" role="tab">1. User</button>
-          <button class="seg-tab" data-segment="space" type="button" role="tab">2. Space</button>
-          <button class="seg-tab" data-segment="launch" type="button" role="tab">3. Launch</button>
-          <button class="seg-tab" data-segment="ground" type="button" role="tab">4. Ground</button>
-        </div>
-        <div id="segment-content" class="segment-content"></div>
-      </aside>
-
+      <div id="comms-banner" class="comms-banner plate">
+        <span class="eng-avatar" aria-hidden="true">👩‍🚀</span>
+        <span id="comms-text" class="comms-text">CHIEF ENG: Initializing telemetry...</span>
+      </div>
       <section id="stage-hud" class="stage-hud"></section>
+      <div id="center-action-hud" class="center-action-hud"></div>
       <div id="review-overlay" class="review-overlay" hidden></div>
-
-      <section id="mel-drawer" class="mel-drawer glass" hidden>
-        <div class="drawer-head">
-          <strong>Master Equipment List (MEL)</strong>
-          <span id="mel-summary-meta" class="pill">0 items</span>
-        </div>
-        <div class="mel-body" id="mel-body"></div>
+      <section id="mel-drawer" class="mel-drawer plate" hidden>
+        <div class="drawer-head"><strong>MASTER EQUIPMENT LIST</strong><span id="mel-summary-meta" class="badge-tag">0 items</span></div>
+        <div id="mel-body" class="mel-body"></div>
       </section>
     </div>
 
-    <footer class="hud-bottom glass">
-      <div id="resource-gauges" class="gauges-strip"></div>
-      <div class="bottom-actions">
-        <button id="mel-toggle" class="btn btn-secondary" type="button" aria-expanded="false">MEL</button>
-        <button id="launch-cta-btn" class="btn-launch" type="button">LAUNCH MISSION</button>
+    <footer id="hud-bottom" class="hud-bottom">
+      <div id="hangar-loadout" class="hangar-loadout plate">
+        <div class="loadout-nav">
+          <div id="segment-tabs" class="segment-pills" role="tablist">
+            <button class="seg-tab active" data-segment="user" type="button" role="tab">🎯 Objective</button>
+            <button class="seg-tab" data-segment="space" type="button" role="tab">🛰️ Sat Bus &amp; Payload</button>
+            <button class="seg-tab" data-segment="launch" type="button" role="tab">🚀 Rocket</button>
+            <button class="seg-tab" data-segment="ground" type="button" role="tab">📡 Comms</button>
+          </div>
+          <div id="sub-pills" class="sub-pills"></div>
+        </div>
+        <div id="equipment-strip" class="equipment-strip"></div>
+      </div>
+
+      <div id="status-cta-bar" class="status-cta-bar plate">
+        <div id="resource-gauges" class="gauges-mini"></div>
+        <button id="launch-cta-btn" class="btn-rollout" type="button">🚀 ROLL OUT TO PAD</button>
       </div>
     </footer>
   </div>
 
-  <dialog id="resources-modal" class="modal glass">
-    <div class="modal-head">
-      <h2>Official NASA &amp; CSA Reference Data (7)</h2>
-      <button class="btn btn-secondary close-modal" data-close="resources-modal" type="button">Close</button>
-    </div>
-    <p class="modal-desc">GoSpace mission rules, Keplerian propagation, CubeSat limits, and CML gates are grounded in these 7 official resources:</p>
-    <ul id="resources-list" class="resources-list"></ul>
+  <dialog id="resources-modal" class="modal plate">
+    <div class="modal-head"><h2>NASA &amp; CSA CODEX (7)</h2><button class="btn-sci close-modal" data-close="resources-modal" type="button">Close</button></div>
+    <ul id="resources-list" class="codex-list"></ul>
   </dialog>
 
-  <dialog id="saveload-modal" class="modal glass">
-    <div class="modal-head">
-      <h2>Save, Load &amp; Compare Point Designs</h2>
-      <button class="btn btn-secondary close-modal" data-close="saveload-modal" type="button">Close</button>
-    </div>
+  <dialog id="saveload-modal" class="modal plate">
+    <div class="modal-head"><h2>HANGAR POINT DESIGNS</h2><button class="btn-sci close-modal" data-close="saveload-modal" type="button">Close</button></div>
     <div class="save-form">
-      <input id="design-name-input" type="text" placeholder="Design name (e.g., WildFireSat Baseline)" maxlength="48" />
-      <button id="save-design-btn" class="btn btn-primary" type="button">Save Current</button>
+      <input id="design-name-input" type="text" placeholder="Callsign (e.g., WildFireSat V2)" maxlength="48" />
+      <button id="save-design-btn" class="btn-sci active" type="button">Save Build</button>
     </div>
-    <div id="saved-designs-list" class="saved-list"></div>
+    <div id="saved-designs-list" class="codex-list"></div>
     <div id="compare-box" class="compare-box"></div>
   </dialog>
 

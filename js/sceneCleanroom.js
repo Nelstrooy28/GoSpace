@@ -5,7 +5,7 @@ import { CATALOG } from './catalog.js';
 const find = (arr, id) => arr.find((x) => x.id === id) || null;
 let renderer = null, scene = null, camera = null, controls = null, resizeObserver = null;
 let rafId = 0, craftRoot = null, autoRotate = true, exploded = false, meshCount = 0;
-let pulseMeshes = [], animParts = [];
+let pulseMeshes = [], animParts = [], subGroups = {}, popTarget = null, popProg = 1, camGoal = null;
 const clock = new THREE.Clock();
 
 function disposeGroup(group) {
@@ -68,29 +68,31 @@ function buildBus(parent, busId, mats) {
 }
 
 function buildSolar(parent, solarId, dims, mats) {
+  const wrap = new THREE.Group();
   if (solarId === 'body-mounted') {
     [-1, 1].forEach((dir) => {
       const wing = new THREE.Group();
       addPart(wing, new THREE.BoxGeometry(0.05, dims.halfH * 1.55, dims.halfD * 1.55), mats.solar);
       regAnim(wing, [dir * (dims.halfW + 0.04), 0, 0], [dir * 0.55, 0, 0]);
-      parent.add(wing);
+      wrap.add(wing);
     });
-    return;
+  } else {
+    const panels = solarId === 'high-eff-gimbal' ? 3 : 2;
+    const pw = solarId === 'high-eff-gimbal' ? 1.15 : 0.75, ph = solarId === 'high-eff-gimbal' ? 0.95 : 0.62;
+    [-1, 1].forEach((dir) => {
+      const wing = new THREE.Group();
+      addPart(wing, new THREE.CylinderGeometry(0.035, 0.035, 0.45, 10), mats.alloy, [dir * 0.22, 0, 0], [0, 0, Math.PI / 2]);
+      for (let p = 0; p < panels; p += 1) {
+        const cx = dir * (0.48 + p * (pw + 0.06) + pw * 0.5);
+        addPart(wing, new THREE.BoxGeometry(pw, 0.04, ph), mats.solar, [cx, 0, 0]);
+        addPart(wing, new THREE.BoxGeometry(pw + 0.03, 0.025, ph + 0.03), mats.rail, [cx, -0.022, 0]);
+      }
+      regAnim(wing, [dir * dims.halfW, 0.08, 0], [dir * 0.95, 0, 0]);
+      wrap.add(wing);
+    });
   }
-  const panels = solarId === 'high-eff-gimbal' ? 3 : 2;
-  const pw = solarId === 'high-eff-gimbal' ? 1.15 : 0.75;
-  const ph = solarId === 'high-eff-gimbal' ? 0.95 : 0.62;
-  [-1, 1].forEach((dir) => {
-    const wing = new THREE.Group();
-    addPart(wing, new THREE.CylinderGeometry(0.035, 0.035, 0.45, 10), mats.alloy, [dir * 0.22, 0, 0], [0, 0, Math.PI / 2]);
-    for (let p = 0; p < panels; p += 1) {
-      const cx = dir * (0.48 + p * (pw + 0.06) + pw * 0.5);
-      addPart(wing, new THREE.BoxGeometry(pw, 0.04, ph), mats.solar, [cx, 0, 0]);
-      addPart(wing, new THREE.BoxGeometry(pw + 0.03, 0.025, ph + 0.03), mats.rail, [cx, -0.022, 0]);
-    }
-    regAnim(wing, [dir * dims.halfW, 0.08, 0], [dir * 0.95, 0, 0]);
-    parent.add(wing);
-  });
+  parent.add(wrap);
+  return wrap;
 }
 
 function buildPayloads(parent, state, bus, dims, mats) {
@@ -120,6 +122,7 @@ function buildPayloads(parent, state, bus, dims, mats) {
   });
   regAnim(group, [0, dims.halfH + 0.02, 0], [0, 0.95, 0]);
   parent.add(group);
+  return group;
 }
 
 function buildCommsAndThermal(parent, state, dims, mats) {
@@ -148,27 +151,45 @@ function buildCommsAndThermal(parent, state, dims, mats) {
   addPart(prop, new THREE.ConeGeometry(0.09 * stSize, 0.24 * stSize, 12), mats.rail, [-dims.halfW * 0.5, dims.halfH * 1.55, dims.halfD + 0.08], [Math.PI / 3, 0, 0]);
   regAnim(prop, [0, -dims.halfH - 0.02, 0], [0, -0.85, 0]);
   parent.add(prop);
+  return { comms, thermal: prop };
 }
 
-export function updateSpacecraft(missionState) {
+export function focusSubsystem(tag) {
+  if (!camera || !controls) return;
+  const presets = {
+    payload: [[2.9, 2.7, 3.2], [0, 0.95, 0]], solar: [[5.8, 2.1, 4.6], [0, 0.1, 0]],
+    comms: [[2.8, 2.5, 3.6], [0, 1.05, 0.3]], thermal: [[3.6, 1.1, 4.2], [0, -0.45, 0]], bus: [[4.5, 2.6, 4.9], [0, 0.15, 0]]
+  };
+  const [p, t] = presets[tag] || presets.bus;
+  camGoal = { pos: new THREE.Vector3(...p), target: new THREE.Vector3(...t) };
+}
+
+export function updateSpacecraft(missionState, focusTag = null) {
   if (!scene || !craftRoot) return meshCount;
   disposeGroup(craftRoot); craftRoot.clear();
   meshCount = 0; pulseMeshes = []; animParts = [];
   const bus = find(CATALOG.space.buses, missionState.busId), mats = makeMats(), busGroup = new THREE.Group();
   const dims = buildBus(busGroup, missionState.busId, mats);
   craftRoot.add(busGroup);
-  buildSolar(craftRoot, missionState.solarId, dims, mats);
-  buildPayloads(craftRoot, missionState, bus, dims, mats);
-  buildCommsAndThermal(craftRoot, missionState, dims, mats);
+  const solar = buildSolar(craftRoot, missionState.solarId, dims, mats);
+  const payload = buildPayloads(craftRoot, missionState, bus, dims, mats);
+  const { comms, thermal } = buildCommsAndThermal(craftRoot, missionState, dims, mats);
+  subGroups = { bus: busGroup, solar, payload, comms, thermal };
+  if (focusTag) { popTarget = subGroups[focusTag] || craftRoot; popProg = 0; popTarget.scale.setScalar(0.2); focusSubsystem(focusTag); }
   return meshCount;
 }
 
 function animate() {
   rafId = requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-  if (craftRoot) {
-    if (autoRotate) craftRoot.rotation.y += dt * 0.32;
-    craftRoot.position.y = Math.sin(t * 1.4) * 0.04;
+  if (craftRoot) { if (autoRotate) craftRoot.rotation.y += dt * 0.32; craftRoot.position.y = Math.sin(t * 1.4) * 0.04; }
+  if (popTarget && popProg < 1) {
+    popProg = Math.min(1, popProg + dt * 4.2);
+    popTarget.scale.setScalar(popProg >= 1 ? 1 : 0.2 + 0.8 * popProg + Math.sin(popProg * Math.PI) * 0.1);
+  }
+  if (camGoal && camera && controls) {
+    camera.position.lerp(camGoal.pos, Math.min(1, dt * 4.5)); controls.target.lerp(camGoal.target, Math.min(1, dt * 5));
+    if (camera.position.distanceTo(camGoal.pos) < 0.08) camGoal = null;
   }
   animParts.forEach((p) => p.obj.position.lerp(exploded ? p.exp : p.base, Math.min(1, dt * 7)));
   pulseMeshes.forEach((m) => { m.material.opacity = 0.4 + 0.45 * Math.abs(Math.sin(t * 4)); });
@@ -180,25 +201,21 @@ export const setExploded = (v) => { exploded = Boolean(v); };
 export const getMeshCount = () => meshCount;
 export function resetCamera() {
   if (!camera || !controls) return;
-  camera.position.set(4.6, 2.9, 5.1);
-  controls.target.set(0, 0.2, 0);
-  controls.update();
+  camGoal = null; camera.position.set(4.6, 2.9, 5.1); controls.target.set(0, 0.2, 0); controls.update();
 }
 
 export function mountCleanroom(container, missionState) {
   unmountCleanroom();
   const w = Math.max(container.clientWidth, 320), h = Math.max(container.clientHeight, 320);
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setSize(w, h, false);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(w, h, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
   container.appendChild(renderer.domElement);
 
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 100);
+  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 100);
   controls = new OrbitControls(camera, renderer.domElement);
   Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, minDistance: 2.2, maxDistance: 12, maxPolarAngle: Math.PI * 0.48 });
+  controls.addEventListener('start', () => { camGoal = null; });
   resetCamera();
 
   scene.add(new THREE.AmbientLight(0xdbeafe, 0.65));
@@ -211,26 +228,22 @@ export function mountCleanroom(container, missionState) {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.62, 0.025, 10, 64), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0ea5e9, emissiveIntensity: 0.7 }));
   ring.rotation.x = Math.PI / 2; ring.position.y = -1.51; scene.add(ring);
 
-  craftRoot = new THREE.Group();
-  scene.add(craftRoot);
-  updateSpacecraft(missionState);
+  craftRoot = new THREE.Group(); scene.add(craftRoot); updateSpacecraft(missionState);
   resizeObserver = new ResizeObserver(() => {
     if (!renderer || !camera || !container) return;
     const nw = Math.max(container.clientWidth, 1), nh = Math.max(container.clientHeight, 1);
     camera.aspect = nw / nh; camera.updateProjectionMatrix(); renderer.setSize(nw, nh, false);
   });
-  resizeObserver.observe(container);
-  clock.start();
-  animate();
+  resizeObserver.observe(container); clock.start(); animate();
   return meshCount;
 }
 
-export function unmountCleanroom() {
-  if (rafId) cancelAnimationFrame(rafId);
-  rafId = 0;
+function unmountAllCleanup() {
+  if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }
   if (scene) { disposeGroup(scene); scene = null; }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
-  craftRoot = null; pulseMeshes = []; animParts = []; meshCount = 0;
+  craftRoot = null; pulseMeshes = []; animParts = []; subGroups = {}; popTarget = null; camGoal = null; meshCount = 0;
 }
+export function unmountCleanroom() { unmountAllCleanup(); }

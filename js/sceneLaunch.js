@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import { playCountdownBeep, startRocketRumbling, stopRocketRumbling } from './sfx.js';
 
 let renderer = null, scene = null, camera = null, resizeObserver = null, rafId = 0;
 let rocketGroup = null, boosterGroup = null, stage2Group = null, fairingL = null, fairingR = null;
 let wingL = null, wingR = null, armPivot = null, padGroup = null, flames = [], puffs = [];
 let starMat = null, trenchLight = null, skyColor = null, camMode = 'rocket';
-let elapsed = 0, completed = false, lastHudMs = 0, updateCb = null, completeCb = null;
+let ignitedCmd = false, igniteElapsed = 0, lastBeep = -1, rumbleOn = false, padClock = 0;
+let completed = false, lastHudMs = 0, updateCb = null, completeCb = null;
 const clock = new THREE.Clock();
 const SKY_PAD = new THREE.Color(0x164e87), SKY_MID = new THREE.Color(0x0b1d3a), SKY_SPACE = new THREE.Color(0x040810);
 
@@ -106,36 +108,39 @@ function buildPadAndSky() {
 function animate() {
   rafId = requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
-  elapsed += dt;
+  padClock += dt;
+  if (ignitedCmd) igniteElapsed += dt;
+  const elapsed = ignitedCmd ? igniteElapsed : 0;
 
-  // Sky transition 2.5s -> 7.5s
   const skyT = THREE.MathUtils.clamp((elapsed - 2.5) / 5.0, 0, 1);
   if (skyT < 0.5) skyColor.copy(SKY_PAD).lerp(SKY_MID, skyT * 2);
   else skyColor.copy(SKY_MID).lerp(SKY_SPACE, (skyT - 0.5) * 2);
   scene.background = skyColor;
   if (starMat) starMat.opacity = THREE.MathUtils.clamp((elapsed - 3.5) / 3.5, 0, 1);
 
+  if (ignitedCmd) {
+    const beepIdx = elapsed < 0.8 ? 0 : (elapsed < 1.6 ? 1 : (elapsed < 2.4 ? 2 : (elapsed < 3.0 ? 3 : -1)));
+    if (beepIdx > lastBeep && beepIdx >= 0) { lastBeep = beepIdx; playCountdownBeep(beepIdx === 3); }
+    if (elapsed >= 2.5 && !rumbleOn) { rumbleOn = true; startRocketRumbling(); }
+  }
   if (armPivot) armPivot.rotation.y = elapsed > 2.2 ? THREE.MathUtils.lerp(armPivot.rotation.y, 1.25, dt * 4) : 0;
-  const ignited = elapsed >= 2.6;
+  const ignited = ignitedCmd && elapsed >= 2.6;
   flames.forEach((f) => { f.visible = ignited && elapsed < 8.4; if (f.visible) f.scale.set(1, 0.85 + Math.random() * 0.4, 1); });
-  if (trenchLight) trenchLight.intensity = ignited && elapsed < 5.5 ? 5 + Math.random() * 3 : 0;
+  if (trenchLight) trenchLight.intensity = ignited && elapsed < 5.5 ? 5 + Math.random() * 3 : (ignitedCmd ? 0 : 0.8 + Math.sin(padClock * 3) * 0.4);
 
-  let altKm = 0, velKms = 0, phase = 'COUNTDOWN';
-  let cdLabel = elapsed < 1 ? 'T-3' : (elapsed < 2 ? 'T-2' : (elapsed < 2.8 ? 'T-1' : 'IGNITION'));
+  let altKm = 0, velKms = 0, phase = ignitedCmd ? 'COUNTDOWN' : 'ARMED ON PAD', callout = ignitedCmd ? 'T-MINUS' : 'READY FOR IGNITION';
+  let cdLabel = !ignitedCmd ? 'HOLD' : (elapsed < 0.85 ? 'T-3' : (elapsed < 1.7 ? 'T-2' : (elapsed < 2.55 ? 'T-1' : 'IGNITION')));
   if (elapsed >= 3.0) {
     const tFlight = elapsed - 3.0;
-    const rocketY = Math.pow(tFlight, 1.85) * 1.15;
-    rocketGroup.position.y = rocketY;
+    rocketGroup.position.y = Math.pow(tFlight, 1.85) * 1.15;
     altKm = Math.round(Math.min(240, tFlight * tFlight * 3.1));
     velKms = Number(Math.min(7.7, tFlight * 0.94).toFixed(2));
-    phase = elapsed < 8.2 ? 'LIFTOFF & MAX-Q' : 'STAGE SEP & FAIRING';
+    phase = elapsed < 8.2 ? 'LIFTOFF & MAX-Q' : 'ORBIT INSERTION';
+    callout = elapsed < 5.0 ? 'LIFTOFF!' : (elapsed < 8.2 ? 'MAX-Q!' : 'FAIRING SEPARATION!');
     cdLabel = `T+${tFlight.toFixed(1)}s`;
   }
 
-  if (elapsed >= 8.2) {
-    boosterGroup.position.y -= dt * 3.2;
-    boosterGroup.rotation.z += dt * 0.25;
-  }
+  if (elapsed >= 8.2) { boosterGroup.position.y -= dt * 3.2; boosterGroup.rotation.z += dt * 0.25; }
   if (elapsed >= 8.5) {
     fairingL.position.x -= dt * 1.15; fairingL.rotation.z += dt * 0.55;
     fairingR.position.x += dt * 1.15; fairingR.rotation.z -= dt * 0.55;
@@ -143,46 +148,46 @@ function animate() {
     wingR.rotation.z = THREE.MathUtils.lerp(wingR.rotation.z, 0, dt * 4);
   }
 
+  const venting = (!ignitedCmd && Math.floor(padClock * 10) % 3 === 0) || (ignited && elapsed < 8.0);
   puffs.forEach((p, idx) => {
-    if (ignited && elapsed < 8.0 && p.life <= 0 && idx % 2 === Math.floor(elapsed * 20) % 2) {
+    if (venting && p.life <= 0 && idx % 3 === Math.floor(padClock * 20) % 3) {
       p.life = 1; p.m.visible = true;
-      p.m.position.set((Math.random() - 0.5) * 0.4, rocketGroup.position.y - 0.2, (Math.random() - 0.5) * 0.4);
-      p.vx = (Math.random() - 0.5) * 1.6; p.vy = -1.2 - Math.random(); p.vz = (Math.random() - 0.5) * 1.6;
+      p.m.position.set((Math.random() - 0.5) * 0.4, rocketGroup.position.y + (ignited ? -0.2 : 1.4), (Math.random() - 0.5) * 0.4);
+      p.vx = (Math.random() - 0.5) * (ignited ? 1.6 : 0.6); p.vy = ignited ? -1.2 - Math.random() : 0.35; p.vz = (Math.random() - 0.5) * 1.4;
     }
     if (p.life > 0) {
       p.life -= dt * 1.4;
       p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
-      p.m.scale.setScalar(1 + (1 - p.life) * 2.2); p.m.material.opacity = Math.max(0, p.life * 0.5);
+      p.m.scale.setScalar(1 + (1 - p.life) * 2.2); p.m.material.opacity = Math.max(0, p.life * (ignited ? 0.5 : 0.25));
       if (p.life <= 0) p.m.visible = false;
     }
   });
 
-  const ry = rocketGroup.position.y;
-  const shake = ignited && elapsed < 7.0 ? 0.04 : 0;
+  const ry = rocketGroup.position.y, shake = ignited && elapsed < 7.0 ? 0.045 : 0;
   const sx = (Math.random() - 0.5) * shake, sy = (Math.random() - 0.5) * shake;
-  if (camMode === 'pad') {
-    camera.position.set(5.4 + sx, 2.2 + sy, 6.2);
-    camera.lookAt(0, ry + 1.8, 0);
-  } else {
-    camera.position.set(2.5 + sx, ry + 3.2 + sy, 3.4);
-    camera.lookAt(0, ry + 2.5, 0);
-  }
+  if (camMode === 'pad') { camera.position.set(5.4 + sx, 2.2 + sy, 6.2); camera.lookAt(0, ry + 1.8, 0); }
+  else { camera.position.set(2.5 + sx, ry + 3.2 + sy, 3.4); camera.lookAt(0, ry + 2.5, 0); }
 
   const now = performance.now();
   if (updateCb && now - lastHudMs > 90) {
     lastHudMs = now;
-    updateCb({ phase, countdownLabel: cdLabel, altitudeKm: altKm, velocityKms: velKms, progressPct: Math.min(100, Math.round((elapsed / 11.2) * 100)), camMode });
+    updateCb({ phase, callout, countdownLabel: cdLabel, altitudeKm: altKm, velocityKms: velKms, progressPct: Math.min(100, Math.round((elapsed / 11.2) * 100)), camMode, armed: !ignitedCmd });
   }
   renderer.render(scene, camera);
-  if (elapsed >= 11.2 && !completed) { completed = true; completeCb?.(); }
+  if (ignitedCmd && elapsed >= 11.2 && !completed) { completed = true; stopRocketRumbling(); completeCb?.(); }
 }
 
 export const setLaunchCamera = (m) => { camMode = m; };
+export function triggerIgnition() {
+  if (ignitedCmd) return false;
+  ignitedCmd = true; igniteElapsed = 0; lastBeep = -1; rumbleOn = false;
+  return true;
+}
 
 export function mountLaunch(container, missionState, onUpdate, onComplete) {
   unmountLaunch();
   updateCb = onUpdate; completeCb = onComplete;
-  elapsed = 0; completed = false; lastHudMs = 0;
+  ignitedCmd = false; igniteElapsed = 0; padClock = 0; completed = false; lastHudMs = 0; lastBeep = -1; rumbleOn = false;
   const w = Math.max(container.clientWidth, 320), h = Math.max(container.clientHeight, 320);
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -210,6 +215,8 @@ export function mountLaunch(container, missionState, onUpdate, onComplete) {
 }
 
 export function unmountLaunch() {
+  stopRocketRumbling();
+  ignitedCmd = false; rumbleOn = false;
   if (rafId) cancelAnimationFrame(rafId);
   rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }

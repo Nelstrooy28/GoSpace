@@ -12,28 +12,28 @@ export const OFFICIAL_RESOURCES = [
 
 export const SCENARIOS = [
   {
-    id: 'wildfiresat-l1', level: 1, tag: 'Level 1 · CubeSat 101',
+    id: 'wildfiresat-l1', level: 1, stars: '★☆☆', tag: 'Level 1 · CubeSat 101', badge: 'ARCTIC GUARDIAN', orbitIcon: '🛰️ SSO LEO 575km',
     name: 'CSA WildFireSat & Arctic Thermal Monitor',
     summary: 'Detect boreal wildfires & Arctic heat anomalies from Sun-Synchronous LEO using a compact CubeSat.',
     targetBand: 'ir', targetObjective: 'wildfire-ir', targetOrbit: 'sso-leo', targetLatency: 'realtime',
     budgetLimitM: 24, minLifetimeYr: 2, minScience: 75,
-    realMatch: { name: 'CSA WildFireSat & NASA FireSense', detail: 'Canadian Space Agency thermal IR wildfire monitoring constellation + NASA FireSense airborne/spaceborne analytics.' }
+    realMatch: { name: 'CSA WildFireSat & NASA FireSense', tag: 'CSA WILDFIRE FLEET', detail: 'Canadian Space Agency thermal IR wildfire monitoring constellation + NASA FireSense analytics.' }
   },
   {
-    id: 'ocean-l2', level: 2, tag: 'Level 2 · SmallSat',
+    id: 'ocean-l2', level: 2, stars: '★★☆', tag: 'Level 2 · SmallSat', badge: 'OCEAN SENTINEL', orbitIcon: '🌍 Polar LEO 680km',
     name: 'Coastal Ocean & Climate Radiometry',
     summary: 'Measure phytoplankton, coastal turbidity, and sea-ice dynamics with UV-Visible hyperspectral radiometry.',
     targetBand: 'uv-vis', targetObjective: 'ocean-color', targetOrbit: 'polar-leo', targetLatency: 'daily',
     budgetLimitM: 115, minLifetimeYr: 3, minScience: 80,
-    realMatch: { name: 'NASA PACE & CSA RADARSAT Constellation', detail: 'NASA Plankton, Aerosol, Cloud, ocean Ecosystem hyperspectral mission paired with CSA maritime monitoring.' }
+    realMatch: { name: 'NASA PACE & CSA RADARSAT Constellation', tag: 'NASA OCEAN COLOR', detail: 'NASA Plankton, Aerosol, Cloud, ocean Ecosystem hyperspectral mission paired with CSA maritime monitoring.' }
   },
   {
-    id: 'lunar-l3', level: 3, tag: 'Level 3 · Flagship / Lunar',
+    id: 'lunar-l3', level: 3, stars: '★★★', tag: 'Level 3 · Flagship / Lunar', badge: 'LUNAR PIONEER', orbitIcon: '🌙 Lunar Transfer',
     name: 'Lunar South Pole Volatiles & Deep Space Observatory',
     summary: 'Map shadowed lunar craters for water ice using cryogenic infrared spectroscopy and neutron detection.',
     targetBand: 'cryo-ir', targetObjective: 'lunar-volatiles', targetOrbit: 'lunar-transfer', targetLatency: 'archival',
     budgetLimitM: 500, minLifetimeYr: 5, minScience: 85,
-    realMatch: { name: 'NASA Lunar Trailblazer & JWST', detail: 'High-resolution volatiles and minerals mapper combined with JWST-class cryogenic thermal architecture.' }
+    realMatch: { name: 'NASA Lunar Trailblazer & JWST', tag: 'DEEP SPACE FLAGSHIP', detail: 'High-resolution volatiles and minerals mapper combined with JWST-class cryogenic thermal architecture.' }
   }
 ];
 
