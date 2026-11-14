@@ -134,8 +134,8 @@ export function renderStageHud(stage, state, ev, opts) {
       <div class="btn-row">
         <button class="btn-sci ${opts.orbitCam === 'chase' ? 'is-on' : ''}" data-cam="chase" type="button">🛰️ Chase Sat</button>
         <button class="btn-sci ${opts.orbitCam === 'full' ? 'is-on' : ''}" data-cam="full" type="button">🌍 Full Orbit</button>
-        <button class="btn-sci ${opts.orbitCam === 'asteroid' ? 'is-on' : ''}" data-cam="asteroid" type="button">☄️ Asteroid Watch</button>
-        <button class="btn-sci ${opts.orbitCam === 'solar' ? 'is-on' : ''}" data-cam="solar" type="button">🌌 Solar System</button>
+        <button class="btn-sci ${opts.orbitCam === 'asteroid' ? 'is-on' : ''}" data-cam="asteroid" type="button">☄️ Asteroid &amp; Comet</button>
+        <button class="btn-sci ${opts.orbitCam === 'solar' ? 'is-on' : ''}" data-cam="solar" type="button">🌌 Full Solar System</button>
       </div>
       <div class="btn-row">
         <button class="btn-sci ${opts.orbitWarp === 1 ? 'is-on' : ''}" data-warp="1" type="button">1x</button>

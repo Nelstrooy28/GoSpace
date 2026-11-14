@@ -101,7 +101,7 @@ function renderAll(rebuildScene = true, focusTag = null) {
 const openSaveModal = () => { renderSavedModal(readJson(STORAGE_SAVED, []), lastEval); document.getElementById('saveload-modal').showModal(); };
 const handleTransmit = () => { const r = transmitScience(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} DATA DOWNLINKED (${r.station})!`); } };
 const handleSafeMode = () => { const r = activateSafeMode(); orbitScore += r.points; spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`); };
-const handleScanAsteroid = () => { const r = scanAsteroid(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} ASTEROID ${r.id} SCANNED!`); } };
+const handleScanAsteroid = () => { const r = scanAsteroid(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`); } };
 
 function init() {
   document.getElementById('mode-campaign-btn').addEventListener('click', () => { playEquip(); missionState.sandboxMode = false; renderAll(false); });
