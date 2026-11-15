@@ -419,6 +419,20 @@ function createParticleStream(colorHex, count, size = 0.09) {
 
 export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15, 3.2, -16), moonScale = 0.65 } = {}) {
   const disposables = [], track = (o) => { disposables.push(o); return o; };
+  const holoProxies = [];
+  const holoTargets = {};
+  const proxyMat = track(new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false }));
+  const addHoloProxy = (parent, radius, holoId, visualRadius, getFocusPos, camOffset) => {
+    const proxy = new THREE.Mesh(track(new THREE.SphereGeometry(radius, 12, 10)), proxyMat);
+    proxy.userData.holoId = holoId;
+    proxy.userData.holoRadius = visualRadius;
+    parent.add(proxy);
+    holoProxies.push(proxy);
+    if (!holoTargets[holoId]) {
+      holoTargets[holoId] = { id: holoId, visualRadius, getPos: getFocusPos, camOffset: camOffset.clone() };
+    }
+    return proxy;
+  };
 
   // 1. Cached 2048x1024 Milky Way sky-dome + 5,800 spectral stars
   const sky = new THREE.Mesh(
@@ -442,6 +456,7 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
   const c2 = makeGlowSprite('rgba(253,224,71,0.38)', 'rgba(234,88,12,0)', 136);
   track(c1.tex); track(c1.mat); track(c2.tex); track(c2.mat);
   sunGroup.add(c1.sprite, c2.sprite);
+  addHoloProxy(sunGroup, 16 * 2.8, 'sun', 17.5, () => sunPos.clone(), new THREE.Vector3(34, 15, 44));
   scene.add(sunGroup);
 
   // 3. Cratered Moon & Earth heliocentric orbit arc
@@ -451,6 +466,7 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
     track(new THREE.MeshStandardMaterial({ map: moonMaps.map, bumpMap: moonMaps.bumpMap, bumpScale: 0.038, roughness: 0.92 }))
   );
   moon.position.copy(moonPos);
+  addHoloProxy(moon, Math.max(moonScale * 2.8, 3.0), 'moon', moonScale, () => moon.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(Math.max(1.8, moonScale * 3.1), Math.max(0.9, moonScale * 1.5), Math.max(2.3, moonScale * 3.8)));
   scene.add(moon);
 
   const earthGuide = new THREE.Mesh(
@@ -503,6 +519,23 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
     lbl.sprite.position.set(0, spec.rad + 3.4, 0);
     grp.add(lbl.sprite);
 
+    const visualR = spec.kind === 'saturn' ? spec.rad * 2.45 : (spec.kind === 'uranus' ? spec.rad * 1.88 : spec.rad);
+    const hitR = Math.max(spec.rad * 2.8, 10.5);
+    const viewScale = Math.max(2.6, spec.rad * 2.4);
+    const camOffset = spec.kind === 'saturn'
+      ? new THREE.Vector3(viewScale * 1.12, viewScale * 1.18, viewScale * 1.25)
+      : (spec.kind === 'uranus'
+        ? new THREE.Vector3(viewScale * 1.2, viewScale * 0.9, viewScale * 1.35)
+        : new THREE.Vector3(viewScale * 1.15, viewScale * 0.56, viewScale * 1.35));
+    addHoloProxy(
+      grp,
+      hitR,
+      spec.kind,
+      visualR,
+      () => grp.getWorldPosition(new THREE.Vector3()),
+      camOffset
+    );
+
     const guide = new THREE.Mesh(
       track(new THREE.RingGeometry(spec.orbR - 0.18, spec.orbR + 0.18, 128)),
       track(new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.11, side: THREE.DoubleSide }))
@@ -511,6 +544,22 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
     scene.add(guide, grp);
     return { sphere, spin: spec.spin };
   });
+
+  // Main Asteroid Belt generous torus hit proxy centered on sunPos
+  const beltProxy = new THREE.Mesh(track(new THREE.TorusGeometry(405, 24, 8, 48)), proxyMat);
+  beltProxy.rotation.x = Math.PI / 2;
+  beltProxy.position.copy(sunPos);
+  beltProxy.userData.holoId = 'asteroid-belt';
+  beltProxy.userData.holoRadius = 22;
+  scene.add(beltProxy);
+  holoProxies.push(beltProxy);
+  const beltFocusPt = new THREE.Vector3(sunPos.x + Math.cos(3.15) * 405, 2, sunPos.z + Math.sin(3.15) * 405);
+  holoTargets['asteroid-belt'] = {
+    id: 'asteroid-belt',
+    visualRadius: 14,
+    getPos: () => beltFocusPt.clone(),
+    camOffset: new THREE.Vector3(24, 16, 34)
+  };
 
   // 5. 840+ Main Asteroid Belt (3 cratered rock variants x 280 instances)
   const beltBatches = [11, 29, 47].map((seed, bIdx) => {
@@ -546,6 +595,10 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
     const wake = createParticleStream(0x67e8f9, 26, 0.08);
     track(wake.geo); track(wake.mat);
     group.add(rock, coma.sprite);
+    const neaProxy = new THREE.Mesh(track(new THREE.SphereGeometry(Math.max(aRad * 2.8, 1.3), 8, 8)), proxyMat);
+    neaProxy.userData.holoId = 'asteroid-belt';
+    group.add(neaProxy);
+    holoProxies.push(neaProxy);
     scene.add(group, wake.points);
 
     const orb = 5.4 + i * 1.12, ang = (i / 7) * Math.PI * 2, inc = (i % 2 ? 1 : -1) * 0.28;
@@ -571,6 +624,7 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
   track(ionParticles.geo); track(ionParticles.mat);
   track(dustParticles.geo); track(dustParticles.mat);
   cometGroup.add(cometCore, cometComa.sprite, ionPivot);
+  addHoloProxy(cometGroup, 2.4, 'comet', 1.4, () => cometGroup.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(4.5, 2.5, 5.8));
   scene.add(cometGroup, ionParticles.points, dustParticles.points);
 
   const cometTarget = { id: 'C/2026 GOSPACE', isComet: true, points: 100, mesh: cometGroup, phase: 0.45 };
@@ -647,7 +701,7 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
   }
 
   return {
-    sunPos, moon, nearAsteroids, comet: cometTarget, update, findNearestTarget, findNearestNea: (p) => { const r = findNearestTarget(p); return { nea: r.target, dist: r.dist }; },
+    sunPos, moon, nearAsteroids, comet: cometTarget, holoProxies, holoTargets, update, findNearestTarget, findNearestNea: (p) => { const r = findNearestTarget(p); return { nea: r.target, dist: r.dist }; },
     dispose() { disposables.forEach((d) => d.dispose?.()); }
   };
 }

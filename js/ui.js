@@ -1,4 +1,4 @@
-import { CATALOG, OFFICIAL_RESOURCES, SCENARIOS, getMissionOrbitGuide } from './catalog.js';
+import { CATALOG, CELESTIAL_DATABASE, OFFICIAL_RESOURCES, SCENARIOS, getMissionOrbitGuide } from './catalog.js';
 import { playRankStamp, playStarChime } from './sfx.js';
 
 let debriefTimers = [];
@@ -264,6 +264,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.orbitWarp === 100 ? 'is-on' : ''}" data-warp="100" type="button">100x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
         <button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Test Hazard</button>
+        <button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Replay Zero-G Satellite Unfolding [U]">🛰️ Replay Unfold [U]</button>
         <button id="orb-sensorcam-btn" class="btn-sci ${opts.sensorCamOpen ? 'is-on' : ''}" type="button">📷 Sensor Cam [C]</button>
         <button id="hud-mission-guide-btn" class="btn-sci guide-pill" type="button">📋 Mission Guide</button>
         <button id="orb-debrief-btn" class="btn-sci active" type="button">🏆 View Debrief</button>
@@ -496,6 +497,15 @@ export function updateOrbitOverlay(t) {
   }
   const tx = document.getElementById('orb-transmit-btn'); if (tx) tx.hidden = !t?.inLineOfSight;
   const sm = document.getElementById('orb-safemode-btn'); if (sm) sm.hidden = !(t?.inEclipse || t?.stormActive) || Boolean(t?.safeModeActive);
+  const db = document.getElementById('orbit-deploy-banner');
+  if (db) {
+    const active = Boolean(t?.deployActive && !t?.briefingPaused);
+    db.hidden = !active;
+    if (active) {
+      const pct = Math.round((t.deployProgress || 0) * 100);
+      db.textContent = `🛰️ DEPLOYING SOLAR ARRAYS & HIGH-GAIN ANTENNA... ${pct}%`;
+    }
+  }
 }
 
 export const renderResourcesList = () => { document.getElementById('resources-list').innerHTML = OFFICIAL_RESOURCES.map((r) => `<li><span><strong>[${r.agency}]</strong> ${esc(r.title)}</span><a href="${r.url}" target="_blank" rel="noopener noreferrer">Open</a></li>`).join(''); };
@@ -563,5 +573,52 @@ export function renderMissionBriefing(ev, stage, open) {
     <div class="brief-actions">
       <button id="brief-start-btn" class="brief-start-btn" type="button">${startLabel}</button>
     </div>
+  </div>`;
+}
+
+export function renderHoloScannerCard(holoId, focusedHoloId = null) {
+  const card = document.getElementById('holo-scanner-card');
+  if (!card) return;
+  const data = holoId ? CELESTIAL_DATABASE[holoId] : null;
+  if (!data) {
+    card.hidden = true;
+    card.dataset.holoId = '';
+    return;
+  }
+  const key = `${data.id}|${focusedHoloId === data.id ? 1 : 0}`;
+  card.hidden = false;
+  if (card.dataset.renderKey === key) return;
+  card.dataset.renderKey = key;
+  card.dataset.holoId = data.id;
+  card.style.setProperty('--holo-accent', data.accent || '#38bdf8');
+
+  card.innerHTML = `<div class="holo-scan-head">
+    <div class="holo-scan-title-wrap">
+      <span class="holo-scan-emblem" aria-hidden="true">${data.emblem}</span>
+      <div>
+        <div class="holo-scan-kicker">HOLO-SCANNER TELEMETRY</div>
+        <h3 class="holo-scan-name">${esc(data.name)}</h3>
+      </div>
+    </div>
+    <button id="holo-close-btn" class="holo-scan-close" type="button" title="Close Scanner Card" aria-label="Close Holo-Scanner Card">✕</button>
+  </div>
+
+  <div class="holo-scan-class-row">
+    <span class="holo-class-pill">${esc(data.classification)}</span>
+    <span class="holo-dist-pill">${esc(data.stats.distanceAU)}</span>
+  </div>
+
+  <div class="holo-stats-grid">
+    <div class="holo-stat-cell"><span>GRAVITY</span><strong>${esc(data.stats.gravity)}</strong></div>
+    <div class="holo-stat-cell"><span>ROTATION / PASSES</span><strong>${esc(data.stats.dayLength)}</strong></div>
+    <div class="holo-stat-cell"><span>ORBIT / BAND</span><strong>${esc(data.stats.orbitalPeriod)}</strong></div>
+    <div class="holo-stat-cell"><span>TEMPERATURE</span><strong>${esc(data.stats.tempRange)}</strong></div>
+  </div>
+
+  <p class="holo-scan-fact">${esc(data.scienceFact)}</p>
+
+  <div class="holo-scan-actions">
+    <button id="holo-zoom-btn" class="btn-sci ${focusedHoloId === data.id ? 'is-on' : ''}" type="button">🎥 Zoom to Body</button>
+    <button id="holo-return-btn" class="btn-sci" type="button">🛰️ Back to My Satellite</button>
   </div>`;
 }

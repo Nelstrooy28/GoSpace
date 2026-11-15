@@ -362,7 +362,7 @@ function animate() {
     else if (elapsed < 7.6) callout = 'MAX-Q · MAXIMUM DYNAMIC PRESSURE';
     else if (elapsed < 9.4) callout = becoDone ? 'BECO · SIDE BOOSTER SEP!' : 'SUPERSONIC ASCENT';
     else if (elapsed < 10.6) callout = 'MECO · STAGE 2 IGNITION!';
-    else callout = 'FAIRING SEP · SOLAR DEPLOY!';
+    else callout = 'FAIRING SEP · ORBITAL INSERTION!';
     cdLabel = `T+${tf.toFixed(1)}s`;
   }
   lastRocketY = rocketGroup.position.y;
@@ -392,8 +392,7 @@ function animate() {
     if (!fairingDone) { fairingDone = true; playStageSep(); }
     fairingL.position.x -= dt * 1.45; fairingL.rotation.z += dt * 0.62;
     fairingR.position.x += dt * 1.45; fairingR.rotation.z -= dt * 0.62;
-    const deployT = Math.min(1, (elapsed - 10.6) / 1.85);
-    launchCraft?.setDeployProgress(deployT);
+    launchCraft?.update?.(dt, elapsed);
   }
 
   sparks.forEach((sp) => {

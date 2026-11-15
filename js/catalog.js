@@ -384,3 +384,231 @@ export function getMissionOrbitGuide(scenario, sandboxMode = false) {
     proTip: `Sandbox Active (unlimited budget & rocket mass): ${g.proTip}`
   };
 }
+
+export const CELESTIAL_DATABASE = {
+  sun: {
+    id: 'sun',
+    name: 'The Sun',
+    emblem: '☀️',
+    accent: '#fbbf24',
+    classification: 'G-Type Main-Sequence Star',
+    stats: {
+      gravity: '274.0 m/s²',
+      dayLength: '25.4 Earth days',
+      orbitalPeriod: '230 Myr (Galactic)',
+      tempRange: '5,500 °C surface · 15M °C core',
+      distanceAU: '0.00 AU'
+    },
+    scienceFact: 'Containing 99.86% of the Solar System’s mass, the Sun fuses 600 million tons of hydrogen into helium every second while driving space weather across every planetary magnetosphere. Robotic sentinels like Parker Solar Probe and ESA’s Solar Orbiter dive into its superheated corona to forecast coronal mass ejections.'
+  },
+  mercury: {
+    id: 'mercury',
+    name: 'Mercury',
+    emblem: '🪨',
+    accent: '#cbd5e1',
+    classification: 'Terrestrial Planet',
+    stats: {
+      gravity: '3.70 m/s²',
+      dayLength: '1,408 hrs (58.6d)',
+      orbitalPeriod: '88 Earth days',
+      tempRange: '-180 °C to +430 °C',
+      distanceAU: '0.39 AU'
+    },
+    scienceFact: 'Mercury possesses an oversized iron core spanning roughly 85% of its radius and hides permanently shadowed polar craters cold enough to trap water ice. Following MESSENGER’s orbital mapping, the joint ESA/JAXA BepiColombo mission uses electric ion propulsion and solar shields to probe its faint magnetosphere.'
+  },
+  venus: {
+    id: 'venus',
+    name: 'Venus',
+    emblem: '🌫️',
+    accent: '#fde68a',
+    classification: 'Terrestrial Planet',
+    stats: {
+      gravity: '8.87 m/s²',
+      dayLength: '5,832 hrs (Retrograde)',
+      orbitalPeriod: '225 Earth days',
+      tempRange: '+462 °C surface avg',
+      distanceAU: '0.72 AU'
+    },
+    scienceFact: 'Shrouded in thick sulfuric-acid clouds and 92-bar carbon dioxide pressure, Venus experiences a runaway greenhouse hotter than Mercury’s equator despite reflecting most sunlight. Orbiters such as JAXA’s Akatsuki and upcoming radar mappers like VERITAS and EnVision peer beneath its clouds to study active volcanism.'
+  },
+  earth: {
+    id: 'earth',
+    name: 'Earth',
+    emblem: '🌍',
+    accent: '#38bdf8',
+    classification: 'Oceanic Terrestrial Planet',
+    stats: {
+      gravity: '9.81 m/s²',
+      dayLength: '23h 56m',
+      orbitalPeriod: '365.25 days',
+      tempRange: '-89 °C to +57 °C',
+      distanceAU: '1.00 AU'
+    },
+    scienceFact: 'Earth is the only known world sustaining global liquid surface oceans, plate tectonics, and a protective dipole magnetosphere that deflects ionizing solar wind. Fleets of Earth-observation satellites including CSA’s WildFireSat, Swarm, and Sentinel constellations monitor wildfire heat, reefs, and ice loss in real time.'
+  },
+  moon: {
+    id: 'moon',
+    name: 'The Moon',
+    emblem: '🌙',
+    accent: '#e2e8f0',
+    classification: 'Terrestrial Natural Satellite',
+    stats: {
+      gravity: '1.62 m/s²',
+      dayLength: '708.7 hrs (Tidally Locked)',
+      orbitalPeriod: '27.3 days',
+      tempRange: '-246 °C craters to +121 °C',
+      distanceAU: '1.00 AU (384,400 km)'
+    },
+    scienceFact: 'Tidally locked to Earth, the Moon preserves a 4-billion-year impact record alongside volatile water-ice deposits hidden inside South Pole craters such as Shackleton. Lunar Reconnaissance Orbiter, Chandrayaan-3, and Artemis polar scouts map hydrogen ice and shadowed illumination corridors for future habitats.'
+  },
+  mars: {
+    id: 'mars',
+    name: 'Mars',
+    emblem: '🔴',
+    accent: '#fb923c',
+    classification: 'Terrestrial Planet',
+    stats: {
+      gravity: '3.72 m/s²',
+      dayLength: '24h 37m (1 Sol)',
+      orbitalPeriod: '687 Earth days',
+      tempRange: '-140 °C to +20 °C',
+      distanceAU: '1.52 AU'
+    },
+    scienceFact: 'Carved by ancient river deltas and crowned by Olympus Mons, Mars retains polar CO₂ and water-ice caps beneath a wispy 0.6% carbon-dioxide atmosphere. Rovers Curiosity and Perseverance—supported by Ingenuity’s historic rotorcraft flights and Mars Reconnaissance Orbiter—search Jezero Crater for ancient biosignatures.'
+  },
+  'asteroid-belt': {
+    id: 'asteroid-belt',
+    name: 'Main Asteroid Belt',
+    emblem: '☄️',
+    accent: '#94a3b8',
+    classification: 'Main-Belt Debris Zone',
+    stats: {
+      gravity: '0.01–0.28 m/s²',
+      dayLength: '4–18 hrs rotation',
+      orbitalPeriod: '3.2–6.0 years',
+      tempRange: '-110 °C to -30 °C',
+      distanceAU: '2.2–3.2 AU'
+    },
+    scienceFact: 'Between Mars and Jupiter orbit hundreds of thousands of primordial planetesimals sculpted by Jovian gravitational resonances into silicate, metallic, and carbon-rich worlds. Sample-return pioneers Hayabusa2 and OSIRIS-REx alongside Dawn’s survey of Vesta and Ceres unlocked pristine clues to planet formation.'
+  },
+  jupiter: {
+    id: 'jupiter',
+    name: 'Jupiter',
+    emblem: '🟠',
+    accent: '#fdba74',
+    classification: 'Gas Giant',
+    stats: {
+      gravity: '24.79 m/s²',
+      dayLength: '9h 55m',
+      orbitalPeriod: '11.86 years',
+      tempRange: '-145 °C cloud tops',
+      distanceAU: '5.20 AU'
+    },
+    scienceFact: 'Over twice as massive as all other planets combined, Jupiter spins in under ten hours, powering banded jet streams, megawatt polar auroras, and intense radiation belts. While the Juno polar orbiter probes its deep metallic-hydrogen interior, JUICE and Europa Clipper race toward icy ocean moons Europa and Ganymede.'
+  },
+  saturn: {
+    id: 'saturn',
+    name: 'Saturn',
+    emblem: '🪐',
+    accent: '#fcd34d',
+    classification: 'Ringed Gas Giant',
+    stats: {
+      gravity: '10.44 m/s²',
+      dayLength: '10h 33m',
+      orbitalPeriod: '29.45 years',
+      tempRange: '-178 °C cloud tops',
+      distanceAU: '9.54 AU'
+    },
+    scienceFact: 'Less dense than liquid water, Saturn wears a shimmering 282,000-km ring system sculpted by shepherd moons and Enceladus’s cryogenic water plumes. Over 13 years in orbit, the Cassini-Huygens mission revealed a hexagonal polar jet stream and landed on Titan’s liquid-methane shorelines—soon to be explored by Dragonfly.'
+  },
+  uranus: {
+    id: 'uranus',
+    name: 'Uranus',
+    emblem: '🩵',
+    accent: '#67e8f9',
+    classification: 'Ice Giant',
+    stats: {
+      gravity: '8.69 m/s²',
+      dayLength: '17h 14m',
+      orbitalPeriod: '84.0 years',
+      tempRange: '-224 °C (Coldest)',
+      distanceAU: '19.2 AU'
+    },
+    scienceFact: 'Tipped sideways at a dramatic 97.8° axial tilt, Uranus rolls around the Sun with 42-year polar summers and winters above a pressurized mantle of water, ammonia, and methane ices. Voyager 2 remains the sole spacecraft ever to fly past its faint dark rings and canyon-scarred moon Miranda in 1986.'
+  },
+  neptune: {
+    id: 'neptune',
+    name: 'Neptune',
+    emblem: '🔵',
+    accent: '#60a5fa',
+    classification: 'Ice Giant',
+    stats: {
+      gravity: '11.15 m/s²',
+      dayLength: '16h 06m',
+      orbitalPeriod: '164.8 years',
+      tempRange: '-214 °C cloud tops',
+      distanceAU: '30.1 AU'
+    },
+    scienceFact: 'Driven by internal heat, Neptune whips supersonic methane winds above 2,100 km/h—faster than any other planet despite receiving tiny sunlight at the Solar System’s edge. During Voyager 2’s 1989 flyby, its cameras captured active nitrogen geysers erupting across Triton’s frost-coated plains.'
+  },
+  'gs-inuvik': {
+    id: 'gs-inuvik',
+    name: 'Arctic Polar Station (Inuvik)',
+    emblem: '📡',
+    accent: '#34d399',
+    classification: 'Polar Downlink Station',
+    stats: {
+      gravity: '9.82 m/s² (68.4° N)',
+      dayLength: '14 passes / day',
+      orbitalPeriod: 'S / X / Ka-Band',
+      tempRange: '-42 °C to +22 °C',
+      distanceAU: '1.00 AU · 13m Dish'
+    },
+    scienceFact: 'Positioned inside the Arctic Circle at 68.36° N, high-latitude polar ground dishes catch Sun-Synchronous and Polar LEO satellites on nearly every single orbit around Earth. Its radome-protected S/X/Ka-band antennas rush urgent wildfire hotspot and ice-sheet telemetry to mission ops within seconds.'
+  },
+  'gs-nsn': {
+    id: 'gs-nsn',
+    name: 'Global Near-Space Network',
+    emblem: '📡',
+    accent: '#38bdf8',
+    classification: 'Mid-Latitude Tracking Complex',
+    stats: {
+      gravity: '9.80 m/s² (37.9° N)',
+      dayLength: '24/7 Relay Coverage',
+      orbitalPeriod: 'S / Ka / Optical',
+      tempRange: '-10 °C to +35 °C',
+      distanceAU: '1.00 AU · 18m Dish'
+    },
+    scienceFact: 'Mid-latitude coastal tracking arrays coordinate high-rate launch ascent telemetry, CubeSat command uplinks, and orbital anomaly recovery passes across inclinations from 35° to Polar. Dual S-band and optical ground terminals deliver continuous health monitoring during atmospheric entry and orbital insertion.'
+  },
+  'gs-dsn': {
+    id: 'gs-dsn',
+    name: 'Deep-Space Dish Array',
+    emblem: '🛰️',
+    accent: '#a78bfa',
+    classification: 'Deep-Space Telemetry Array',
+    stats: {
+      gravity: '9.80 m/s² (35.4° N)',
+      dayLength: 'Continuous Interplanetary',
+      orbitalPeriod: 'X / Ka / Laser Link',
+      tempRange: '-5 °C to +44 °C',
+      distanceAU: '1.00 AU · 70m Array'
+    },
+    scienceFact: 'Steerable 70-meter parabolic reflectors in arid desert basins detect whisper-faint attowatt radio signals arriving across millions of kilometers from lunar, Martian, and outer-planet probes. Three longitudinally spaced arrays maintain uninterrupted contact with deep-space spacecraft as Earth rotates.'
+  },
+  comet: {
+    id: 'comet',
+    name: 'Comet C/2026 GOSPACE',
+    emblem: '🌠',
+    accent: '#67e8f9',
+    classification: 'Volatile Deep-Space Comet',
+    stats: {
+      gravity: '0.0005 m/s²',
+      dayLength: '7.4 hrs spin',
+      orbitalPeriod: '76 Years (Eccentric)',
+      tempRange: '-200 °C to +45 °C coma',
+      distanceAU: '1.05 AU (Perihelion)'
+    },
+    scienceFact: 'Composed of pristine water ice, frozen CO₂, and silicate dust, active comets sprout twin plasma-ion and golden dust tails pushed away by solar radiation and solar wind. Rendezvous missions like ESA’s Rosetta orbiter and Philae lander sampled comet 67P’s organics up close.'
+  }
+};

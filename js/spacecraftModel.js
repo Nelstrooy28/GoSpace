@@ -289,6 +289,48 @@ function addBusMesh(busGroup, busId, dims, mats) {
   busGroup.add(plate);
 }
 
+const easeOutCubic = (x) => 1 - Math.pow(1 - THREE.MathUtils.clamp(x, 0, 1), 3);
+
+function tagDeployable(obj, role) {
+  obj.name = role;
+  obj.userData.deployRest = {
+    pos: obj.position.clone(),
+    rot: obj.rotation.clone(),
+    scale: obj.scale.clone()
+  };
+  return obj;
+}
+
+export function setDeploymentState(craftOrModel, progress) {
+  const k = THREE.MathUtils.clamp(progress, 0, 1);
+  if (craftOrModel && typeof craftOrModel.setDeployProgress === 'function') {
+    craftOrModel.setDeployProgress(k);
+    return;
+  }
+  const root = craftOrModel?.group || craftOrModel;
+  if (!root || typeof root.traverse !== 'function') return;
+  const kShield = easeOutCubic(THREE.MathUtils.clamp(k / (0.9 / 2.8), 0, 1));
+  const kWings = easeOutCubic(THREE.MathUtils.clamp((k - 0.6 / 2.8) / (1.5 / 2.8), 0, 1));
+  const kAnt = easeOutCubic(THREE.MathUtils.clamp((k - 1.7 / 2.8) / (1.1 / 2.8), 0, 1));
+  root.traverse((obj) => {
+    const rest = obj.userData?.deployRest;
+    if (!rest) return;
+    if (obj.name === 'sunshield') {
+      obj.scale.set(THREE.MathUtils.lerp(0.28, rest.scale.x, kShield), rest.scale.y, THREE.MathUtils.lerp(0.28, rest.scale.z, kShield));
+    } else if (obj.name === 'solarWingLeft' || obj.name === 'solarWingRight') {
+      const side = obj.name === 'solarWingLeft' ? -1 : 1;
+      obj.rotation.z = side * (1 - kWings) * (Math.PI * 0.5);
+      obj.rotation.x = THREE.MathUtils.lerp(0, rest.rot.x, kWings);
+    } else if (obj.name === 'commsAntenna' || obj.name === 'scienceBoom') {
+      obj.scale.set(
+        THREE.MathUtils.lerp(0.32, rest.scale.x, kAnt),
+        THREE.MathUtils.lerp(0.22, rest.scale.y, kAnt),
+        THREE.MathUtils.lerp(0.32, rest.scale.z, kAnt)
+      );
+    }
+  });
+}
+
 function buildInstrumentMesh(instId, mats, deployState) {
   const g = new THREE.Group();
   const baseBox = (bw, bh, bd, mat = mats.darkMetal) => {
@@ -345,6 +387,7 @@ function buildInstrumentMesh(instId, mats, deployState) {
     frame.position.copy(panel.position);
     frame.position.y -= 0.015;
     hinge.add(panel, frame);
+    tagDeployable(hinge, 'scienceBoom');
     g.add(yoke, hinge);
     deployState.sarHinges.push(hinge);
   } else if (instId === 'lidar-cloud') {
@@ -366,11 +409,13 @@ function buildInstrumentMesh(instId, mats, deployState) {
     baffle.castShadow = true;
     const shroud = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.31, 0.22, 24), mats.whiteCeramic);
     shroud.position.y = 0.56;
+    tagDeployable(shroud, 'scienceBoom');
     const mirror = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 6), mats.goldFoil);
     mirror.position.y = 0.52;
     const trip = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 12), mats.alum);
     trip.position.y = 0.66;
     g.add(baffle, shroud, mirror, trip);
+    deployState.baffleShrouds.push(shroud);
   } else if (instId === 'boom-mag') {
     const canister = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.18, 16), mats.alum);
     g.add(canister);
@@ -391,6 +436,7 @@ function buildInstrumentMesh(instId, mats, deployState) {
     const flux = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 14), mats.cyanGlow);
     flux.position.set(0, len + 0.18, 0);
     ext.add(tip, flux);
+    tagDeployable(ext, 'scienceBoom');
     g.add(ext);
     deployState.booms.push(ext);
   } else if (instId === 'neutron-spec') {
@@ -532,6 +578,8 @@ function buildPowerSystem(solarGroup, solarId, dims, mats, deployState) {
         const panel = makeWingPanel(1.38, 0.40, mats, false);
         panel.position.set(sx * 0.86, 0, 0);
         hinge.add(yoke, panel);
+        hinge.rotation.x = tilt;
+        tagDeployable(hinge, sx < 0 ? 'solarWingLeft' : 'solarWingRight');
         solarGroup.add(hinge);
         deployState.wings.push({ group: hinge, side: sx, baseTiltX: tilt, deployedZ: 0 });
       }
@@ -555,6 +603,8 @@ function buildPowerSystem(solarGroup, solarId, dims, mats, deployState) {
       roller.rotation.x = Math.PI / 2;
       roller.position.set(sx * 2.02, 0, 0);
       hinge.add(blanket, roller);
+      hinge.rotation.x = 0.22;
+      tagDeployable(hinge, sx < 0 ? 'solarWingLeft' : 'solarWingRight');
       solarGroup.add(hinge);
       deployState.wings.push({ group: hinge, side: sx, baseTiltX: 0.22, deployedZ: 0 });
     }
@@ -576,6 +626,8 @@ function buildPowerSystem(solarGroup, solarId, dims, mats, deployState) {
       p.position.x = sx * (0.20 + segLen * 0.5 + k * (segLen + 0.03));
       hinge.add(p);
     }
+    hinge.rotation.x = 0.24;
+    tagDeployable(hinge, sx < 0 ? 'solarWingLeft' : 'solarWingRight');
     solarGroup.add(hinge);
     deployState.wings.push({ group: hinge, side: sx, baseTiltX: 0.24, deployedZ: 0 });
   }
@@ -591,9 +643,11 @@ function buildCommsSystem(commsGroup, txId, dims, mats, deployState) {
       const pivot = new THREE.Group();
       pivot.position.set(Math.sin(a) * (w * 0.34), h * 0.5, Math.cos(a) * (d * 0.34));
       pivot.rotation.y = a;
+      pivot.rotation.x = 0.85;
       const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.011, 0.52, 8), mats.alum);
       rod.position.y = 0.26;
       pivot.add(rod);
+      tagDeployable(pivot, 'commsAntenna');
       commsGroup.add(pivot);
       deployState.whips.push(pivot);
     }
@@ -610,15 +664,20 @@ function buildCommsSystem(commsGroup, txId, dims, mats, deployState) {
   }
 
   if (txId === 'sx-band') {
+    const antPivot = new THREE.Group();
+    antPivot.position.copy(basePos);
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.18, 12), mats.alum);
-    mast.position.copy(basePos).add(new THREE.Vector3(0, 0.08, 0));
+    mast.position.set(0, 0.08, 0);
     const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.05, 0.22, 20, 1, true), mats.copper);
     horn.material.side = THREE.DoubleSide;
-    horn.position.copy(basePos).add(new THREE.Vector3(0, 0.24, 0));
+    horn.position.set(0, 0.24, 0);
     const collar = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.016, 10, 20), mats.alum);
     collar.rotation.x = Math.PI / 2;
-    collar.position.copy(basePos).add(new THREE.Vector3(0, 0.35, 0));
-    commsGroup.add(mast, horn, collar);
+    collar.position.set(0, 0.35, 0);
+    antPivot.add(mast, horn, collar);
+    tagDeployable(antPivot, 'commsAntenna');
+    commsGroup.add(antPivot);
+    deployState.antRotPivots.push({ group: antPivot, stowedX: -1.35, deployedX: 0 });
     return;
   }
 
@@ -651,30 +710,52 @@ function buildCommsSystem(commsGroup, txId, dims, mats, deployState) {
     const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.028, 0.22, 12), mats.goldFoil);
     feed.position.y = 0.24;
     meshGroup.add(feed);
+    tagDeployable(meshGroup, 'commsAntenna');
     root.add(meshGroup);
+    tagDeployable(root, 'commsAntenna');
     commsGroup.add(root);
     deployState.dishGroups.push(meshGroup);
+    deployState.antRotPivots.push({ group: root, stowedX: -1.18, deployedX: -0.28 });
     return;
   }
 
   // ka-optical: precision laser gimbal turret
+  const turretPivot = new THREE.Group();
+  turretPivot.position.copy(basePos);
   const turretBase = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.12, 16), mats.darkMetal);
-  turretBase.position.copy(basePos).add(new THREE.Vector3(0, 0.06, 0));
+  turretBase.position.set(0, 0.06, 0);
   const yoke = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.09), mats.alum);
-  yoke.position.copy(basePos).add(new THREE.Vector3(0, 0.18, 0));
+  yoke.position.set(0, 0.18, 0);
   const head = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.22, 20), mats.whiteCeramic);
   head.rotation.x = Math.PI * 0.35;
-  head.position.copy(basePos).add(new THREE.Vector3(0, 0.22, 0.04));
+  head.position.set(0, 0.22, 0.04);
   const laserPort = new THREE.Mesh(new THREE.CircleGeometry(0.068, 20), mats.lens);
   laserPort.rotation.x = -Math.PI * 0.15;
-  laserPort.position.copy(basePos).add(new THREE.Vector3(0, 0.28, 0.14));
+  laserPort.position.set(0, 0.28, 0.14);
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 10), mats.cyanGlow);
   beacon.position.copy(laserPort.position).add(new THREE.Vector3(0, 0.01, 0.01));
-  commsGroup.add(turretBase, yoke, head, laserPort, beacon);
+  turretPivot.add(turretBase, yoke, head, laserPort, beacon);
+  tagDeployable(turretPivot, 'commsAntenna');
+  commsGroup.add(turretPivot);
+  deployState.antRotPivots.push({ group: turretPivot, stowedX: -0.95, deployedX: 0 });
 }
 
 function buildThermalPropulsion(thermGroup, thermId, dims, mats, deployState) {
   const { w, h, d } = dims;
+
+  // Perimeter thermal / fairing release latches on bus shoulders (unlatch 0.0s-0.9s)
+  for (let i = 0; i < 4; i++) {
+    const sx = i % 2 === 0 ? -1 : 1;
+    const sz = i < 2 ? -1 : 1;
+    const latch = new THREE.Group();
+    latch.position.set(sx * (w * 0.44), h * 0.48, sz * (d * 0.42));
+    const clamp = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.032, 0.09), mats.alum);
+    clamp.position.set(sx * 0.03, 0.015, 0);
+    latch.add(clamp);
+    tagDeployable(latch, 'sunshield');
+    thermGroup.add(latch);
+    deployState.latches.push({ group: latch, side: sx });
+  }
 
   if (thermId === 'cryocooler-st') {
     const shieldRoot = new THREE.Group();
@@ -687,9 +768,11 @@ function buildThermalPropulsion(thermGroup, thermId, dims, mats, deployState) {
       );
       kite.rotation.y = Math.PI * 0.25;
       kite.position.y = -layer * 0.055;
+      tagDeployable(kite, 'sunshield');
       shieldRoot.add(kite);
       deployState.sunshieldLayers.push({ mesh: kite, layer });
     }
+    tagDeployable(shieldRoot, 'sunshield');
     const radWing = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.42, 0.03), mats.whiteCeramic);
     radWing.position.set(0, 0.15, -d * 0.56);
     thermGroup.add(shieldRoot, radWing);
@@ -765,7 +848,12 @@ export function buildSpacecraftModel(missionState, options = {}) {
   battBox.position.set(0, -dims.h * 0.12, -dims.d * 0.46);
   batteryGroup.add(battBox);
 
-  const deployState = { wings: [], booms: [], sarHinges: [], whips: [], dishGroups: [], sunshieldLayers: [], ionGlows: [], rtgGlows: [] };
+  const deployState = {
+    wings: [], booms: [], sarHinges: [], whips: [], dishGroups: [], antRotPivots: [],
+    baffleShrouds: [], latches: [], sunshieldLayers: [], ionGlows: [], rtgGlows: []
+  };
+  let lockFlashAmt = 0;
+  let lastProgress = deployProgress;
 
   addBusMesh(busGroup, bus.id, dims, mats);
   mountPayloads(payloadGroup, missionState.instrumentIds, bus, dims, mats, deployState);
@@ -775,32 +863,57 @@ export function buildSpacecraftModel(missionState, options = {}) {
 
   group.add(busGroup, payloadGroup, solarGroup, commsGroup, thermalGroup, batteryGroup);
 
+  function triggerLockFlash(strength = 1.0) {
+    lockFlashAmt = Math.max(lockFlashAmt, strength);
+  }
+
   function setDeployProgress(t) {
     const k = THREE.MathUtils.clamp(t, 0, 1);
-    deployState.wings.forEach((w) => {
-      w.group.rotation.z = w.side * (1 - k) * 1.48;
-      w.group.rotation.x = THREE.MathUtils.lerp(0, w.baseTiltX, k);
-    });
-    deployState.booms.forEach((b) => {
-      b.scale.y = THREE.MathUtils.lerp(0.14, 1.0, k);
-    });
-    deployState.sarHinges.forEach((h) => {
-      h.rotation.x = THREE.MathUtils.lerp(-1.45, 0.28, k);
-    });
-    deployState.whips.forEach((p) => {
-      p.rotation.x = THREE.MathUtils.lerp(0.12, 0.85, k);
-    });
-    deployState.dishGroups.forEach((d) => {
-      const s = THREE.MathUtils.lerp(0.28, 1.0, k);
-      d.scale.set(s, 1, s);
+    const kShield = easeOutCubic(THREE.MathUtils.clamp(k / (0.9 / 2.8), 0, 1));
+    const kWings = easeOutCubic(THREE.MathUtils.clamp((k - 0.6 / 2.8) / (1.5 / 2.8), 0, 1));
+    const kAnt = easeOutCubic(THREE.MathUtils.clamp((k - 1.7 / 2.8) / (1.1 / 2.8), 0, 1));
+
+    // Metallic lock flash as each stage snaps into final rest position
+    if (lastProgress < 0.32 && k >= 0.32) triggerLockFlash(0.75);
+    if (lastProgress < 0.75 && k >= 0.75) triggerLockFlash(1.0);
+    if (lastProgress < 0.99 && k >= 0.99) triggerLockFlash(1.1);
+    lastProgress = k;
+
+    deployState.latches.forEach((l) => {
+      l.group.rotation.z = l.side * THREE.MathUtils.lerp(0.95, -0.65, kShield);
     });
     deployState.sunshieldLayers.forEach((s) => {
-      const xy = THREE.MathUtils.lerp(0.26, 1.0, k);
+      const xy = THREE.MathUtils.lerp(0.24, 1.0, kShield);
       s.mesh.scale.set(xy, 1, xy);
-      s.mesh.position.y = -s.layer * THREE.MathUtils.lerp(0.015, 0.06, k);
+      s.mesh.position.y = -s.layer * THREE.MathUtils.lerp(0.012, 0.06, kShield);
+    });
+    deployState.wings.forEach((w) => {
+      w.group.rotation.z = w.side * (1 - kWings) * (Math.PI * 0.5);
+      w.group.rotation.x = THREE.MathUtils.lerp(0, w.baseTiltX, kWings);
+      w.group.scale.x = THREE.MathUtils.lerp(0.45, 1.0, kWings);
+    });
+    deployState.booms.forEach((b) => {
+      b.scale.y = THREE.MathUtils.lerp(0.14, 1.0, kAnt);
+    });
+    deployState.baffleShrouds.forEach((s) => {
+      const rest = s.userData?.deployRest;
+      if (rest) s.position.y = THREE.MathUtils.lerp(rest.pos.y - 0.14, rest.pos.y, kAnt);
+    });
+    deployState.sarHinges.forEach((h) => {
+      h.rotation.x = THREE.MathUtils.lerp(-1.48, 0.28, kAnt);
+    });
+    deployState.whips.forEach((p) => {
+      p.rotation.x = THREE.MathUtils.lerp(0.06, 0.85, kAnt);
+    });
+    deployState.antRotPivots.forEach((a) => {
+      a.group.rotation.x = THREE.MathUtils.lerp(a.stowedX, a.deployedX, kAnt);
+    });
+    deployState.dishGroups.forEach((d) => {
+      const s = THREE.MathUtils.lerp(0.24, 1.0, kAnt);
+      d.scale.set(s, 1, s);
     });
     deployState.ionGlows.forEach((g) => {
-      g.plume.visible = k > 0.5;
+      g.plume.visible = k > 0.6;
     });
   }
 
@@ -815,7 +928,7 @@ export function buildSpacecraftModel(missionState, options = {}) {
     batteryGroup.position.set(0, 0, -a * 0.42);
   }
 
-  function update(_dt, elapsed = 0) {
+  function update(dt, elapsed = 0) {
     const pulse = 1.3 + Math.sin(elapsed * 4.5) * 0.45;
     deployState.ionGlows.forEach((g) => {
       g.ring.material.emissiveIntensity = pulse * 1.4;
@@ -824,9 +937,20 @@ export function buildSpacecraftModel(missionState, options = {}) {
     deployState.rtgGlows.forEach((r) => {
       r.material.emissiveIntensity = 1.2 + Math.sin(elapsed * 2.2) * 0.35;
     });
+    if (lockFlashAmt > 0.001) {
+      lockFlashAmt = Math.max(0, lockFlashAmt - (dt || 0.016) * 3.4);
+      mats.alum.emissive.setHex(0x7dd3fc);
+      mats.alum.emissiveIntensity = lockFlashAmt * 1.15;
+      mats.goldFoil.emissive.setHex(0xfde68a);
+      mats.goldFoil.emissiveIntensity = lockFlashAmt * 0.95;
+    } else if (mats.alum.emissiveIntensity !== 0) {
+      mats.alum.emissiveIntensity = 0;
+      mats.goldFoil.emissiveIntensity = 0;
+    }
   }
 
   setDeployProgress(deployProgress);
+  lockFlashAmt = 0;
 
   let meshCount = 0;
   group.traverse((obj) => {
@@ -854,6 +978,7 @@ export function buildSpacecraftModel(missionState, options = {}) {
     meshCount,
     setExploded,
     setDeployProgress,
+    triggerLockFlash,
     update,
     dispose
   };

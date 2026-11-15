@@ -6,10 +6,11 @@ import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpace
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
 import { getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js';
 import { isTutorialActive } from './tutorial.js';
-import { playDownlinkPing, playSafeMode, playWarning } from './sfx.js';
+import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSafeMode, playWarning } from './sfx.js';
 
 const EARTH_R = 2.0, KM_TO_SCENE = EARTH_R / 6371;
 const SUN_DIR = new THREE.Vector3(1, 0, 0);
+const DEPLOY_DURATION_SEC = 2.8;
 const STATIONS = [
   { id: 'inuvik', name: 'Arctic Polar Station', lat: 68.36, lon: -133.72 },
   { id: 'nsn', name: 'Global Near-Space Network', lat: 37.94, lon: -75.46 },
@@ -28,6 +29,12 @@ let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 
 let downlinkPts = 0, anomalyPts = 0, scanPts = 0;
 let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
 let hazardEventCb = null, hazardFx = null, dodgeT = 0, heaterGlowT = 0, repairSweepT = 0, sparkFlashUntil = 0;
+let deployActive = false, deployCompleted = false, deployElapsed = 0, deployProgress = 1, deployStageMask = 0;
+let holoSelectCb = null, holoTargets = {}, holoProxies = [], gsHoloProxies = [], earthSolidMesh = null, earthOuterProxy = null;
+let selectedHoloId = null, followHoloId = null, hasPrevFollow = false, selectionRing = null;
+let pointerDownPos = null, lastHoverMs = 0, pointerCleanup = null;
+const prevFollowPos = new THREE.Vector3(), tmpFollowPos = new THREE.Vector3(), tmpDeltaFollow = new THREE.Vector3(), tmpUpAxis = new THREE.Vector3(0, 1, 0);
+const holoRaycaster = new THREE.Raycaster(), holoNdc = new THREE.Vector2();
 
 const parallaxTarget = new THREE.Vector2(), parallaxCur = new THREE.Vector2();
 
@@ -398,7 +405,8 @@ function buildHazardFxRig(satContainer, worldParent, scaleRadius) {
 }
 
 function buildOrbitSpacecraft(missionState, orbitScale, envInt = 0.55) {
-  satModel = buildSpacecraftModel(missionState, { showWarnings: false, deployProgress: 1, envMapIntensity: envInt, castShadow: false, receiveShadow: false });
+  const initDeploy = showcaseMode || victoryMode ? 1 : 0;
+  satModel = buildSpacecraftModel(missionState, { showWarnings: false, deployProgress: initDeploy, envMapIntensity: envInt, castShadow: false, receiveShadow: false });
   satModel.group.scale.setScalar(orbitScale);
   satModel.group.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(satModel.group);
@@ -422,7 +430,7 @@ function buildOrbitSpacecraft(missionState, orbitScale, envInt = 0.55) {
   return grp;
 }
 
-function getPresetPose(mode) {
+function getPresetPose(mode, chaseScale = 1.0) {
   if (mode === 'full') {
     return {
       pos: new THREE.Vector3(trackCenter.x + fitDist * 0.56, trackCenter.y + fitDist * 0.42, trackCenter.z + fitDist * 0.74),
@@ -430,7 +438,7 @@ function getPresetPose(mode) {
     };
   }
   if ((mode === 'chase' || mode === 'victory') && satMesh) {
-    const chaseDist = Math.max(0.44, satFitR * (mode === 'victory' ? 2.75 : 3.0));
+    const chaseDist = Math.max(0.42, satFitR * (mode === 'victory' ? 2.75 : 3.0) * chaseScale);
     const radial = tmpSat.length() > 0.1 ? tmpSat.clone().normalize() : new THREE.Vector3(1, 0.2, 1).normalize();
     const tang = tmpNext.clone().sub(tmpSat);
     const fwd = tang.lengthSq() > 1e-6 ? tang.normalize() : new THREE.Vector3(0, 0, 1);
@@ -460,9 +468,10 @@ function getPresetPose(mode) {
   return { pos: new THREE.Vector3(65, 210, 540), target: new THREE.Vector3(45, 0, -40) };
 }
 
-function startCameraTween(mode, immediate = false) {
+function startCameraTween(mode, immediate = false, chaseScale = 1.0) {
   if (!camera || !controls) return;
-  const pose = getPresetPose(mode);
+  if (mode !== 'holo') { followHoloId = null; hasPrevFollow = false; }
+  const pose = getPresetPose(mode, chaseScale);
   if (immediate) {
     camTween.active = false;
     camera.position.copy(pose.pos); controls.target.copy(pose.target); controls.update();
@@ -471,6 +480,20 @@ function startCameraTween(mode, immediate = false) {
   camTween.active = true; camTween.t = 0;
   camTween.fromPos.copy(camera.position); camTween.toPos.copy(pose.pos);
   camTween.fromTarget.copy(controls.target); camTween.toTarget.copy(pose.target);
+}
+
+function startOrbitDeployment(isReplay = false) {
+  if (showcaseMode || victoryMode || !satModel) return;
+  if (!isReplay && (deployCompleted || deployActive)) return;
+  deployActive = true;
+  deployElapsed = 0;
+  deployProgress = 0;
+  deployStageMask = 0;
+  satModel.setDeployProgress(0);
+  followHoloId = null;
+  hasPrevFollow = false;
+  cameraMode = 'chase';
+  startCameraTween('chase', false, 0.78);
 }
 
 function buildWorld(missionState, evaluation) {
@@ -493,7 +516,15 @@ function buildWorld(missionState, evaluation) {
   const maps = getEarthMaps();
   earthGroup = new THREE.Group();
   earthMat = makeEarthTerminatorMaterial(maps);
-  earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, 64, 40), earthMat));
+  earthSolidMesh = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, 64, 40), earthMat);
+  earthSolidMesh.userData.holoId = 'earth';
+  earthGroup.add(earthSolidMesh);
+  earthOuterProxy = new THREE.Mesh(
+    new THREE.SphereGeometry(EARTH_R * 2.8, 16, 12),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })
+  );
+  earthOuterProxy.userData.holoId = 'earth';
+  earthGroup.add(earthOuterProxy);
   cloudMesh = new THREE.Mesh(
     new THREE.SphereGeometry(EARTH_R * 1.018, 48, 32),
     new THREE.MeshStandardMaterial({ map: maps.cloudMap, transparent: true, opacity: 0.85, depthWrite: false, roughness: 0.9 })
@@ -514,11 +545,27 @@ function buildWorld(missionState, evaluation) {
     refGrid.material.transparent = true; refGrid.material.opacity = 0.24;
     scene.add(refGrid);
 
+    gsHoloProxies = [];
     gsNodes = STATIONS.map((gs) => {
       const active = gs.id === missionState.stationId;
       const localPos = latLonToVec(gs.lat, gs.lon, EARTH_R * 1.02), localNorm = localPos.clone().normalize();
       const m = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.095 : 0.06, 12, 10), new THREE.MeshBasicMaterial({ color: active ? 0x22c55e : 0xf59e0b }));
       m.position.copy(localPos); earthGroup.add(m);
+      const gsProxy = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 10, 8),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })
+      );
+      const holoKey = `gs-${gs.id}`;
+      gsProxy.userData.holoId = holoKey;
+      gsProxy.position.copy(localPos);
+      earthGroup.add(gsProxy);
+      gsHoloProxies.push(gsProxy);
+      holoTargets[holoKey] = {
+        id: holoKey,
+        visualRadius: 0.28,
+        getPos: () => m.getWorldPosition(new THREE.Vector3()),
+        getNormal: () => localNorm.clone().applyQuaternion(earthGroup.quaternion).normalize()
+      };
       let cone = null;
       if (active) {
         cone = new THREE.Mesh(new THREE.ConeGeometry(0.52, 0.95, 22, 1, true), new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }));
@@ -579,6 +626,30 @@ function buildWorld(missionState, evaluation) {
 
   const moonPos = orbitEl.id === 'lunar-transfer' ? apPt.clone().multiplyScalar(1.04) : new THREE.Vector3(-15, 3.4, -16);
   spaceEnv = createSpaceEnvironment(scene, { moonPos, moonScale: deep ? EARTH_R * 0.44 : EARTH_R * 0.3 });
+  Object.assign(holoTargets, spaceEnv.holoTargets || {});
+  holoTargets.earth = {
+    id: 'earth',
+    visualRadius: EARTH_R,
+    getPos: () => new THREE.Vector3(0, 0, 0),
+    camOffset: new THREE.Vector3(3.8, 2.0, 4.4)
+  };
+  holoProxies = [...(spaceEnv.holoProxies || [])];
+
+  selectionRing = new THREE.Group();
+  const ringCore = new THREE.Mesh(
+    new THREE.TorusGeometry(1, 0.036, 12, 64),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  ringCore.rotation.x = Math.PI / 2;
+  const ringHalo = new THREE.Mesh(
+    new THREE.RingGeometry(1.08, 1.24, 64),
+    new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
+  );
+  ringHalo.rotation.x = Math.PI / 2;
+  selectionRing.add(ringCore, ringHalo);
+  selectionRing.visible = false;
+  scene.add(selectionRing);
+
   scene.traverse((obj) => {
     if (obj.material && obj.material.isMeshStandardMaterial) obj.material.envMapIntensity = 0.16;
   });
@@ -697,7 +768,39 @@ function animate() {
     controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, e);
     if (camTween.t >= 1) camTween.active = false;
   }
+  if (followHoloId && holoTargets[followHoloId] && camera && controls) {
+    tmpFollowPos.copy(holoTargets[followHoloId].getPos());
+    if (hasPrevFollow) {
+      tmpDeltaFollow.copy(tmpFollowPos).sub(prevFollowPos);
+      if (camTween.active) {
+        camTween.fromPos.add(tmpDeltaFollow); camTween.toPos.add(tmpDeltaFollow);
+        camTween.fromTarget.add(tmpDeltaFollow); camTween.toTarget.add(tmpDeltaFollow);
+      } else {
+        camera.position.add(tmpDeltaFollow);
+        controls.target.add(tmpDeltaFollow);
+      }
+    }
+    prevFollowPos.copy(tmpFollowPos);
+    hasPrevFollow = true;
+  }
   prevSat.copy(tmpSat); hasPrevSat = true;
+
+  if (selectionRing) {
+    const selTarget = selectedHoloId ? holoTargets[selectedHoloId] : null;
+    if (selTarget) {
+      selectionRing.visible = true;
+      selectionRing.position.copy(selTarget.getPos());
+      const pulse = 1 + 0.055 * Math.sin(sunElapsed * 4.2);
+      selectionRing.scale.setScalar(Math.max(0.28, selTarget.visualRadius * 1.42) * pulse);
+      if (selTarget.getNormal) {
+        selectionRing.quaternion.setFromUnitVectors(tmpUpAxis, selTarget.getNormal());
+      } else {
+        selectionRing.rotation.set(0, sunElapsed * 0.85, 0);
+      }
+    } else {
+      selectionRing.visible = false;
+    }
+  }
 
   if (lineColorAttr && ribbonColorAttr && orbitPts.length) {
     const head = Math.floor(((prop.trueAnomalyDeg / 360) * (orbitPts.length - 1))), len = orbitPts.length;
@@ -722,6 +825,24 @@ function animate() {
   const activeKind = activeHaz?.kind || null;
 
   if (satModel) {
+    if (deployActive && !briefingPaused && !victoryMode) {
+      deployElapsed += realDt;
+      deployProgress = Math.min(1, deployElapsed / DEPLOY_DURATION_SEC);
+      satModel.setDeployProgress(deployProgress);
+      if (!(deployStageMask & 1)) { deployStageMask |= 1; playDeployServoWhir(0); }
+      if (deployElapsed >= 0.6 && !(deployStageMask & 2)) { deployStageMask |= 2; playDeployServoWhir(1); }
+      if (deployElapsed >= 0.88 && !(deployStageMask & 4)) { deployStageMask |= 4; playDeployLatchLock(0); }
+      if (deployElapsed >= 1.7 && !(deployStageMask & 8)) { deployStageMask |= 8; playDeployServoWhir(2); }
+      if (deployElapsed >= 2.08 && !(deployStageMask & 16)) { deployStageMask |= 16; playDeployLatchLock(1); }
+      if (deployProgress >= 1 && !(deployStageMask & 32)) {
+        deployStageMask |= 32;
+        playDeployLatchLock(2);
+        deployActive = false;
+        deployCompleted = true;
+        satModel.setDeployProgress(1);
+        lastHudMs = 0;
+      }
+    }
     satModel.update?.(realDt, sunElapsed);
     if (victoryMode) satModel.group.rotation.y += realDt * 0.28;
     else satModel.group.rotation.y = 0;
@@ -859,6 +980,8 @@ function animate() {
       hazardState: hazardSnap,
       nearestNeaId: nearest?.target.id || '', nearestNeaDist: nearest ? Number(nearest.dist.toFixed(1)) : 99,
       timeWarp, briefingPaused, sensorCamEnabled, sensorCamMode: getSensorCamMode(stateRef).mode,
+      deployActive, deployProgress: Number(deployProgress.toFixed(3)),
+      selectedHoloId, followHoloId, holoTargetCount: Object.keys(holoTargets).length,
       simTime: Number(simTime.toFixed(1)), cameraMode, fitDist: Number(fitDist.toFixed(1))
     });
   }
@@ -1110,8 +1233,110 @@ function drawSensorCamFeed(latDeg, lonDeg, inEclipse, stormActive, tReal, tSim) 
 }
 
 export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); };
-export const setOrbitBriefingPaused = (paused) => { briefingPaused = Boolean(paused); };
+export function setOrbitBriefingPaused(paused) {
+  const next = Boolean(paused);
+  const wasPaused = briefingPaused;
+  briefingPaused = next;
+  if (wasPaused && !next && !deployCompleted && !deployActive) {
+    startOrbitDeployment(false);
+    lastHudMs = 0;
+  }
+}
 export const isOrbitBriefingPaused = () => briefingPaused;
+export function replayOrbitDeployment() {
+  if (showcaseMode || victoryMode || briefingPaused) return false;
+  startOrbitDeployment(true);
+  lastHudMs = 0;
+  return true;
+}
+
+function pickHoloAtClient(clientX, clientY) {
+  if (!renderer || !camera || showcaseMode) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  holoNdc.set(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1
+  );
+  holoRaycaster.setFromCamera(holoNdc, camera);
+  if (gsHoloProxies.length && earthSolidMesh) {
+    const gsAndEarth = holoRaycaster.intersectObjects([...gsHoloProxies, earthSolidMesh], false);
+    if (gsAndEarth.length) {
+      const earthHit = gsAndEarth.find((h) => h.object === earthSolidMesh);
+      const earthDist = earthHit ? earthHit.distance : Infinity;
+      const gsHit = gsAndEarth.find((h) => h.object !== earthSolidMesh && h.distance <= earthDist + 0.25);
+      if (gsHit?.object.userData?.holoId) return gsHit.object.userData.holoId;
+    }
+  }
+  const pool = [...holoProxies];
+  if (earthSolidMesh) pool.push(earthSolidMesh);
+  if (earthOuterProxy) pool.push(earthOuterProxy);
+  const hits = holoRaycaster.intersectObjects(pool, false);
+  const hit = hits.find((h) => h.object.userData?.holoId);
+  return hit ? hit.object.userData.holoId : null;
+}
+
+export function selectHoloBody(holoId) {
+  if (!holoId || !holoTargets[holoId]) return false;
+  selectedHoloId = holoId;
+  playHoloScanPing();
+  holoSelectCb?.(holoId);
+  lastHudMs = 0;
+  return true;
+}
+
+export function clearHoloSelection() {
+  selectedHoloId = null;
+  if (selectionRing) selectionRing.visible = false;
+  lastHudMs = 0;
+}
+
+export function focusCelestialBody(holoId = selectedHoloId) {
+  const target = holoId ? holoTargets[holoId] : null;
+  if (!target || !camera || !controls) return false;
+  selectedHoloId = holoId;
+  followHoloId = holoId;
+  cameraMode = 'holo';
+  hasPrevFollow = false;
+  const center = target.getPos();
+  let camPos;
+  if (target.getNormal) {
+    const n = target.getNormal();
+    const side = new THREE.Vector3(0, 1, 0).cross(n);
+    if (side.lengthSq() < 1e-4) side.set(1, 0, 0);
+    side.normalize();
+    camPos = center.clone().addScaledVector(n, 2.35).addScaledVector(side, 0.95).add(new THREE.Vector3(0, 0.55, 0));
+  } else {
+    camPos = center.clone().add(target.camOffset || new THREE.Vector3(4, 2, 5));
+  }
+  camTween.active = true; camTween.t = 0; camTween.dur = 0.85;
+  camTween.fromPos.copy(camera.position); camTween.toPos.copy(camPos);
+  camTween.fromTarget.copy(controls.target); camTween.toTarget.copy(center);
+  lastHudMs = 0;
+  return true;
+}
+
+export function returnToSatellite() {
+  followHoloId = null;
+  hasPrevFollow = false;
+  cameraMode = 'chase';
+  startCameraTween('chase', false, 1.0);
+  lastHudMs = 0;
+  return true;
+}
+
+export const getHoloBodyScreenPos = (holoId) => {
+  const t = holoTargets[holoId];
+  if (!t || !camera || !renderer) return null;
+  const p = t.getPos().project(camera);
+  if (p.z < -1 || p.z > 1) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  return {
+    x: Math.round(rect.left + (p.x * 0.5 + 0.5) * rect.width),
+    y: Math.round(rect.top + (-p.y * 0.5 + 0.5) * rect.height),
+    inView: Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1
+  };
+};
 export const setSensorCamEnabled = (enabled) => {
   sensorCamEnabled = Boolean(enabled);
   if (sensorCamEnabled) lastCamMs = 0;
@@ -1186,13 +1411,23 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   victoryMode = Boolean(options.victory);
   briefingPaused = Boolean(options.paused);
   stateRef = missionState; evalRef = evaluation; telemetryCb = onTelemetry; hazardEventCb = options.onHazardEvent || null;
+  holoSelectCb = options.onSelectHolo || null;
   simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
   stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
   downlinkPts = 0; anomalyPts = 0; scanPts = 0; lastAutoFlare = 14; lastHudMs = 0; lastCamMs = 0;
   sensorCamEnabled = Boolean(options.sensorCam);
   dodgeT = 0; heaterGlowT = 0; repairSweepT = 0; sparkFlashUntil = 0;
-  if (victoryMode) cameraMode = 'victory';
+  holoTargets = {}; holoProxies = []; gsHoloProxies = []; earthSolidMesh = null; earthOuterProxy = null;
+  selectedHoloId = null; followHoloId = null; hasPrevFollow = false; selectionRing = null; pointerDownPos = null;
+  if (victoryMode) {
+    cameraMode = 'victory';
+    deployActive = false; deployCompleted = true; deployProgress = 1; deployElapsed = 0; deployStageMask = 0;
+  } else if (showcaseMode) {
+    deployActive = false; deployCompleted = true; deployProgress = 1; deployElapsed = 0; deployStageMask = 0;
+  } else {
+    deployActive = false; deployCompleted = false; deployProgress = 0; deployElapsed = 0; deployStageMask = 0;
+  }
   camTween.active = false; watchCometNext = false;
   parallaxTarget.set(0, 0); parallaxCur.set(0, 0);
 
@@ -1262,6 +1497,41 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   bloomComp = createBloomComposer(renderer, scene, camera, w, h, { strength: 0.65, radius: 0.45, threshold: 0.78 });
   buildWorld(stateRef, evalRef);
 
+  if (!showcaseMode) {
+    const dom = renderer.domElement;
+    const onDown = (e) => {
+      if (e.button !== 0) return;
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    };
+    const onMove = (e) => {
+      const nowMs = performance.now();
+      if (nowMs - lastHoverMs < 48) return;
+      lastHoverMs = nowMs;
+      if (briefingPaused || victoryMode) { dom.style.cursor = ''; return; }
+      const hitId = pickHoloAtClient(e.clientX, e.clientY);
+      dom.style.cursor = hitId ? 'pointer' : '';
+    };
+    const onUp = (e) => {
+      const down = pointerDownPos;
+      pointerDownPos = null;
+      if (!down || briefingPaused || victoryMode) return;
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) {
+        const hitId = pickHoloAtClient(e.clientX, e.clientY);
+        if (hitId) selectHoloBody(hitId);
+      }
+    };
+    dom.addEventListener('pointerdown', onDown);
+    dom.addEventListener('pointermove', onMove);
+    dom.addEventListener('pointerup', onUp);
+    pointerCleanup = () => {
+      dom.removeEventListener('pointerdown', onDown);
+      dom.removeEventListener('pointermove', onMove);
+      dom.removeEventListener('pointerup', onUp);
+      dom.style.cursor = '';
+    };
+    if (!briefingPaused && !victoryMode) startOrbitDeployment(false);
+  }
+
   resizeObserver = new ResizeObserver(() => {
     if (!renderer || !camera || !container) return;
     const nw = Math.max(container.clientWidth, 1), nh = Math.max(container.clientHeight, 1);
@@ -1283,10 +1553,13 @@ export function mountShowcase(container, missionState) {
 
 export function unmountOrbit() {
   if (parallaxHandler) { window.removeEventListener('mousemove', parallaxHandler); parallaxHandler = null; }
+  if (pointerCleanup) { pointerCleanup(); pointerCleanup = null; }
   showcaseMode = false;
   victoryMode = false;
   briefingPaused = false;
   sensorCamEnabled = false;
+  deployActive = false; deployCompleted = false; deployProgress = 1; deployElapsed = 0; deployStageMask = 0;
+  selectedHoloId = null; followHoloId = null; hasPrevFollow = false; holoSelectCb = null; pointerDownPos = null;
   if (rafId) cancelAnimationFrame(rafId); rafId = 0;
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }
@@ -1314,5 +1587,7 @@ export function unmountOrbit() {
   orbitLine = ribbonMesh = velArrow = lineColorAttr = ribbonColorAttr = gsPulseRing = hazardFx = null;
   hazardEventCb = null;
   resetOrbitHazards();
-  gsNodes = []; orbitPts = []; hasPrevSat = false;
+  gsNodes = []; gsHoloProxies = []; holoProxies = []; holoTargets = {};
+  earthSolidMesh = null; earthOuterProxy = null; selectionRing = null;
+  orbitPts = []; hasPrevSat = false;
 }

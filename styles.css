@@ -2623,6 +2623,211 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   line-height: 1.42;
 }
 
+/* ================================================================
+   ZERO-G DEPLOYMENT BANNER & SOLAR SYSTEM HOLO-SCANNER CARD
+   ================================================================ */
+#orbit-deploy-banner,
+.orbit-deploy-banner {
+  position: fixed;
+  top: 64px;
+  left: calc(50% - 140px);
+  transform: translateX(-50%);
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #e0f2fe;
+  background: linear-gradient(135deg, rgba(8, 32, 62, 0.92), rgba(14, 116, 144, 0.72));
+  border: 1.5px solid rgba(56, 189, 248, 0.85);
+  box-shadow: 0 0 26px rgba(56, 189, 248, 0.42), 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 33;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: deployBannerPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes deployBannerPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(56, 189, 248, 0.35), 0 8px 24px rgba(0, 0, 0, 0.6); }
+  50% { box-shadow: 0 0 32px rgba(103, 232, 249, 0.68), 0 8px 24px rgba(0, 0, 0, 0.6); }
+}
+
+#holo-scanner-card,
+.holo-scanner-card {
+  position: fixed;
+  top: 110px;
+  left: 12px;
+  width: min(402px, calc(100vw - 24px));
+  max-height: calc(100vh - 182px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(56, 189, 248, 0.55);
+  border-top: 3px solid var(--holo-accent, #38bdf8);
+  background: linear-gradient(155deg, rgba(7, 17, 38, 0.94), rgba(4, 10, 24, 0.94));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.78), 0 0 28px rgba(56, 189, 248, 0.24);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+  z-index: 28;
+}
+
+#hud-layer:has(#holo-scanner-card:not([hidden])) #sensor-cam-pip {
+  left: 424px;
+}
+
+.holo-scan-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.holo-scan-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.holo-scan-emblem {
+  font-size: 30px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.45));
+}
+
+.holo-scan-kicker {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--holo-accent, #38bdf8);
+  letter-spacing: 0.06em;
+}
+
+.holo-scan-name {
+  margin: 2px 0 0;
+  font-family: var(--font-hud);
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+#holo-scanner-card button.holo-scan-close {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 800;
+  background: rgba(15, 29, 58, 0.9);
+  border: 1px solid rgba(125, 211, 252, 0.52);
+  color: #f0f9ff;
+  cursor: pointer;
+}
+
+#holo-scanner-card button.holo-scan-close:hover {
+  border-color: #fde68a;
+  color: #ffffff;
+}
+
+.holo-scan-class-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.holo-class-pill,
+.holo-dist-pill {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.holo-class-pill {
+  background: rgba(14, 116, 144, 0.28);
+  border: 1px solid rgba(56, 189, 248, 0.48);
+  color: #bae6fd;
+}
+
+.holo-dist-pill {
+  background: rgba(251, 191, 36, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde68a;
+}
+
+.holo-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.holo-stat-cell {
+  background: rgba(12, 24, 52, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.26);
+  border-radius: 7px;
+  padding: 5px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.holo-stat-cell span {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  color: #93c5fd;
+  letter-spacing: 0.02em;
+}
+
+.holo-stat-cell strong {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.holo-scan-fact {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.38;
+  color: #e2ecf8;
+}
+
+.holo-scan-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+#holo-scanner-card .holo-scan-actions .btn-sci {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 14.5px;
+  font-weight: 700;
+  padding: 7px 8px;
+  white-space: nowrap;
+}
+
+#holo-scanner-card button#holo-zoom-btn {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.9), rgba(29, 78, 216, 0.85));
+  border-color: rgba(103, 232, 249, 0.72);
+  color: #ffffff;
+}
+
+#holo-scanner-card button#holo-zoom-btn.is-on {
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.55);
+  border-color: #fde68a;
+}
+
 /* Always honor HTML [hidden] above all ID display rules */
 [hidden],
 #hangar-loadout[hidden],
@@ -2630,6 +2835,8 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 #review-overlay[hidden],
 #briefing-overlay[hidden],
 #sensor-cam-pip[hidden],
+#orbit-deploy-banner[hidden],
+#holo-scanner-card[hidden],
 #autobuild-btn[hidden],
 #codex-menu[hidden],
 #hud-restore-btn[hidden],

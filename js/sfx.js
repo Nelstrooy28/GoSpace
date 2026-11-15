@@ -123,6 +123,23 @@ export function playStageSep() {
   tone(820, 290, 0.14, 'triangle', 0.07, 0.03);
 }
 
+export function playDeployServoWhir(stageIdx = 0) {
+  const base = stageIdx === 0 ? 185 : (stageIdx === 1 ? 235 : 310);
+  tone(base, base * 1.48, 0.34, 'triangle', 0.048, 0);
+  tone(base * 0.5, base * 0.72, 0.28, 'sine', 0.038, 0.02);
+}
+
+export function playDeployLatchLock(stageIdx = 0) {
+  const f = stageIdx === 0 ? 640 : (stageIdx === 1 ? 820 : 1040);
+  tone(190, 95, 0.055, 'square', 0.065, 0);
+  tone(f, f * 1.18, 0.16, 'triangle', 0.06, 0.025);
+}
+
+export function playHoloScanPing() {
+  tone(680, 1240, 0.09, 'sine', 0.065, 0);
+  tone(1320, 1760, 0.15, 'triangle', 0.05, 0.055);
+}
+
 export function startRocketRumbling() {
   const c = ensureCtx(); if (!c || rumbleNodes) return;
   const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), data = buf.getChannelData(0);
