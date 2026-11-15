@@ -454,8 +454,7 @@
 }
 
 .loss-card {
-  --plate-rim: rgba(239, 68, 68, 0.65);
-  --tick: var(--status-bad);
+  --plate-ring: linear-gradient(135deg, rgba(239, 68, 68, 0.65) 0%, rgba(148, 197, 255, 0.1) 50%, rgba(239, 68, 68, 0.65) 100%);
 }
 
 .loss-kicker,
@@ -545,7 +544,7 @@ dialog.modal {
   padding: 1rem 1.15rem;
   color: var(--text-main);
   --plate-bg: var(--panel-strong);
-  --plate-rim: var(--border-mid);
+  --plate-ring: linear-gradient(135deg, var(--border-mid) 0%, rgba(148, 197, 255, 0.1) 50%, var(--border-mid) 100%);
 }
 
 dialog.modal::backdrop {

@@ -850,7 +850,7 @@ body[data-stage="4"] #hud-bottom {
   line-height: 1.35;
   color: var(--text-main);
   --plate-bg: var(--panel-strong);
-  --plate-rim: var(--border-focus);
+  --plate-ring: linear-gradient(135deg, var(--border-focus) 0%, rgba(148, 197, 255, 0.1) 50%, var(--border-focus) 100%);
 }
 
 .hud-restore {

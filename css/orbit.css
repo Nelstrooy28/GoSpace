@@ -94,8 +94,8 @@
 }
 
 .orb-obj-item.is-risk {
-  border-color: rgba(94, 231, 255, 0.45);
-  background: rgba(94, 231, 255, 0.09);
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.09);
 }
 
 .orb-obj-check {
@@ -517,17 +517,15 @@
   width: 100%;
   max-width: 31rem;
   padding: 0.64rem 0.79rem;
-  --plate-rim: rgba(239, 68, 68, 0.65);
+  --plate-ring: linear-gradient(135deg, rgba(239, 68, 68, 0.65) 0%, rgba(148, 197, 255, 0.1) 50%, rgba(239, 68, 68, 0.65) 100%);
   --plate-bg: rgba(14, 8, 24, 0.94);
-  --tick: var(--status-bad);
   display: flex;
   flex-direction: column;
   gap: 0.43rem;
 }
 
 .hazard-alert-hud.is-nominal {
-  --plate-rim: rgba(16, 185, 129, 0.65);
-  --tick: var(--status-good);
+  --plate-ring: linear-gradient(135deg, rgba(16, 185, 129, 0.65) 0%, rgba(148, 197, 255, 0.1) 50%, rgba(16, 185, 129, 0.65) 100%);
 }
 
 .hazard-head {
@@ -658,8 +656,8 @@
 }
 
 .haz-badge.is-warn {
-  background: rgba(94, 231, 255, 0.16);
-  color: var(--accent-bright);
+  background: rgba(251, 191, 36, 0.16);
+  color: #fde68a;
 }
 
 .haz-badge.is-bad {
@@ -672,7 +670,7 @@
   width: 100%;
   max-width: 30rem;
   padding: 0.64rem 0.79rem;
-  --plate-rim: rgba(94, 231, 255, 0.6);
+  --plate-ring: linear-gradient(135deg, #fde68a 0%, rgba(251, 191, 36, 0.35) 50%, rgba(167, 139, 250, 0.5) 100%);
   --plate-bg: rgba(14, 8, 24, 0.94);
   display: flex;
   flex-direction: column;
@@ -737,7 +735,7 @@
   width: 100%;
   max-width: 23.5rem;
   padding: 0.64rem 0.79rem;
-  --plate-rim: var(--holo-accent, var(--accent));
+  --plate-ring: linear-gradient(135deg, var(--holo-accent, var(--accent)) 0%, rgba(148, 197, 255, 0.1) 50%, var(--holo-accent, var(--accent)) 100%);
   display: flex;
   flex-direction: column;
   gap: 0.43rem;
