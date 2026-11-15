@@ -11,7 +11,7 @@ let sideBoosters = [], arms = [], clamps = [];
 let flames = [], sideFlames = [], mvacPlume = null, engineBells = [], mvacBell = null, vaporCone = null;
 let puffs = [], sparks = [], trenchLight = null;
 let camMode = 'trench', rocketSpec = null, lastRocketY = 0;
-let ignitedCmd = false, igniteElapsed = 0, lastBeep = -1, rumbleOn = false, padClock = 0;
+let ignitedCmd = false, launchPaused = false, igniteElapsed = 0, lastBeep = -1, rumbleOn = false, padClock = 0;
 let becoDone = false, mecoDone = false, fairingDone = false, completed = false, lastHudMs = 0;
 let updateCb = null, completeCb = null, skipHandler = null;
 
@@ -412,6 +412,10 @@ function animate() {
   if (completed || !renderer || !scene || !camera) return;
   rafId = requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
+  if (launchPaused) {
+    bloomComp ? bloomComp.composer.render() : renderer.render(scene, camera);
+    return;
+  }
   padClock += dt;
   if (ignitedCmd) igniteElapsed += dt;
   const elapsed = ignitedCmd ? igniteElapsed : 0;
@@ -591,7 +595,7 @@ export function triggerIgnition() {
 export function mountLaunch(container, missionState, onUpdate, onComplete) {
   unmountLaunch();
   updateCb = onUpdate; completeCb = onComplete;
-  ignitedCmd = false; igniteElapsed = 0; padClock = 0; lastRocketY = 0; completed = false; lastHudMs = 0;
+  ignitedCmd = false; launchPaused = false; igniteElapsed = 0; padClock = 0; lastRocketY = 0; completed = false; lastHudMs = 0;
   lastBeep = -1; rumbleOn = false; becoDone = false; mecoDone = false; fairingDone = false;
 
   const w = Math.max(container.clientWidth, 320), h = Math.max(container.clientHeight, 320);
@@ -634,9 +638,22 @@ export function setLaunchSkipHandler(fn) {
   skipHandler = typeof fn === 'function' ? fn : null;
 }
 
+export function setLaunchPaused(paused) {
+  const next = Boolean(paused);
+  if (launchPaused === next) return;
+  launchPaused = next;
+  if (next) {
+    stopRocketRumbling();
+  } else if (ignitedCmd && igniteElapsed >= 2.1 && igniteElapsed < 13.8 && !completed) {
+    startRocketRumbling();
+  }
+  clock.getDelta();
+}
+
 export function haltLaunchLoop() {
   completed = true;
   ignitedCmd = false;
+  launchPaused = false;
   rumbleOn = false;
   updateCb = null;
   completeCb = null;

@@ -804,6 +804,119 @@ dialog h3 {
 }
 
 
+/* Quit / Abort Mission Confirmation Modal */
+#quit-modal-overlay,
+.quit-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 68;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.42), rgba(2, 6, 18, 0.84));
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.quit-modal-card {
+  width: min(500px, 92vw);
+  padding: 22px 24px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(56, 189, 248, 0.65);
+  border-top: 3px solid #f87171;
+  background: linear-gradient(160deg, rgba(10, 22, 48, 0.96), rgba(5, 11, 26, 0.97));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.82), 0 0 36px rgba(56, 189, 248, 0.24);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: debriefRise 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.quit-kicker {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fca5a5;
+}
+
+.quit-title {
+  margin: 0;
+  font-family: var(--font-hud);
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.03em;
+}
+
+.quit-sub {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.42;
+  color: #cbd5e1;
+}
+
+.quit-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 6px;
+}
+
+.quit-btn {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 8px;
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f8fafc;
+  border: 1.5px solid rgba(56, 189, 248, 0.5);
+  background: rgba(15, 29, 58, 0.85);
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.quit-btn:hover {
+  transform: translateY(-1px);
+}
+
+.quit-btn.is-resume {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.9), rgba(29, 78, 216, 0.88));
+  border-color: #7dd3fc;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.28);
+}
+
+.quit-btn.is-resume:hover {
+  border-color: #fde68a;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
+}
+
+.quit-btn.is-hangar {
+  background: rgba(15, 34, 70, 0.9);
+  border-color: rgba(125, 211, 252, 0.55);
+  color: #e0f2fe;
+}
+
+.quit-btn.is-hangar:hover {
+  border-color: #7dd3fc;
+  background: rgba(20, 48, 92, 0.95);
+}
+
+.quit-btn.is-danger {
+  background: linear-gradient(135deg, rgba(153, 27, 27, 0.88), rgba(127, 29, 29, 0.92));
+  border-color: rgba(248, 113, 113, 0.82);
+  color: #fef2f2;
+}
+
+.quit-btn.is-danger:hover {
+  border-color: #fca5a5;
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.95), rgba(153, 27, 27, 0.96));
+  box-shadow: 0 0 22px rgba(239, 68, 68, 0.44);
+}
+
 /* Always honor HTML [hidden] above all ID display rules */
 .hidden,
 [hidden],
@@ -812,6 +925,7 @@ dialog h3 {
 #review-overlay[hidden],
 #briefing-overlay[hidden],
 #loss-overlay[hidden],
+#quit-modal-overlay[hidden],
 #sensor-cam-pip[hidden],
 #orbit-deploy-banner[hidden],
 #orbit-objectives-sidebar[hidden],

@@ -95,10 +95,10 @@
   <div id="hud-layer" class="hud-layer">
     <header id="hud-top" class="hud-top plate">
       <div class="brand-cluster">
-        <button id="active-mission-pill" class="btn-sci mission-chip" type="button" title="Switch Mission Contract">
+        <div id="active-mission-pill" class="mission-chip brand-badge">
           <span class="brand-name">GOSPACE</span>
           <span id="scenario-badge" class="badge-tag">L1</span>
-        </button>
+        </div>
         <nav id="stage-switcher" class="stage-bar" aria-label="Mission Stages">
           <button class="stage-btn active" data-stage="hangar" type="button">1. HANGAR</button>
           <button class="stage-btn" data-stage="launch" type="button">2. PAD</button>
@@ -119,6 +119,7 @@
         <button id="mute-btn" class="btn-sci audio-toggle-btn" type="button" title="Toggle Sound Effects">🔊 SFX</button>
         <button id="toggle-hud-btn" class="btn-sci" type="button" title="Hide HUD [H]">[H]</button>
         <button id="menu-btn" class="btn-sci" type="button" aria-expanded="false">⚙️ Menu</button>
+        <button id="quit-mission-btn" class="btn-sci btn-quit-mission" type="button" title="Quit / Restart Mission [Esc]">🚪 Quit</button>
       </div>
     </header>
 
@@ -150,6 +151,7 @@
       <div id="review-overlay" class="review-overlay" hidden></div>
       <div id="loss-overlay" class="loss-overlay" hidden></div>
       <div id="briefing-overlay" class="briefing-overlay" hidden></div>
+      <div id="quit-modal-overlay" class="quit-modal-overlay" hidden></div>
       <aside id="sensor-cam-pip" class="sensor-cam-pip plate" aria-label="Satellite Payload Sensor Cam" hidden>
         <div class="sensor-pip-head">
           <span id="sensor-pip-title" class="sensor-pip-title">📷 THERMAL IR · FLIR</span>

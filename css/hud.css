@@ -46,15 +46,50 @@
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  font-size: 13.5px;
+  font-family: var(--font-hud);
+  font-size: 14px;
   font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f8fafc;
+  background: rgba(15, 29, 58, 0.72);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
   max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
 }
 
 #scenario-badge {
-  font-size: 13.5px;
+  font-size: 14px;
+}
+
+#hud-top .topbar-utils .btn-quit-mission {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 5px 11px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: rgba(248, 113, 113, 0.58);
+  background: rgba(127, 29, 29, 0.45);
+  color: #fecaca;
+}
+
+#hud-top .topbar-utils .btn-quit-mission:hover {
+  border-color: #f87171;
+  background: rgba(153, 27, 27, 0.8);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.36);
+}
+
+#hud-top .topbar-utils .btn-quit-mission[hidden] {
+  display: none !important;
 }
 
 #stage-switcher .stage-btn {

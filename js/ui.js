@@ -227,6 +227,15 @@ export function renderHud(ev, stage, opts = {}) {
   });
   const slBtn = document.getElementById('save-load-btn');
   if (slBtn) slBtn.hidden = stage !== 'hangar';
+  const contractsBtn = document.getElementById('reopen-title-btn');
+  if (contractsBtn) {
+    const allowSwitch = stage === 'hangar';
+    contractsBtn.hidden = !allowSwitch;
+    contractsBtn.disabled = !allowSwitch;
+    contractsBtn.title = allowSwitch ? 'Switch Mission Contract' : 'Mission switching locked during active flight';
+  }
+  const quitBtn = document.getElementById('quit-mission-btn');
+  if (quitBtn) quitBtn.hidden = stage === 'review';
   const expBtn = document.getElementById('export-json-btn');
   if (expBtn) expBtn.hidden = stage !== 'review';
 
@@ -1098,6 +1107,31 @@ export function renderLossOfVehicleModal(open, reason = '', ev = null) {
         <button id="loss-hangar-btn" class="loss-btn is-fix" type="button">🔧 FIX DESIGN IN HANGAR</button>
         <button id="loss-retry-btn" class="loss-btn is-retry" type="button">🔄 RETRY ORBIT</button>
         <button id="loss-menu-btn" class="loss-btn is-menu" type="button">🏠 BACK TO MENU</button>
+      </div>
+    </div>`;
+}
+
+export function renderQuitConfirmModal(open, scenarioName = 'Active Mission') {
+  const el = document.getElementById('quit-modal-overlay');
+  if (!el) return;
+  if (!open) {
+    el.hidden = true;
+    el.dataset.key = '';
+    el.innerHTML = '';
+    return;
+  }
+  const name = scenarioName || 'Active Mission';
+  el.hidden = false;
+  if (el.dataset.key === name && el.innerHTML) return;
+  el.dataset.key = name;
+  el.innerHTML = `<div class="quit-modal-card plate" role="alertdialog" aria-modal="true" aria-labelledby="quit-modal-title">
+      <div class="quit-kicker">FLIGHT CONTROL CONFIRMATION</div>
+      <h2 id="quit-modal-title" class="quit-title">ABORT CURRENT MISSION?</h2>
+      <p class="quit-sub">Unsaved flight progress on <strong>${esc(name)}</strong> will be lost.</p>
+      <div class="quit-actions">
+        <button id="quit-resume-btn" class="quit-btn is-resume" type="button">▶ Resume Mission</button>
+        <button id="quit-hangar-btn" class="quit-btn is-hangar" type="button">🔧 Restart in Hangar</button>
+        <button id="quit-menu-btn" class="quit-btn is-danger" type="button">🏠 Quit to Main Menu</button>
       </div>
     </div>`;
 }

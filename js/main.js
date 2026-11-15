@@ -1,12 +1,12 @@
 import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign, getOptimalLoadoutForMission, getOrbitObjectivesStatus } from './catalog.js';
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
-import { haltLaunchLoop, mountLaunch, setLaunchCamera, setLaunchSkipHandler, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
+import { haltLaunchLoop, mountLaunch, setLaunchCamera, setLaunchPaused, setLaunchSkipHandler, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
 import { clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, markOrbitPlayerAction, mountOrbit, mountShowcase, replayOrbitDeployment, resolveOrbitHazardChoice, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
 import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
-import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, stopRocketRumbling, toggleMute } from './sfx.js';
+import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, stopAllSfx, stopRocketRumbling, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
-import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderLossOfVehicleModal, renderMissionBriefing, renderOrbitObjectivesSidebar, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
+import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderLossOfVehicleModal, renderMissionBriefing, renderOrbitObjectivesSidebar, renderQuitConfirmModal, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
 const STORAGE_ACTIVE = 'gospace_active_v1', STORAGE_SAVED = 'gospace_saved_v1', STORAGE_PROGRESS = 'gospace_progress_v2';
 const readJson = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch { return fb; } };
@@ -42,6 +42,7 @@ let activeScene = null, hudHidden = false, codexOpen = false, briefingOpen = fal
 let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 1, orbitCam = 'full';
 let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0, orbitSessionDirty = true;
 let lossModalTimer = 0, lossModalOpen = false, lossReason = '';
+let quitModalOpen = false, quitModalPrevPaused = false;
 
 function clearLossModalState() {
   if (lossModalTimer) {
@@ -51,6 +52,101 @@ function clearLossModalState() {
   lossModalOpen = false;
   lossReason = '';
   renderLossOfVehicleModal(false);
+}
+
+function clearTransientUiOverlays() {
+  codexOpen = false;
+  hudHidden = false;
+  briefingOpen = false;
+  sensorCamOpen = false;
+  objectivesCollapsed = false;
+  selectedHoloId = null;
+  focusedHoloId = null;
+  quitModalOpen = false;
+  quitModalPrevPaused = false;
+  renderQuitConfirmModal(false);
+  renderHoloScannerCard(null, null);
+  setSensorCamEnabled(false);
+  clearHoloSelection();
+  setHazardTension(false);
+  ['resources-modal', 'saveload-modal'].forEach((id) => {
+    const dlg = document.getElementById(id);
+    if (dlg?.open) dlg.close();
+  });
+  const mel = document.getElementById('mel-drawer');
+  if (mel) mel.hidden = true;
+  const tip = document.getElementById('game-tooltip');
+  if (tip) tip.hidden = true;
+  const popups = document.getElementById('score-popups');
+  if (popups) popups.innerHTML = '';
+  const haz = document.getElementById('hazard-alert-hud');
+  if (haz) { haz.hidden = true; haz.innerHTML = ''; }
+  const dec = document.getElementById('decision-alert-hud');
+  if (dec) { dec.hidden = true; dec.innerHTML = ''; }
+  const dep = document.getElementById('orbit-deploy-banner');
+  if (dep) dep.hidden = true;
+}
+
+function quitMissionToHome() {
+  stopTutorial();
+  clearLossModalState();
+  haltLaunchLoop();
+  stopAllSfx();
+  clearTransientUiOverlays();
+  unmountAll();
+  resetRunSession(missionState.scenarioId);
+  stage = 'hangar';
+  activeSegment = 'user';
+  activeSub = 'obj';
+  titleOpen = true;
+  setMood('menu');
+  triggerWarpFlash();
+  renderAll(true);
+}
+
+function restartMissionInHangar() {
+  stopTutorial();
+  clearLossModalState();
+  haltLaunchLoop();
+  stopAllSfx();
+  clearTransientUiOverlays();
+  unmountAll();
+  resetRunSession(missionState.scenarioId);
+  stage = 'hangar';
+  titleOpen = false;
+  triggerWarpFlash();
+  renderAll(true);
+  spawnPopup('🔧 Returned to Hangar — ready for spacecraft reconfiguration');
+}
+
+function openQuitConfirmModal() {
+  if (titleOpen || stage === 'review' || quitModalOpen) return;
+  codexOpen = false;
+  applyChrome();
+  if (activeScene === 'orbit') {
+    quitModalPrevPaused = Boolean(orbitTelemetry?.briefingPaused || briefingOpen);
+    setOrbitBriefingPaused(true);
+  } else if (activeScene === 'launch') {
+    setLaunchPaused(true);
+  }
+  quitModalOpen = true;
+  renderQuitConfirmModal(true, lastEval?.scenario?.name || 'Active Mission');
+  updateDebug(lastEval);
+}
+
+function closeQuitConfirmModal(restoreResume = true) {
+  if (!quitModalOpen) return;
+  quitModalOpen = false;
+  renderQuitConfirmModal(false);
+  if (restoreResume) {
+    if (activeScene === 'orbit') {
+      setOrbitBriefingPaused(briefingOpen || quitModalPrevPaused);
+    } else if (activeScene === 'launch') {
+      setLaunchPaused(false);
+    }
+  }
+  quitModalPrevPaused = false;
+  updateDebug(lastEval);
 }
 
 function resetRunSession(missionId) {
@@ -132,6 +228,7 @@ function updateDebug(ev) {
     launchActive: activeScene === 'launch', launchTelemetry,
     orbitActive: activeScene === 'orbit', orbitTelemetry, orbitScore,
     isDestroyed: Boolean(orbitTelemetry?.isDestroyed), lossModalOpen, lossReason,
+    quitModalOpen,
     briefingOpen, briefingPaused: Boolean(orbitTelemetry?.briefingPaused ?? (activeScene === 'orbit' && briefingOpen)),
     sensorCamOpen, sensorCamMode: getSensorCamMode(missionState).mode,
     selectedHoloId, focusedHoloId, getHoloScreenPos: getHoloBodyScreenPos,
@@ -622,7 +719,7 @@ function init() {
     },
     seekPass: () => seekOrbitToPass(110),
     transmitNow: () => handleTransmit(),
-    returnHome: () => { titleOpen = true; renderAll(true); },
+    returnHome: () => quitMissionToHome(),
   };
 
   document.getElementById('mode-campaign-btn').addEventListener('click', () => { stopTutorial(); startMissionFromTitle(null, false); });
@@ -650,8 +747,30 @@ function init() {
     e.preventDefault();
     startMissionFromTitle(card.dataset.startScenario, missionState.sandboxMode);
   });
-  document.getElementById('active-mission-pill').addEventListener('click', () => { titleOpen = true; renderAll(true); });
-  document.getElementById('reopen-title-btn').addEventListener('click', () => { titleOpen = true; codexOpen = false; renderAll(true); });
+  document.getElementById('reopen-title-btn').addEventListener('click', () => {
+    if (stage !== 'hangar') { playWarning(); return; }
+    playEquip();
+    quitMissionToHome();
+  });
+  document.getElementById('quit-mission-btn')?.addEventListener('click', () => {
+    playEquip();
+    openQuitConfirmModal();
+  });
+  document.getElementById('quit-modal-overlay')?.addEventListener('click', (e) => {
+    if (e.target.closest('#quit-resume-btn')) {
+      playHover();
+      closeQuitConfirmModal(true);
+    } else if (e.target.closest('#quit-hangar-btn')) {
+      playEquip();
+      restartMissionInHangar();
+    } else if (e.target.closest('#quit-menu-btn')) {
+      playEquip();
+      quitMissionToHome();
+    } else if (e.target === e.currentTarget) {
+      playHover();
+      closeQuitConfirmModal(true);
+    }
+  });
   document.getElementById('sandbox-toggle').addEventListener('change', (e) => { missionState.sandboxMode = e.target.checked; renderAll(false); });
   document.getElementById('menu-btn').addEventListener('click', () => { codexOpen = !codexOpen; applyChrome(); });
   document.getElementById('music-toggle-btn')?.addEventListener('click', () => { toggleMusicMuted(); applyChrome(); updateDebug(lastEval); });
@@ -812,12 +931,7 @@ function init() {
       setStage('orbit', false, true);
     } else if (e.target.closest('#loss-menu-btn')) {
       playEquip();
-      clearLossModalState();
-      triggerWarpFlash();
-      titleOpen = true;
-      stage = 'hangar';
-      orbitSessionDirty = true;
-      renderAll(true);
+      quitMissionToHome();
     }
   });
   document.getElementById('hazard-alert-hud').addEventListener('click', (e) => {
@@ -836,11 +950,7 @@ function init() {
       setOrbitTimeWarp(orbitWarp || 1);
     } else if (e.target.closest('#rev-menu-btn')) {
       playEquip();
-      triggerWarpFlash();
-      titleOpen = true;
-      stage = 'hangar';
-      orbitSessionDirty = true;
-      renderAll(true);
+      quitMissionToHome();
     } else if (e.target.closest('#rev-export-btn')) {
       playEquip();
       if (lastEval) {
@@ -871,14 +981,13 @@ function init() {
   window.addEventListener('keydown', (e) => {
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
     const k = e.key.toLowerCase();
+    if (quitModalOpen && !titleOpen) {
+      if (e.key === 'Escape') { e.preventDefault(); playHover(); closeQuitConfirmModal(true); }
+      return;
+    }
     if (briefingOpen && !titleOpen) {
       if (e.key === 'Escape') { e.preventDefault(); closeMissionBriefing(false); return; }
       if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); closeMissionBriefing(true); return; }
-    }
-    if (e.key === 'Escape' && stage === 'launch' && !titleOpen && !isTutorialActive()) {
-      e.preventDefault();
-      skipLaunchToOrbit();
-      return;
     }
     if (e.key === 'Escape' && stage === 'review' && !titleOpen) {
       e.preventDefault();
@@ -886,6 +995,19 @@ function init() {
       setStage('orbit', true);
       setOrbitTimeWarp(orbitWarp || 1);
       return;
+    }
+    if (e.key === 'Escape' && !titleOpen && !isTutorialActive()) {
+      const openDialog = document.querySelector('dialog[open]');
+      if (openDialog) { openDialog.close(); return; }
+      const melDrawer = document.getElementById('mel-drawer');
+      if (melDrawer && !melDrawer.hidden) { melDrawer.hidden = true; return; }
+      if (codexOpen) { codexOpen = false; applyChrome(); return; }
+      if (!lossModalOpen && ['hangar', 'launch', 'orbit'].includes(stage)) {
+        e.preventDefault();
+        playEquip();
+        openQuitConfirmModal();
+        return;
+      }
     }
     if (k === 'h' && !titleOpen) { hudHidden = !hudHidden; applyChrome(); updateDebug(lastEval); }
     else if (orbitTelemetry?.isDestroyed || lossModalOpen) return;

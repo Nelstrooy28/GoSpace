@@ -1,6 +1,14 @@
 const MUTED_KEY = 'gospace_muted_v1';
 let ctx = null, muted = localStorage.getItem(MUTED_KEY) === '1', rumbleNodes = null, lastHoverAt = 0;
 let gestureUnlocked = false;
+const activeSfxNodes = new Set();
+
+function trackSfxNode(node) {
+  if (!node) return node;
+  activeSfxNodes.add(node);
+  node.addEventListener?.('ended', () => { activeSfxNodes.delete(node); }, { once: true });
+  return node;
+}
 
 export function getSharedAudioContext(fromGesture = false) {
   if (fromGesture) gestureUnlocked = true;
@@ -38,6 +46,7 @@ function tone(freqStart, freqEnd, durSec, type = 'sine', vol = 0.08, delay = 0) 
   gain.gain.linearRampToValueAtTime(vol, now + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
   osc.connect(gain); gain.connect(c.destination);
+  trackSfxNode(osc);
   osc.start(now); osc.stop(now + durSec + 0.02);
 }
 
@@ -153,6 +162,8 @@ export function startRocketRumbling() {
   src.connect(filter); filter.connect(master);
   sub.connect(subGain); subGain.connect(master);
   master.connect(c.destination);
+  trackSfxNode(src);
+  trackSfxNode(sub);
   src.start(); sub.start();
   rumbleNodes = { src, sub, master };
 }
@@ -167,6 +178,21 @@ export function stopRocketRumbling() {
     master.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
     src.stop(t + 0.28); sub.stop(t + 0.28);
   } catch { /* ignore */ }
+}
+
+export function stopAllSfx() {
+  if (rumbleNodes) {
+    const { src, sub, master } = rumbleNodes;
+    rumbleNodes = null;
+    try { master.disconnect(); } catch { /* ignore */ }
+    try { src.stop(0); src.disconnect(); } catch { /* ignore */ }
+    try { sub.stop(0); sub.disconnect(); } catch { /* ignore */ }
+  }
+  for (const node of [...activeSfxNodes]) {
+    try { node.stop?.(0); } catch { /* ignore */ }
+    try { node.disconnect?.(); } catch { /* ignore */ }
+    activeSfxNodes.delete(node);
+  }
 }
 
 export function playSpacecraftExplosion() {
@@ -194,6 +220,7 @@ export function playSpacecraftExplosion() {
   src.connect(lpf);
   lpf.connect(boomGain);
   boomGain.connect(c.destination);
+  trackSfxNode(src);
   src.start(now);
   src.stop(now + dur + 0.05);
 
@@ -231,6 +258,7 @@ function playNoiseBurst(durSec = 0.28, filterType = 'bandpass', freqStart = 1200
   gain.gain.linearRampToValueAtTime(vol, now + 0.015);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
   src.connect(flt); flt.connect(gain); gain.connect(c.destination);
+  trackSfxNode(src);
   src.start(now); src.stop(now + durSec + 0.02);
 }
 
