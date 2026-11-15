@@ -86,6 +86,18 @@ export function propagateOrbit(elements, timeSec = 0) {
   };
 }
 
+export function propagateOrbitAtTrueAnomaly(elements, trueAnomalyRad = 0) {
+  const a = Math.max(elements.aKm || 7000, R_EARTH + 160);
+  const e = Math.min(Math.max(elements.e ?? 0.001, 0), 0.985);
+  const periodSec = 2 * Math.PI * Math.sqrt((a ** 3) / MU_EARTH);
+  const state = keplerStateAtAnomaly({ ...elements, aKm: a, e }, trueAnomalyRad);
+  return {
+    ...state,
+    periodSec,
+    trueAnomalyDeg: (((trueAnomalyRad / DEG2RAD) % 360) + 360) % 360
+  };
+}
+
 export function propagateOrbitVisual(elements, timeSec = 0) {
   const a = Math.max(elements.aKm || 7000, R_EARTH + 160);
   const e = Math.min(Math.max(elements.e ?? 0.001, 0), 0.985);

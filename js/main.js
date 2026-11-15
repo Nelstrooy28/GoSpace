@@ -21,6 +21,7 @@ function createFreshRunSession(missionId) {
     scansCompleted: 0,
     onboardBuffer: 0,
     eclipsesSurvived: 0,
+    orbitHasShadow: true,
     anomaliesResolved: 0,
     hullIntegrity: 100,
     deployCompleted: false,
@@ -261,6 +262,7 @@ function mountLiveOrbit(vp, isVictory = false) {
     runSession.scansCompleted = t.scienceScansCount ?? t.asteroidsScanned ?? 0;
     runSession.onboardBuffer = t.onboardBuffer ?? 0;
     runSession.eclipsesSurvived = t.eclipsesSurvived ?? 0;
+    if (typeof t.orbitHasShadow === 'boolean') runSession.orbitHasShadow = t.orbitHasShadow;
     runSession.anomaliesResolved = t.anomaliesResolved || 0;
     runSession.hullIntegrity = t.hullIntegrity ?? 100;
     const objStatus = syncOrbitObjectives(t);
@@ -475,9 +477,9 @@ const handleTransmit = () => {
   } else if (r.reason === 'empty-buffer') {
     playWarning();
     spawnPopup('💾 Data Buffer Empty — Scan a Science Target [E] first!');
-  } else if (r.reason === 'pass-cooldown') {
+  } else if (r.reason === 'downlink-cooldown' || r.reason === 'pass-cooldown') {
     playWarning();
-    spawnPopup(`⏳ Pass Already Used at ${r.station} — Exit cone first!`);
+    spawnPopup(`⏳ Downlink recharging (${r.cooldownSec || 1}s) at ${r.station}`);
   } else if (r.reason === 'brownout') {
     playWarning();
     spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to transmit.');
@@ -517,8 +519,9 @@ const handleScanAsteroid = () => {
     spawnPopup(`⏳ ${r.zoneName} on ${r.cooldownSec}s cooldown — fly to next zone!`);
   } else if (r.reason === 'out-of-swath') {
     playWarning();
-    const etaHint = r.nextZoneName ? ` — next: ${r.nextZoneName} (~${r.nextZoneEtaSec}s)!` : ' — fly into a cyan waypoint ring!';
-    spawnPopup(`🔍 No Scan Zone in Swath${etaHint}`);
+    const degHint = typeof r.nextZoneDeg === 'number' && r.nextZoneDeg > 0 ? ` (${r.nextZoneDeg}°)` : '';
+    const etaHint = r.nextZoneName ? ` — next: ${r.nextZoneName}${degHint}, ~${r.nextZoneEtaSec}s!` : ' — fly into a pulsing Scan Gate!';
+    spawnPopup(`🔍 No Scan Gate in Swath${etaHint}`);
   } else if (r.reason === 'brownout') {
     playWarning();
     spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to scan.');

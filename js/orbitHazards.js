@@ -185,13 +185,13 @@ export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tu
   if (!canAutoTrigger || timeWarp <= 0) return;
 
   if (!stateRef?.sandboxMode) {
-    if (!milestone35Done && milestonePct >= 35) {
+    if (!milestone35Done && milestonePct >= 30) {
       milestone35Done = true;
       autoTriggeredCount += 1;
       triggerRandomHazard(inEclipse ? 'cryo' : null);
       return;
     }
-    if (!milestone70Done && milestonePct >= 70) {
+    if (!milestone70Done && milestonePct >= 65) {
       milestone70Done = true;
       autoTriggeredCount += 1;
       triggerRandomHazard(inEclipse ? 'cryo' : (cycleIdx % 2 === 1 ? 'gimbal' : null));

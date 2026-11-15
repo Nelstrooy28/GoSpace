@@ -27,7 +27,7 @@ export const SCENARIOS = [
         { icon: '🔋', title: 'Manage Nightside Eclipse Power', text: 'Keep Battery above 25% while passing through Earth’s dark eclipse shadow; trigger [Q] Safe Mode if solar power dips.' },
         { icon: '🛡️', title: 'Resolve Mid-Orbit Space Events', text: 'Counter micrometeoroid or solar alerts cleanly with [1][2][3] tactical choices to protect Hull Integrity and earn bonus Science.' }
       ],
-      proTip: 'Use 2x or 5x Time Warp to glide between Wildfire Plumes and Ground Dishes—each zone has an orbital cooldown and each dish allows 1 downlink per pass!'
+      proTip: 'Use 5x or 20x Time Warp to glide between Wildfire Plumes and Ground Dishes—each zone resets after 0.45 orbits and downlinks recharge every 10s!'
     }
   },
   {
@@ -84,7 +84,7 @@ export const SCENARIOS = [
         { icon: '🌑', title: 'Endure Nightside Eclipse Power Draw', text: 'Complete 1 full eclipse transit smoothly without tripping power brownout.' },
         { icon: '🛡️', title: 'Resolve 2 Orbital ConOps Events', text: 'Protect your wide SAR phased-array wing through 2 mid-flight hazard protocols using [1][2][3].' }
       ],
-      proTip: 'Jump to 5x Time Warp over open ocean legs, capture Cyclone Eyes on flyover with [E], then catch Ground Dish passes with [SPACE]!'
+      proTip: 'Jump to 5x or 20x Time Warp over open ocean legs, capture Cyclone Eyes on flyover with [E], then catch Ground Dish passes with [SPACE]!'
     }
   },
   {
@@ -103,7 +103,7 @@ export const SCENARIOS = [
         { icon: '❄️', title: 'Guard Deep-Space Cryo Balance', text: 'Long elliptical transfer arcs bring extreme thermal swings—resolve 2 mid-flight Space Hazards cleanly with [1][2][3].' },
         { icon: '📡', title: 'Relay Through Global Deep-Space Dishes', text: 'Transmit 1 buffered volatile dataset per Ground Station pass until all 4 archival downlinks are logged.' }
       ],
-      proTip: 'Use 2x or 5x Time Warp along outer apogee arcs while sweeping Lunar crater scan gates, then downlink on each station pass!'
+      proTip: 'Use 5x or 20x Time Warp along outer apogee arcs while sweeping Lunar crater scan gates, then downlink on each station link window!'
     }
   },
   {
@@ -376,7 +376,7 @@ export const SANDBOX_ORBIT_GUIDE_FALLBACK = {
   about: 'Unlimited budget and rocket payload mass let you test daring satellite builds without procurement caps. Push extreme sensors, RTGs, or Xenon Ion drives into real Keplerian orbits and watch how they withstand live space hazards.',
   tasks: [
     { icon: '🔬', title: '1. Scan Zones -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit!' },
-    { icon: '📡', title: 'Test Multi-Pass Downlinks', text: 'Each Ground Station allows 1 downlink per flyover cone, and each scanned Science Zone resets on a 60s orbit cooldown.' },
+    { icon: '📡', title: 'Test Multi-Pass Downlinks', text: 'Each Ground Station recharges on a 10s (or 0.18-orbit) downlink cooldown, and each scanned Scan Gate resets in 0.45 orbits.' },
     { icon: '⚠️', title: 'Stress-Test Orbital Hazards', text: 'Click ⚠️ Trigger Hazard or survive incoming debris, solar flares, and cryo freezes via [1][2][3] ConOps protocols.' }
   ],
   proTip: 'Equip Xenon Ion, Cryo Sunshields, or RTGs in the Hangar to unlock zero-damage emergency counter-moves in Orbit!'
@@ -812,46 +812,46 @@ export function getHazardProtocol(kind, missionState, batterySoc = 84) {
 
 export const MISSION_SCIENCE_ZONES = {
   'wildfiresat-l1': [
-    { id: 'wf-mackenzie', name: 'Mackenzie Wildfire Plume', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.14, points: 75, color: '#f97316' },
-    { id: 'wf-taiga', name: 'Siberian Taiga Front', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.33, points: 75, color: '#fbbf24' },
-    { id: 'wf-yukon', name: 'Yukon Crown Hotspot', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.52, points: 80, color: '#f97316' },
-    { id: 'wf-quebec', name: 'Labrador Boreal Swath', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.72, points: 75, color: '#38bdf8' },
-    { id: 'wf-alpine', name: 'Southern Ridge Bushfire', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.90, points: 85, color: '#fbbf24' }
+    { id: 'wf-mackenzie', name: 'Mackenzie Wildfire Plume', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.12, points: 75, color: '#f97316' },
+    { id: 'wf-taiga', name: 'Siberian Taiga Front', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.30, points: 75, color: '#fbbf24' },
+    { id: 'wf-yukon', name: 'Yukon Crown Hotspot', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.48, points: 80, color: '#f97316' },
+    { id: 'wf-quebec', name: 'Labrador Boreal Swath', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.68, points: 75, color: '#38bdf8' },
+    { id: 'wf-alpine', name: 'Southern Ridge Bushfire', category: 'Thermal Plume', targetBody: 'earth', orbitFrac: 0.86, points: 85, color: '#fbbf24' }
   ],
   'aurora-l1': [
-    { id: 'au-ncusp', name: 'Northern Polar Cusp', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.14, points: 75, color: '#34d399' },
-    { id: 'au-birkeland', name: 'Birkeland Current Arc', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.33, points: 80, color: '#22d3ee' },
-    { id: 'au-substorm', name: 'Substorm Oval Core', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.52, points: 85, color: '#38bdf8' },
-    { id: 'au-scusp', name: 'Southern Polar Cusp', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.72, points: 80, color: '#34d399' },
-    { id: 'au-jet', name: 'Auroral Electrojet Sheet', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.90, points: 75, color: '#fbbf24' }
+    { id: 'au-ncusp', name: 'Northern Polar Cusp', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.12, points: 75, color: '#34d399' },
+    { id: 'au-birkeland', name: 'Birkeland Current Arc', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.30, points: 80, color: '#22d3ee' },
+    { id: 'au-substorm', name: 'Substorm Oval Core', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.48, points: 85, color: '#38bdf8' },
+    { id: 'au-scusp', name: 'Southern Polar Cusp', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.68, points: 80, color: '#34d399' },
+    { id: 'au-jet', name: 'Auroral Electrojet Sheet', category: 'Magnetosphere Cusp', targetBody: 'earth', orbitFrac: 0.86, points: 75, color: '#fbbf24' }
   ],
   'ocean-l2': [
-    { id: 'oc-barrier', name: 'Great Barrier Reef Bloom', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.14, points: 85, color: '#22d3ee' },
-    { id: 'oc-belize', name: 'Mesoamerican Coral Shelf', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.33, points: 85, color: '#34d399' },
-    { id: 'oc-natl', name: 'North Atlantic Plankton Swirl', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.52, points: 90, color: '#38bdf8' },
-    { id: 'oc-humboldt', name: 'Humboldt Upwelling Front', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.72, points: 85, color: '#22d3ee' },
-    { id: 'oc-triangle', name: 'Coral Triangle Archipelago', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.90, points: 95, color: '#fbbf24' }
+    { id: 'oc-barrier', name: 'Great Barrier Reef Bloom', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.12, points: 85, color: '#22d3ee' },
+    { id: 'oc-belize', name: 'Mesoamerican Coral Shelf', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.30, points: 85, color: '#34d399' },
+    { id: 'oc-natl', name: 'North Atlantic Plankton Swirl', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.48, points: 90, color: '#38bdf8' },
+    { id: 'oc-humboldt', name: 'Humboldt Upwelling Front', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.68, points: 85, color: '#22d3ee' },
+    { id: 'oc-triangle', name: 'Coral Triangle Archipelago', category: 'Coastal Reef Bloom', targetBody: 'earth', orbitFrac: 0.86, points: 95, color: '#fbbf24' }
   ],
   'monsoon-l2': [
-    { id: 'mn-bengal', name: 'Bay of Bengal Eyewall', category: 'Cyclone Eye', targetBody: 'earth', orbitFrac: 0.14, points: 90, color: '#38bdf8' },
-    { id: 'mn-wpac', name: 'West Pacific Super-Typhoon', category: 'Cyclone Eye', targetBody: 'earth', orbitFrac: 0.33, points: 95, color: '#fbbf24' },
-    { id: 'mn-mekong', name: 'Mekong Floodplain Basin', category: 'SAR Flood Swath', targetBody: 'earth', orbitFrac: 0.52, points: 85, color: '#22d3ee' },
-    { id: 'mn-atl', name: 'Atlantic Hurricane Vortex', category: 'Cyclone Eye', targetBody: 'earth', orbitFrac: 0.72, points: 90, color: '#38bdf8' },
-    { id: 'mn-coral', name: 'Coral Sea Storm Core', category: 'Cyclone Eye', targetBody: 'earth', orbitFrac: 0.90, points: 90, color: '#fbbf24' }
+    { id: 'mn-bengal', name: 'Bay of Bengal Eyewall', category: 'Cyclone Eye', targetBody: 'earth', orbitFrac: 0.12, points: 90, color: '#38bdf8' },
+    { id: 'mn-wpac', name: 'West Pacific Super-Typhoon', category: 'Cyclone Eye', targetBody: 'earth', orbitFrac: 0.30, points: 95, color: '#fbbf24' },
+    { id: 'mn-mekong', name: 'Mekong Floodplain Basin', category: 'SAR Flood Swath', targetBody: 'earth', orbitFrac: 0.48, points: 85, color: '#22d3ee' },
+    { id: 'mn-atl', name: 'Atlantic Hurricane Vortex', category: 'Cyclone Eye', targetBody: 'earth', orbitFrac: 0.68, points: 90, color: '#38bdf8' },
+    { id: 'mn-coral', name: 'Coral Sea Storm Core', category: 'Cyclone Eye', targetBody: 'earth', orbitFrac: 0.86, points: 90, color: '#fbbf24' }
   ],
   'lunar-l3': [
-    { id: 'ln-outbound', name: 'Cislunar Cryo Calibration Gate', category: 'Lunar Corridor', targetBody: 'earth', orbitFrac: 0.14, points: 95, color: '#22d3ee' },
-    { id: 'ln-shackleton', name: 'Shackleton Rim Cryo Sweep', category: 'Lunar Crater PSR', targetBody: 'moon', orbitFrac: 0.33, points: 110, color: '#67e8f9' },
-    { id: 'ln-cabeus', name: 'Cabeus Volatile Basin Scan', category: 'Lunar Crater PSR', targetBody: 'moon', orbitFrac: 0.52, points: 115, color: '#38bdf8' },
-    { id: 'ln-shoemaker', name: 'Shoemaker Ice Trap Window', category: 'Lunar Crater PSR', targetBody: 'moon', orbitFrac: 0.72, points: 110, color: '#a78bfa' },
-    { id: 'ln-inbound', name: 'Return Neutron Spectrometer Arc', category: 'Lunar Corridor', targetBody: 'earth', orbitFrac: 0.90, points: 100, color: '#fbbf24' }
+    { id: 'ln-outbound', name: 'Cislunar Cryo Calibration Gate', category: 'Lunar Corridor', targetBody: 'earth', orbitFrac: 0.12, points: 95, color: '#22d3ee' },
+    { id: 'ln-shackleton', name: 'Shackleton Rim Cryo Sweep', category: 'Lunar Crater PSR', targetBody: 'moon', orbitFrac: 0.30, points: 110, color: '#67e8f9' },
+    { id: 'ln-cabeus', name: 'Cabeus Volatile Basin Scan', category: 'Lunar Crater PSR', targetBody: 'moon', orbitFrac: 0.48, points: 115, color: '#38bdf8' },
+    { id: 'ln-shoemaker', name: 'Shoemaker Ice Trap Window', category: 'Lunar Crater PSR', targetBody: 'moon', orbitFrac: 0.68, points: 110, color: '#a78bfa' },
+    { id: 'ln-inbound', name: 'Return Neutron Spectrometer Arc', category: 'Lunar Corridor', targetBody: 'earth', orbitFrac: 0.86, points: 100, color: '#fbbf24' }
   ],
   'asteroid-l3': [
-    { id: 'as-peri', name: 'Deep-Space Optical Calibration', category: 'Transfer Waypoint', targetBody: 'earth', orbitFrac: 0.14, points: 100, color: '#fbbf24' },
-    { id: 'as-nea1', name: 'Silicate NEA-2026 Waypoint', category: 'Asteroid Target', targetBody: 'nea', neaIndex: 0, orbitFrac: 0.33, points: 105, color: '#22d3ee' },
-    { id: 'as-nea2', name: 'Metallic M-Type NEA-2027', category: 'Asteroid Target', targetBody: 'nea', neaIndex: 1, orbitFrac: 0.52, points: 115, color: '#38bdf8' },
-    { id: 'as-comet', name: 'Comet C/2026 GOSPACE Coma', category: 'Comet Flyby', targetBody: 'comet', orbitFrac: 0.72, points: 135, color: '#67e8f9' },
-    { id: 'as-nea3', name: 'Carbonaceous NEA-2028 Assay', category: 'Asteroid Target', targetBody: 'nea', neaIndex: 2, orbitFrac: 0.90, points: 110, color: '#fbbf24' }
+    { id: 'as-peri', name: 'Deep-Space Optical Calibration', category: 'Transfer Waypoint', targetBody: 'earth', orbitFrac: 0.12, points: 100, color: '#fbbf24' },
+    { id: 'as-nea1', name: 'Silicate NEA-2026 Waypoint', category: 'Asteroid Target', targetBody: 'nea', neaIndex: 0, orbitFrac: 0.30, points: 105, color: '#22d3ee' },
+    { id: 'as-nea2', name: 'Metallic M-Type NEA-2027', category: 'Asteroid Target', targetBody: 'nea', neaIndex: 1, orbitFrac: 0.48, points: 115, color: '#38bdf8' },
+    { id: 'as-comet', name: 'Comet C/2026 GOSPACE Coma', category: 'Comet Flyby', targetBody: 'comet', orbitFrac: 0.68, points: 135, color: '#67e8f9' },
+    { id: 'as-nea3', name: 'Carbonaceous NEA-2028 Assay', category: 'Asteroid Target', targetBody: 'nea', neaIndex: 2, orbitFrac: 0.86, points: 110, color: '#fbbf24' }
   ]
 };
 
@@ -945,6 +945,14 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
   }
 
   const tgt = ORBIT_MISSION_TARGETS[scenarioId] || ORBIT_MISSION_TARGETS['wildfiresat-l1'];
+  const orbitSpec = CATALOG.launch.orbits.find((o) => o.id === state?.orbitId) || CATALOG.launch.orbits[0];
+  const hasEclipseShadow = telemetry?.orbitHasShadow
+    ?? (telemetry?.eclipseFraction !== undefined
+      ? telemetry.eclipseFraction > 0
+      : (run?.orbitHasShadow ?? (generateOrbitTrack(orbitSpec, 48).eclipseFraction > 0)));
+  const needEclipse = tgt.eclipseTarget > 0 && hasEclipseShadow;
+  const reqScans = tgt.scanTarget + (tgt.eclipseTarget > 0 && !hasEclipseShadow ? 1 : 0);
+
   const tasks = [
     {
       id: 'unfold',
@@ -957,9 +965,9 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
     {
       id: 'scans',
       title: tgt.scanLabel,
-      progressText: `${Math.min(scans, tgt.scanTarget)} / ${tgt.scanTarget}`,
-      complete: scans >= tgt.scanTarget,
-      badgeText: scans >= tgt.scanTarget ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+      progressText: `${Math.min(scans, reqScans)} / ${reqScans}`,
+      complete: scans >= reqScans,
+      badgeText: scans >= reqScans ? '✅ COMPLETE' : '⬜ INCOMPLETE',
       required: true
     },
     {
@@ -971,7 +979,7 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       required: true
     }
   ];
-  if (tgt.eclipseTarget > 0) {
+  if (needEclipse) {
     tasks.push({
       id: 'eclipse',
       title: 'Survive 1 Eclipse Pass',
@@ -1001,8 +1009,8 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
     }
   );
 
-  const opsTotal = 0.5 + tgt.scanTarget + tgt.downlinks + (tgt.eclipseTarget || 0);
-  const opsDone = (deployDone ? 0.5 : 0) + Math.min(scans, tgt.scanTarget) + Math.min(dl, tgt.downlinks) + Math.min(eclipsesSurvived, tgt.eclipseTarget || 0);
+  const opsTotal = 0.5 + reqScans + tgt.downlinks + (needEclipse ? tgt.eclipseTarget : 0);
+  const opsDone = (deployDone ? 0.5 : 0) + Math.min(scans, reqScans) + Math.min(dl, tgt.downlinks) + (needEclipse ? Math.min(eclipsesSurvived, tgt.eclipseTarget) : 0);
   const milestonePct = Math.round((opsDone / Math.max(1, opsTotal)) * 100);
 
   const completedCount = tasks.filter((item) => item.complete).length;

@@ -361,8 +361,8 @@ export function renderStageHud(stage, state, ev, opts) {
       </div>
       <div class="btn-row">
         <button class="btn-sci ${opts.orbitWarp === 1 ? 'is-on' : ''}" data-warp="1" type="button">1x</button>
-        <button class="btn-sci ${opts.orbitWarp === 2 ? 'is-on' : ''}" data-warp="2" type="button">2x</button>
         <button class="btn-sci ${opts.orbitWarp === 5 ? 'is-on' : ''}" data-warp="5" type="button">5x</button>
+        <button class="btn-sci ${opts.orbitWarp === 20 ? 'is-on' : ''}" data-warp="20" type="button">20x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
         ${testHazBtn}
         <button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Replay Zero-G Satellite Unfolding [U]">🛰️ Replay Unfold [U]</button>
@@ -665,11 +665,11 @@ export function updateOrbitOverlay(t, objStatus = null) {
       tx.textContent = '🔋 BROWNOUT: RECHARGE TO 15% IN SUNLIGHT';
     } else if (dlPaused) {
       tx.textContent = `⏸️ DOWNLINK PAUSED (${t.commsPausedSec}s)`;
-    } else if (t?.stationPassCooldownActive) {
-      tx.textContent = '⏳ PASS USED — EXIT CONE FOR NEXT DISH';
+    } else if ((t?.downlinkCooldownSec || 0) > 0 || t?.stationPassCooldownActive) {
+      tx.textContent = `⏳ DOWNLINK COOLDOWN (${t.downlinkCooldownSec || 1}s)`;
       tx.classList.add('is-cooldown');
     } else if (bufPkts < 1 && !t?.tutorialActive) {
-      tx.textContent = '💾 BUFFER EMPTY — SCAN ZONE [E] FIRST';
+      tx.textContent = '📡 LINK LOCKED — CAPTURE SCIENCE [E] FIRST TO FILL BUFFER';
       tx.classList.add('is-standby');
     } else {
       let pts = 50;
@@ -677,7 +677,8 @@ export function updateOrbitOverlay(t, objStatus = null) {
       if (t?.designRisks?.wavelengthMismatch) pts = Math.round(pts * 0.6);
       if ((t?.omniReducedDownlinks || 0) > 0) pts = Math.round(pts * 0.7);
       const omniTag = (t?.omniReducedDownlinks || 0) > 0 ? ' · OMNI 70%' : '';
-      tx.textContent = `📡 [SPACE] TRANSMIT SCIENCE (+${pts})${omniTag}`;
+      const stLabel = t?.linkedStation || 'Ground Station';
+      tx.textContent = `📡 LINK LOCKED (${stLabel}) — PRESS [SPACE] TO DOWNLINK (${bufPkts} PKT · +${pts})${omniTag}`;
     }
   }
   const scanBtn = document.getElementById('orb-scan-btn');
@@ -686,16 +687,17 @@ export function updateOrbitOverlay(t, objStatus = null) {
     scanBtn.disabled = destroyed;
     scanBtn.classList.remove('is-swath-ready', 'is-cooldown', 'is-standby');
     if (t?.swathReady) {
-      scanBtn.textContent = `🔬 IN SCAN ZONE — PRESS [E] TO CAPTURE SCIENCE (+${t.swathZonePoints || 60})`;
+      scanBtn.textContent = `🔬 IN SCAN GATE — PRESS [E] TO CAPTURE SCIENCE (+${t.swathZonePoints || 60})`;
       scanBtn.classList.add('is-swath-ready');
     } else if ((t?.swathCooldownSec || 0) > 0) {
-      scanBtn.textContent = `⏳ ${(t.swathZoneName || 'ZONE').toUpperCase()} COOLDOWN (${t.swathCooldownSec}s)`;
+      scanBtn.textContent = `⏳ ${(t.swathZoneName || 'SCAN GATE').toUpperCase()} COOLDOWN (${t.swathCooldownSec}s)`;
       scanBtn.classList.add('is-cooldown');
     } else if (t?.nextZoneName) {
-      scanBtn.textContent = `🔍 NEXT SCAN: ${t.nextZoneName} · ${t.nextZoneEtaSec}s (~${t.nextZoneDistKm} km)`;
+      const degPart = typeof t.nextZoneDeg === 'number' && t.nextZoneDeg > 0 ? ` · ${t.nextZoneDeg}°` : '';
+      scanBtn.textContent = `🔍 NEXT SCAN GATE: ${t.nextZoneName}${degPart} (~${t.nextZoneEtaSec}s)`;
       scanBtn.classList.add('is-standby');
     } else {
-      scanBtn.textContent = '🔍 [E] SCAN SCIENCE ZONE (FLY INTO RING)';
+      scanBtn.textContent = '🔍 [E] CAPTURE SCIENCE (ENTER PULSING SCAN GATE)';
       scanBtn.classList.add('is-standby');
     }
   }
@@ -778,7 +780,7 @@ export function renderMissionBriefing(ev, stage, open) {
     <div class="brief-keybinds" aria-label="Orbital Controls">
       <span><kbd>[SPACE]</kbd> Downlink Buffer at Ground Dish</span>
       <span><kbd>[E]</kbd> Scan Science Zone</span>
-      <span><kbd>[1x–5x]</kbd> Time Warp</span>
+      <span><kbd>[1x–20x]</kbd> Time Warp</span>
       <span><kbd>[Click / Hotkey]</kbd> Fix Hazards</span>
     </div>
 
