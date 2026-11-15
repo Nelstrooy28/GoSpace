@@ -2,7 +2,7 @@ import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign, getOptim
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, mountOrbit, mountShowcase, replayOrbitDeployment, resolveOrbitHazardChoice, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
+import { clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, markOrbitPlayerAction, mountOrbit, mountShowcase, replayOrbitDeployment, resolveOrbitHazardChoice, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
 import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
 import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
@@ -456,6 +456,7 @@ function renderAll(rebuildScene = true, focusTag = null) {
 const openSaveModal = () => { renderSavedModal(readJson(STORAGE_SAVED, []), lastEval); document.getElementById('saveload-modal').showModal(); };
 const handleTransmit = () => {
   if (orbitTelemetry?.isDestroyed) return;
+  markOrbitPlayerAction();
   const r = transmitScience();
   if (r.ok) {
     orbitScore += r.points;
@@ -491,6 +492,7 @@ const handleTransmit = () => {
 };
 const handleScanAsteroid = () => {
   if (orbitTelemetry?.isDestroyed) return;
+  markOrbitPlayerAction();
   const r = scanAsteroid();
   if (r.ok) {
     orbitScore += r.points;

@@ -939,6 +939,7 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       totalCount: tasks.length,
       pct: Math.round((completedCount / tasks.length) * 100),
       milestonePct: Math.round(((deployDone ? 0.5 : 0) + Math.min(1, scans) + Math.min(1, dl)) / 2.5 * 100),
+      requiredEvents: 1,
       isDestroyed: destroyed,
       canDebrief
     };
@@ -1025,6 +1026,7 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
     totalCount: tasks.length,
     pct: Math.round((completedCount / tasks.length) * 100),
     milestonePct,
+    requiredEvents: tgt.eventTarget,
     isDestroyed: destroyed,
     canDebrief
   };

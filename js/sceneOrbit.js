@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { generateOrbitTrack, propagateOrbit, propagateOrbitAtTrueAnomaly } from './missionVizPropagator.js';
-import { getMissionScienceZones, getOrbitObjectivesStatus } from './catalog.js';
+import { getMissionScienceZones, getOrbitObjectivesStatus, ORBIT_MISSION_TARGETS } from './catalog.js';
 import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpaceTexture } from './solarSystem.js';
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
-import { applyHullDelta, clearActiveHazard, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=17';
+import { applyHullDelta, clearActiveHazard, getHazardSnapshot, initOrbitHazards, recordOrbitPlayerAction, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=18';
 import { isTutorialActive } from './tutorial.js';
 import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSpacecraftExplosion, playWarning } from './sfx.js';
 
@@ -28,7 +28,7 @@ let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = n
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, downlinkRig = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
 let gsNodes = [], apsisSprites = [], scienceZones = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
-let orbitPeriodSec = 5800, orbitPhase = 0, totalRevs = 0, orbitHasShadow = true;
+let orbitPeriodSec = 5800, orbitPhase = 0, totalRevs = 0, orbitHasShadow = true, requiredEventsCount = 1;
 let simTime = 0, timeWarp = 1, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false, sensorCamEnabled = false;
 let stormUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs = 0, fitDist = 7.2, sunElapsed = 0;
@@ -1431,10 +1431,13 @@ function animate() {
 
   updateOrbitHazards(realDt, {
     inEclipse: prop.inEclipse,
+    inLineOfSight,
+    onboardBuffer,
+    deployCompleted: deployCompleted && !deployActive,
+    requiredEvents: objStatus.requiredEvents ?? requiredEventsCount,
     timeWarp,
     tutorialActive: isTutorialActive() || victoryMode || briefingPaused,
-    destroyed: isDestroyed,
-    milestonePct: objStatus.milestonePct || 0
+    destroyed: isDestroyed
   });
   const hazardSnap = getHazardSnapshot();
   const activeHaz = hazardSnap.activeHazard;
@@ -2350,13 +2353,17 @@ export function triggerTestHazard(forcedKind = null) {
 }
 export function repairActiveHazard(key = null) {
   if (isDestroyed) return { ok: false, reason: 'destroyed' };
-  return resolveActiveHazard(key);
+  return resolveActiveHazard(key, requiredEventsCount);
 }
 export function resolveOrbitHazardChoice(choiceIdx = 0) {
   if (isDestroyed) return { ok: false, reason: 'destroyed' };
-  return resolveActiveHazardChoice(choiceIdx);
+  return resolveActiveHazardChoice(choiceIdx, requiredEventsCount);
+}
+export function markOrbitPlayerAction() {
+  recordOrbitPlayerAction();
 }
 export function transmitScience() {
+  recordOrbitPlayerAction();
   if (isDestroyed) return { ok: false, reason: 'destroyed', points: 0, station: 'None' };
   const now = performance.now();
   if (brownoutLocked) return { ok: false, reason: 'brownout', points: 0, station: activeStationName };
@@ -2406,6 +2413,7 @@ export function transmitScience() {
   };
 }
 export function scanAsteroid() {
+  recordOrbitPlayerAction();
   if (isDestroyed) return { ok: false, reason: 'destroyed', points: 0 };
   const now = performance.now();
   if (brownoutLocked) return { ok: false, reason: 'brownout', points: 0 };
@@ -2475,6 +2483,7 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   if (timeWarp <= 0) timeWarp = 1;
   stateRef = missionState; evalRef = evaluation; telemetryCb = onTelemetry; hazardEventCb = options.onHazardEvent || null;
   holoSelectCb = options.onSelectHolo || null;
+  requiredEventsCount = missionState?.sandboxMode ? 1 : (ORBIT_MISSION_TARGETS[missionState?.scenarioId]?.eventTarget ?? 1);
   const elA = Math.max(evaluation?.orbitElements?.aKm || 7000, 6531);
   orbitPeriodSec = 2 * Math.PI * Math.sqrt((elA ** 3) / 398600.4418);
   simTime = 0; orbitPhase = 0; totalRevs = 0; orbitHasShadow = true; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
