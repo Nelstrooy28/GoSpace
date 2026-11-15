@@ -22,7 +22,7 @@ let renderer = null, bloomComp = null, scene = null, camera = null, controls = n
 let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = null, earthshineLight = null;
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, downlinkRig = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
-let gsNodes = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
+let gsNodes = [], apsisSprites = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
 let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false, sensorCamEnabled = false;
 let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs = 0, fitDist = 7.2, sunElapsed = 0;
@@ -439,42 +439,44 @@ function createDownlinkStreamRig() {
 }
 
 function makeTagSprite(badge, altText, color) {
-  const c = document.createElement('canvas'); c.width = 320; c.height = 96;
+  const c = document.createElement('canvas'); c.width = 280; c.height = 84;
   const ctx = c.getContext('2d');
-  const cut = 14;
+  const cut = 12;
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(cut + 6, 8); ctx.lineTo(312 - cut, 8); ctx.lineTo(312, 8 + cut);
-  ctx.lineTo(312, 88 - cut); ctx.lineTo(312 - cut, 88); ctx.lineTo(6 + cut, 88);
-  ctx.lineTo(6, 88 - cut); ctx.lineTo(6, 8 + cut); ctx.closePath();
+  ctx.moveTo(cut + 6, 8); ctx.lineTo(272 - cut, 8); ctx.lineTo(272, 8 + cut);
+  ctx.lineTo(272, 76 - cut); ctx.lineTo(272 - cut, 76); ctx.lineTo(6 + cut, 76);
+  ctx.lineTo(6, 76 - cut); ctx.lineTo(6, 8 + cut); ctx.closePath();
   ctx.fillStyle = 'rgba(4, 12, 26, 0.92)';
   ctx.fill();
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  // Inner diamond glyph + badge label + altitude value
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(30, 34); ctx.lineTo(42, 48); ctx.lineTo(30, 62); ctx.lineTo(18, 48); ctx.closePath();
-  ctx.fill();
-
-  ctx.font = 'bold 28px Orbitron, monospace';
+  ctx.font = 'bold 26px Orbitron, monospace';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText(badge, 52, 49);
+  ctx.fillText(badge, 24, 43);
 
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
-  ctx.fillRect(114, 24, 2, 48);
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.42)';
+  ctx.fillRect(82, 22, 2, 42);
 
   ctx.fillStyle = '#f8fafc';
-  ctx.font = 'bold 28px "Chakra Petch", monospace';
-  ctx.fillText(altText, 128, 49);
+  ctx.font = 'bold 25px "Chakra Petch", monospace';
+  ctx.fillText(altText, 96, 43);
   ctx.restore();
 
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    opacity: 0.92,
+    sizeAttenuation: false,
+    depthTest: false,
+    depthWrite: false
+  }));
   sp.renderOrder = 11;
-  sp.scale.set(1.85, 0.55, 1);
+  sp.scale.set(0.15, 0.045, 1);
   return sp;
 }
 
@@ -582,7 +584,7 @@ function buildHazardFxRig(satContainer, worldParent, scaleRadius) {
   const sparks = [];
   for (let i = 0; i < 10; i += 1) {
     const sp = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.065, 0),
+      new THREE.BoxGeometry(0.032, 0.032, 0.09),
       new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x38bdf8 : 0xfde047, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending })
     );
     cmeGroup.add(sp);
@@ -1050,16 +1052,18 @@ function buildWorld(missionState, evaluation) {
     if (d2 < peMin) { peMin = d2; pePt = p; peAlt = alt; }
     if (d2 > apMax) { apMax = d2; apPt = p; apAlt = alt; }
   });
-  const bScale = deep ? 0.24 : 0.11;
-  const peGem = new THREE.Mesh(new THREE.OctahedronGeometry(bScale, 0), new THREE.MeshBasicMaterial({ color: 0x34d399 })); peGem.position.copy(pePt);
-  const apGem = new THREE.Mesh(new THREE.OctahedronGeometry(bScale, 0), new THREE.MeshBasicMaterial({ color: 0xfbbf24 })); apGem.position.copy(apPt);
-  const peRing = new THREE.Mesh(new THREE.RingGeometry(bScale * 1.4, bScale * 1.9, 24), new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.72, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
-  peRing.rotation.x = Math.PI / 2; peRing.position.copy(pePt);
-  const apRing = new THREE.Mesh(new THREE.RingGeometry(bScale * 1.4, bScale * 1.9, 24), new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.72, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
-  apRing.rotation.x = Math.PI / 2; apRing.position.copy(apPt);
-  const peTag = makeTagSprite('Pe', `${peAlt} km`, '#34d399'); peTag.position.copy(pePt).add(new THREE.Vector3(0, 0.38, 0));
-  const apTag = makeTagSprite('Ap', `${apAlt} km`, '#fbbf24'); apTag.position.copy(apPt).add(new THREE.Vector3(0, 0.48, 0));
-  scene.add(peGem, apGem, peRing, apRing, peTag, apTag);
+  const peOut = pePt.clone().normalize(), apOut = apPt.clone().normalize();
+  const peTag = makeTagSprite('Pe', `${peAlt} km`, '#34d399');
+  peTag.position.copy(pePt).addScaledVector(peOut, 0.34).add(new THREE.Vector3(0, 0.16, 0));
+  const apTag = makeTagSprite('Ap', `${apAlt} km`, '#fbbf24');
+  apTag.position.copy(apPt).addScaledVector(apOut, 0.36).add(new THREE.Vector3(0, 0.2, 0));
+  apsisSprites = [peTag, apTag];
+  const hideInit = cameraMode === 'chase' || cameraMode === 'victory';
+  apsisSprites.forEach((sp) => {
+    sp.material.opacity = hideInit ? 0 : 0.92;
+    sp.visible = !hideInit;
+  });
+  scene.add(peTag, apTag);
 
   const moonPos = orbitEl.id === 'lunar-transfer' ? apPt.clone().multiplyScalar(1.04) : new THREE.Vector3(-7.8, 2.8, -5.2);
   spaceEnv = createSpaceEnvironment(scene, { moonPos, moonScale: deep ? EARTH_R * 0.48 : EARTH_R * 0.40 });
@@ -1177,6 +1181,17 @@ function animate() {
       targetReticle.scale.setScalar(camDist * 0.048);
       targetReticle.material.opacity = THREE.MathUtils.clamp((camDist - showThresh) / 3.5, 0, 0.88);
     } else targetReticle.visible = false;
+  }
+  if (apsisSprites.length && camera) {
+    const chaseOrLocked = cameraMode === 'chase' || cameraMode === 'victory' || showcaseMode || isDestroyed;
+    const camSatDist = camera.position.distanceTo(tmpSat);
+    apsisSprites.forEach((sp) => {
+      const nearDist = Math.min(camera.position.distanceTo(sp.position), camSatDist);
+      const targetOp = chaseOrLocked ? 0 : THREE.MathUtils.clamp((nearDist - 3.5) / 1.5, 0, 1) * 0.92;
+      const nextOp = THREE.MathUtils.lerp(sp.material.opacity, targetOp, Math.min(1, realDt * 9));
+      sp.material.opacity = nextOp < 0.01 && targetOp === 0 ? 0 : nextOp;
+      sp.visible = sp.material.opacity > 0.02;
+    });
   }
 
   if ((cameraMode === 'chase' || cameraMode === 'victory') && controls && hasPrevSat) {
@@ -1562,6 +1577,7 @@ function animate() {
       timeWarp, briefingPaused, sensorCamEnabled, sensorCamMode: getSensorCamMode(stateRef).mode,
       deployActive, deployProgress: Number(deployProgress.toFixed(3)),
       selectedHoloId, followHoloId, holoTargetCount: Object.keys(holoTargets).length,
+      apsisVisibleCount: apsisSprites.filter((s) => s.visible).length,
       simTime: Number(simTime.toFixed(1)), cameraMode, fitDist: Number(fitDist.toFixed(1))
     });
   }
@@ -2275,7 +2291,7 @@ export function unmountOrbit() {
   isDestroyed = false; destructionReason = ''; explosionElapsed = 0; shakeRemaining = 0;
   hazardEventCb = null;
   resetOrbitHazards();
-  gsNodes = []; gsHoloProxies = []; holoProxies = []; holoTargets = {};
+  gsNodes = []; apsisSprites = []; gsHoloProxies = []; holoProxies = []; holoTargets = {};
   earthSolidMesh = null; earthOuterProxy = null; selectionRing = null;
   orbitPts = []; hasPrevSat = false;
 }
