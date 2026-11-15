@@ -1,18 +1,55 @@
-/* GoSpace — High-Contrast AAA Aerospace HUD & Live-Space Title Screen */
+/* GoSpace — Grounded Tactical Aerospace UI Design System */
 :root {
-  --bg: #040814;
-  --panel: rgba(9, 17, 34, 0.84);
-  --panel-strong: rgba(7, 13, 27, 0.94);
-  --line: rgba(56, 189, 248, 0.3);
-  --line-bright: rgba(56, 189, 248, 0.72);
-  --cyan: #38bdf8;
-  --cyan-soft: #7dd3fc;
+  /* Deep Matte Carbon & Obsidian Surfaces */
+  --bg: #07080b;
+  --bg-dark: #07080b;
+  --bg-hud: rgba(12, 14, 18, 0.84);
+  --bg-hud-elevated: rgba(20, 23, 30, 0.90);
+  --bg-card: rgba(20, 23, 30, 0.90);
+  --bg-card-hover: rgba(28, 32, 42, 0.95);
+  --bg-card-active: rgba(245, 158, 11, 0.14);
+  --panel: rgba(12, 14, 18, 0.84);
+  --panel-strong: rgba(14, 17, 23, 0.96);
+
+  /* Crisp 1px Hairline Borders & Tight 4px Tactical Corners */
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-mid: rgba(255, 255, 255, 0.18);
+  --border-focus: rgba(245, 158, 11, 0.55);
+  --border-bright: rgba(245, 158, 11, 0.72);
+  --line: rgba(255, 255, 255, 0.10);
+  --line-bright: rgba(245, 158, 11, 0.65);
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+
+  /* Aerospace Kapton Amber / Gold + Crisp Bone White */
+  --accent: #f59e0b;
+  --accent-bright: #fbbf24;
   --amber: #f59e0b;
-  --amber-soft: #fcd34d;
+  --amber-soft: #fbbf24;
+  --cyan: #f59e0b;
+  --cyan-soft: #fbbf24;
+  --scan-teal: #38bdf8;
+  --text: #f3f4f6;
+  --text-main: #f3f4f6;
+  --text-dim: #9ca3af;
+  --muted: #9ca3af;
+  --text-muted: #6b7280;
+
+  /* Strict Semantic Colors Only */
   --green: #10b981;
-  --red: #f43f5e;
-  --text: #eef6ff;
-  --muted: #b6cbe2;
+  --status-good: #10b981;
+  --status-warn: #f59e0b;
+  --red: #ef4444;
+  --status-bad: #ef4444;
+
+  /* Strict 4-Step Game HUD Type Scale */
+  --fs-xs: 10px;
+  --fs-sm: 11.5px;
+  --fs-md: 12.5px;
+  --fs-title: clamp(18px, 1.8vw, 24px);
+
   --font-hud: 'Orbitron', 'Segoe UI', sans-serif;
   --font-ui: 'Chakra Petch', 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Consolas', monospace;
@@ -32,13 +69,30 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--bg-dark);
+  color: var(--text-main);
   font-family: var(--font-ui);
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: var(--fs-sm);
+  line-height: 1.35;
   -webkit-font-smoothing: antialiased;
   user-select: none;
+}
+
+/* Tabular Numerals on All Telemetry & Counters */
+.tabular,
+.gm-top b,
+.gm-val,
+.telem-mono,
+.orbit-clock-val,
+.hazard-timer-pill,
+.debrief-total-num,
+.score-row strong,
+.orb-obj-val,
+.orb-obj-count,
+.lch-stat-val,
+.spill,
+.equip-row-stats {
+  font-variant-numeric: tabular-nums;
 }
 
 /* 3D WebGL Canvas Layer */
@@ -46,7 +100,7 @@ html, body {
   position: fixed;
   inset: 0;
   z-index: 1;
-  background: radial-gradient(circle at 60% 45%, #0c1732 0%, #03060f 75%);
+  background: radial-gradient(circle at 60% 45%, #11151d 0%, #050609 78%);
 }
 
 #viewport-container canvas {
@@ -55,35 +109,49 @@ html, body {
   height: 100% !important;
 }
 
-/* Hyperspace Warp Flash Transition */
+/* Warp Transition */
 #warp-flash, .warp-flash {
   position: fixed;
   inset: 0;
   z-index: 95;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.96) 0%, rgba(56, 189, 248, 0.65) 36%, rgba(4, 8, 20, 0) 78%);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85) 0%, rgba(245, 158, 11, 0.35) 38%, rgba(7, 8, 11, 0) 76%);
 }
 
 #warp-flash.active, .warp-flash.active {
-  animation: warpFlashAnim 0.68s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: warpFlashAnim 0.52s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes warpFlashAnim {
-  0% { opacity: 0; transform: scale(0.82); }
-  22% { opacity: 0.95; transform: scale(1.06); }
-  100% { opacity: 0; transform: scale(1.35); }
+  0% { opacity: 0; transform: scale(0.86); }
+  22% { opacity: 0.9; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1.26); }
 }
 
-/* Shared Glassmorphism Plates & Interactive Controls */
-.plate {
-  background: linear-gradient(155deg, rgba(11, 21, 42, 0.88), rgba(6, 12, 26, 0.82));
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(125, 211, 252, 0.14);
+/* Tactical Matte Carbon Surface + 2px Corner Ticks */
+.plate,
+.hud-panel {
+  background-color: var(--bg-hud);
+  background-image:
+    linear-gradient(var(--accent-bright), var(--accent-bright)),
+    linear-gradient(var(--accent-bright), var(--accent-bright)),
+    linear-gradient(var(--accent-bright), var(--accent-bright)),
+    linear-gradient(var(--accent-bright), var(--accent-bright)),
+    linear-gradient(var(--accent-bright), var(--accent-bright)),
+    linear-gradient(var(--accent-bright), var(--accent-bright)),
+    linear-gradient(var(--accent-bright), var(--accent-bright)),
+    linear-gradient(var(--accent-bright), var(--accent-bright));
+  background-size: 6px 1px, 1px 6px, 6px 1px, 1px 6px, 6px 1px, 1px 6px, 6px 1px, 1px 6px;
+  background-position: top left, top left, top right, top right, bottom left, bottom left, bottom right, bottom right;
+  background-repeat: no-repeat;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
 }
 
+/* Shared Tactical Controls */
 .btn-sci,
 #hud-top button,
 #stage-hud button,
@@ -92,16 +160,24 @@ html, body {
 #hangar-loadout button,
 dialog button {
   font-family: var(--font-ui);
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--text);
-  background: rgba(15, 29, 56, 0.82);
-  border: 1px solid rgba(56, 189, 248, 0.38);
-  border-radius: 6px;
-  padding: 7px 12px;
+  color: var(--text-main);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 5px 9px;
   cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: border-color 0.14s ease, background-color 0.14s ease, color 0.14s ease;
   white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btn-sci:hover,
@@ -109,10 +185,9 @@ dialog button {
 #stage-hud button:hover,
 #hangar-loadout button:hover,
 dialog button:hover {
-  border-color: var(--cyan);
-  background: rgba(24, 48, 92, 0.92);
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.28);
-  transform: translateY(-1px);
+  border-color: var(--border-focus);
+  background: var(--bg-card-hover);
+  color: #ffffff;
 }
 
 .btn-sci.active,
@@ -121,76 +196,116 @@ dialog button:hover {
 .seg-tab.active,
 .sub-pill.active,
 .sub-chip.active {
-  background: linear-gradient(135deg, rgba(14, 116, 144, 0.72), rgba(29, 78, 216, 0.68)) !important;
-  border-color: var(--cyan-soft) !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+  background: rgba(245, 158, 11, 0.18) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-bright) !important;
 }
 
 .btn-sci.danger {
-  border-color: rgba(244, 63, 94, 0.58);
-  background: rgba(127, 29, 49, 0.58);
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(127, 29, 29, 0.45);
+  color: #fecaca;
 }
 
 .btn-sci.danger:hover {
-  border-color: #fb7185;
-  background: rgba(159, 18, 57, 0.78);
+  border-color: var(--status-bad);
+  background: rgba(153, 27, 27, 0.72);
+  color: #ffffff;
 }
 
 .btn-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 5px;
+}
+
+/* Crisp Monospace Keycap & Small Status Badges */
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-main);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
 .badge-tag {
   display: inline-flex;
   align-items: center;
-  font-family: var(--font-hud);
-  font-size: 13.5px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--cyan-soft);
-  background: rgba(14, 116, 144, 0.26);
-  border: 1px solid rgba(56, 189, 248, 0.42);
-  border-radius: 5px;
-  padding: 2px 9px;
+  letter-spacing: 0.05em;
+  color: var(--accent-bright);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  white-space: nowrap;
 }
 
 .stat-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
 }
 
 .spill {
   display: inline-flex;
   align-items: center;
-  font-size: 13.5px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
   font-weight: 600;
-  color: var(--text);
-  background: rgba(30, 48, 84, 0.78);
-  border: 1px solid rgba(148, 163, 184, 0.34);
-  border-radius: 5px;
-  padding: 2px 8px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  white-space: nowrap;
 }
 
 .spill.ok {
-  color: #a7f3d0;
-  background: rgba(6, 78, 59, 0.55);
-  border-color: rgba(16, 185, 129, 0.52);
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.45);
 }
 
 .spill.warn {
-  color: #fde68a;
-  background: rgba(120, 53, 15, 0.55);
-  border-color: rgba(245, 158, 11, 0.52);
+  color: var(--accent-bright);
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.45);
 }
 
 .spill.bad {
-  color: #fecdd3;
-  background: rgba(136, 19, 55, 0.6);
-  border-color: rgba(244, 63, 94, 0.58);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
+/* Custom Subtle Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(7, 8, 11, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.55);
+}

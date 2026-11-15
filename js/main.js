@@ -116,7 +116,7 @@ function restartMissionInHangar() {
   titleOpen = false;
   triggerWarpFlash();
   renderAll(true);
-  spawnPopup('🔧 Returned to Hangar — ready for spacecraft reconfiguration');
+  spawnPopup('Returned to Hangar');
 }
 
 function openQuitConfirmModal() {
@@ -251,10 +251,10 @@ function setStage(nextStage, keepOrbit = false, forceUnlock = false) {
   if (!forceUnlock && !isTutorialActive() && !unlocked[nextStage]) {
     playWarning();
     const lockMsg = nextStage === 'launch'
-      ? '🔒 Equip all 4 mission segments first to unlock Launch!'
+      ? 'LOCKED: Equip all 4 mission segments first'
       : (nextStage === 'orbit'
-        ? '🔒 Complete Rocket Launch sequence first to unlock Orbit!'
-        : '🔒 Complete Mission Objectives in Orbit first to unlock Debrief!');
+        ? 'LOCKED: Complete launch sequence first'
+        : 'LOCKED: Complete orbit objectives first');
     spawnPopup(lockMsg);
     return false;
   }
@@ -410,24 +410,24 @@ function mountLiveOrbit(vp, isVictory = false) {
       setHazardTension(ev.type === 'trigger');
       if (window.__MISSION_DEBUG__) window.__MISSION_DEBUG__.music = getMusicDebugState();
       if (ev.type === 'trigger') {
-        spawnPopup(`🚨 ${ev.icon} ANOMALY DETECTED · CHOOSE RESPONSE [1][2][3]`);
+        spawnPopup(`ANOMALY: ${ev.title} [1][2][3]`);
       } else if (ev.type === 'resolve') {
         orbitScore += ev.scoreDelta ?? ev.bonus ?? 0;
         runSession.currentScore = orbitScore;
         if (typeof ev.anomaliesResolved === 'number') runSession.anomaliesResolved = ev.anomaliesResolved;
         if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
         syncOrbitObjectives(orbitTelemetry);
-        spawnPopup(ev.toast || `+${ev.scoreDelta ?? 0} PTS · ANOMALY MITIGATED!`);
+        spawnPopup(ev.toast || `+${ev.scoreDelta ?? 0} PTS · MITIGATED`);
       } else if (ev.type === 'packet-lost') {
         syncOrbitObjectives(orbitTelemetry);
-        spawnPopup('📡 Buffer Overflow: -1 Packet Lost!');
+        spawnPopup('Buffer Overflow: -1 Packet');
       } else if (ev.type === 'sensor-recal') {
         syncOrbitObjectives(orbitTelemetry);
-        spawnPopup('🔬 Sensor Re-calibrating...');
+        spawnPopup('Sensor Re-calibrating...');
       } else if (ev.type === 'expire') {
         if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
         syncOrbitObjectives(orbitTelemetry);
-        spawnPopup('💥 ANOMALY TIMED OUT — -26% HULL & -18% BATTERY!');
+        spawnPopup('ANOMALY TIMED OUT · -26% HULL');
       } else if (ev.type === 'destroyed') {
         lossReason = ev.reason || 'Severe Hull Failure';
         runSession.hullIntegrity = 0;
@@ -435,7 +435,7 @@ function mountLiveOrbit(vp, isVictory = false) {
         setSensorCamEnabled(false);
         const objStatus = syncOrbitObjectives(orbitTelemetry);
         updateOrbitOverlay(orbitTelemetry, objStatus);
-        spawnPopup('💥 HULL BREACHED (0%) — VEHICLE LOST!');
+        spawnPopup('HULL BREACHED (0%) · VEHICLE LOST');
         if (lossModalTimer) clearTimeout(lossModalTimer);
         lossModalTimer = setTimeout(() => {
           lossModalTimer = 0;
@@ -464,6 +464,8 @@ function mountLiveOrbit(vp, isVictory = false) {
 }
 
 function applyChrome() {
+  document.body.dataset.stage = titleOpen ? '0' : (stage === 'hangar' ? '1' : stage === 'launch' ? '2' : stage === 'orbit' ? '3' : '4');
+  document.body.dataset.stageName = titleOpen ? 'showcase' : stage;
   document.getElementById('title-overlay').hidden = !titleOpen;
   document.getElementById('hud-layer').classList.toggle('is-hidden', hudHidden || titleOpen);
   document.getElementById('hud-restore-btn').hidden = !hudHidden || titleOpen;
@@ -473,25 +475,29 @@ function applyChrome() {
   const musMuted = isMusicMuted();
   const muteBtn = document.getElementById('mute-btn');
   if (muteBtn) {
-    muteBtn.textContent = sfxMuted ? '🔇 SFX' : '🔊 SFX';
     muteBtn.classList.toggle('is-muted', sfxMuted);
     muteBtn.setAttribute('aria-pressed', String(!sfxMuted));
+    muteBtn.title = sfxMuted ? 'Sound: OFF' : 'Sound: ON';
   }
   const musicBtn = document.getElementById('music-toggle-btn');
   if (musicBtn) {
-    musicBtn.textContent = musMuted ? '🔇 Music' : '🎵 Music';
     musicBtn.classList.toggle('is-muted', musMuted);
     musicBtn.setAttribute('aria-pressed', String(!musMuted));
+    musicBtn.title = musMuted ? 'Music: OFF' : 'Music: ON';
   }
   const titleMute = document.getElementById('title-mute-btn');
   if (titleMute) {
-    titleMute.textContent = sfxMuted ? '🔇 SFX: OFF' : '🔊 SFX: ON';
+    const lbl = titleMute.querySelector('.audio-lbl');
+    if (lbl) lbl.textContent = sfxMuted ? 'SFX: OFF' : 'SFX: ON';
+    else titleMute.textContent = sfxMuted ? 'SFX: OFF' : 'SFX: ON';
     titleMute.classList.toggle('is-muted', sfxMuted);
     titleMute.setAttribute('aria-pressed', String(!sfxMuted));
   }
   const titleMusic = document.getElementById('title-music-btn');
   if (titleMusic) {
-    titleMusic.textContent = musMuted ? '🔇 MUSIC: OFF' : '🎵 MUSIC: ON';
+    const lbl = titleMusic.querySelector('.audio-lbl');
+    if (lbl) lbl.textContent = musMuted ? 'MUSIC: OFF' : 'MUSIC: ON';
+    else titleMusic.textContent = musMuted ? 'MUSIC: OFF' : 'MUSIC: ON';
     titleMusic.classList.toggle('is-muted', musMuted);
     titleMusic.setAttribute('aria-pressed', String(!musMuted));
   }
@@ -600,16 +606,16 @@ const handleTransmit = () => {
     notifyTutorialState();
   } else if (r.reason === 'empty-buffer') {
     playWarning();
-    spawnPopup('💾 Data Buffer Empty — Scan a Science Target [E] first!');
+    spawnPopup('Buffer Empty — Scan Target [E] first');
   } else if (r.reason === 'downlink-cooldown' || r.reason === 'pass-cooldown') {
     playWarning();
-    spawnPopup(`⏳ Downlink recharging (${r.cooldownSec || 1}s) at ${r.station}`);
+    spawnPopup(`Downlink recharging (${r.cooldownSec || 1}s)`);
   } else if (r.reason === 'brownout') {
     playWarning();
-    spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to transmit.');
+    spawnPopup('BROWNOUT — Recharge to 15% in sunlight');
   } else if (r.reason === 'paused') {
     playWarning();
-    spawnPopup(`⏸️ Downlink paused (${r.pausedSec}s)`);
+    spawnPopup(`Downlink paused (${r.pausedSec}s)`);
   }
 };
 const handleScanAsteroid = () => {
@@ -629,24 +635,24 @@ const handleScanAsteroid = () => {
     }
     const objStatus = syncOrbitObjectives(orbitTelemetry);
     updateOrbitOverlay(orbitTelemetry, objStatus);
-    spawnPopup(`+${r.points} · ${r.id} CAPTURED (+1 BUFFER PKT)!`);
+    spawnPopup(`+${r.points} · ${r.id} (+1 PKT)`);
     renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
     updateDebug(lastEval);
     notifyTutorialState();
   } else if (r.reason === 'cooldown') {
     playWarning();
-    spawnPopup(`⏳ ${r.zoneName} on ${r.cooldownSec}s cooldown — fly to next zone!`);
+    spawnPopup(`${r.zoneName} cooldown (${r.cooldownSec}s)`);
   } else if (r.reason === 'out-of-swath') {
     playWarning();
     const degHint = typeof r.nextZoneDeg === 'number' && r.nextZoneDeg > 0 ? ` (${r.nextZoneDeg}°)` : '';
-    const etaHint = r.nextZoneName ? ` — next: ${r.nextZoneName}${degHint}, ~${r.nextZoneEtaSec}s!` : ' — fly into a pulsing Scan Gate!';
-    spawnPopup(`🔍 No Scan Gate in Swath${etaHint}`);
+    const etaHint = r.nextZoneName ? ` — next: ${r.nextZoneName}${degHint}, ${r.nextZoneEtaSec}s` : ' — enter pulsing gate';
+    spawnPopup(`No Gate in Swath${etaHint}`);
   } else if (r.reason === 'brownout') {
     playWarning();
-    spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to scan.');
+    spawnPopup('BROWNOUT — Recharge to 15% in sunlight');
   } else if (r.reason === 'offline') {
     playWarning();
-    spawnPopup(r.recalibrating ? `🔬 Sensor Re-calibrating... (${r.pausedSec}s)` : `🛡️ Sensors shielded offline (${r.pausedSec}s)`);
+    spawnPopup(r.recalibrating ? `Re-calibrating (${r.pausedSec}s)` : `Sensors offline (${r.pausedSec}s)`);
   }
 };
 const handleHazardChoice = (choiceIdx = 0) => {
@@ -808,14 +814,28 @@ function init() {
   document.body.addEventListener('mouseover', (e) => {
     const btn = e.target.closest('.equip-card, .btn-sci, .btn-rollout, .stage-btn');
     if (btn) playHover();
-    const card = e.target.closest('.equip-card[data-tip]');
+    const card = e.target.closest('[data-tip]');
     if (!card || !card.dataset.tip) { tip.hidden = true; return; }
     const r = card.getBoundingClientRect();
-    tip.textContent = card.dataset.tip; tip.hidden = false;
-    tip.style.left = `${Math.min(window.innerWidth - 250, Math.max(8, r.left))}px`;
-    tip.style.top = `${Math.max(8, r.top - tip.offsetHeight - 8)}px`;
+    tip.textContent = card.dataset.tip;
+    tip.hidden = false;
+    const tipW = tip.offsetWidth || 260;
+    const tipH = tip.offsetHeight || 54;
+    const prefLeft = r.right + 10 + tipW <= window.innerWidth - 10 ? r.right + 10 : r.left;
+    tip.style.left = `${Math.min(window.innerWidth - tipW - 10, Math.max(8, prefLeft))}px`;
+    tip.style.top = `${Math.min(window.innerHeight - tipH - 10, Math.max(46, r.top))}px`;
+  });
+  document.body.addEventListener('mouseout', (e) => {
+    const fromTip = e.target.closest('[data-tip]');
+    if (fromTip && !fromTip.contains(e.relatedTarget)) tip.hidden = true;
   });
   document.getElementById('equipment-strip').addEventListener('mouseleave', () => { tip.hidden = true; });
+  document.getElementById('hangar-loadout')?.addEventListener('click', (e) => {
+    if (e.target.closest('[data-action="toggle-manifest"]')) {
+      const d = document.getElementById('mel-drawer');
+      if (d) { d.hidden = !d.hidden; codexOpen = false; applyChrome(); }
+    }
+  });
 
   document.getElementById('stage-switcher').addEventListener('click', (e) => {
     const b = e.target.closest('.stage-btn');
@@ -861,7 +881,7 @@ function init() {
     else if (e.target.closest('#orb-debrief-btn')) {
       if (orbitTelemetry?.isDestroyed) { playWarning(); return; }
       if (runSession.orbitObjectivesMet) { playEquip(); setStage('review', true); }
-      else { playWarning(); spawnPopup('🔒 Complete at least 1 Science Downlink in Orbit first!'); }
+      else { playWarning(); spawnPopup('Complete at least 1 Science Downlink in Orbit first'); }
     }
   });
   document.getElementById('holo-scanner-card')?.addEventListener('click', (e) => {
@@ -914,7 +934,7 @@ function init() {
       resetRunSession(missionState.scenarioId);
       runSession.launchCompleted = false;
       setStage('hangar');
-      spawnPopup('🔧 Returned to Hangar — fix highlighted debuffs before launch!');
+      spawnPopup('Returned to Hangar — fix highlighted debuffs before launch');
     } else if (e.target.closest('#loss-retry-btn')) {
       playEquip();
       clearLossModalState();
@@ -942,6 +962,19 @@ function init() {
     if (e.target.closest('#lch-ignite-btn')) triggerIgnition();
     else if (e.target.closest('#orb-transmit-btn')) handleTransmit();
     else if (e.target.closest('#orb-scan-btn')) handleScanAsteroid();
+    else if (e.target.closest('[data-warp]')) {
+      playEquip();
+      orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp);
+      setOrbitTimeWarp(orbitWarp);
+      if (orbitTelemetry) orbitTelemetry.timeWarp = orbitWarp;
+      const objStatus = syncOrbitObjectives(orbitTelemetry);
+      if (orbitTelemetry) updateOrbitOverlay(orbitTelemetry, objStatus);
+      else document.querySelectorAll('[data-warp]').forEach((b) => {
+        const on = Number(b.dataset.warp) === orbitWarp;
+        b.classList.toggle('is-on', on);
+        b.classList.toggle('active', on);
+      });
+    }
   });
   document.getElementById('review-overlay').addEventListener('click', (e) => {
     if (e.target.closest('#rev-close-btn')) {
@@ -955,7 +988,7 @@ function init() {
       playEquip();
       if (lastEval) {
         exportMissionVizJSON(missionState, lastEval);
-        spawnPopup('📥 Trajectory JSON Exported!');
+        spawnPopup('Trajectory JSON Exported');
       }
     } else if (e.target.closest('#rev-next-btn')) {
       playEquip();

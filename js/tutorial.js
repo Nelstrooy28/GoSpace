@@ -74,13 +74,13 @@ function ensureDom() {
       </div>
     </aside>
     <div id="tut-complete-toast" class="tut-toast plate" hidden>
-      <div class="tut-toast-badge">🎓 ACADEMY COMPLETE</div>
-      <h3>YOU'RE FLIGHT CERTIFIED!</h3>
-      <p>You configured a CML-4 WildFireSat mission, launched to polar LEO, and beamed live thermal science down inside an Arctic radar pass.</p>
+      <div class="tut-toast-badge">ACADEMY COMPLETE</div>
+      <h3>FLIGHT CERTIFIED</h3>
+      <p>WildFireSat CML-4 configured, launched to polar LEO, and downlinked live thermal science.</p>
       <div class="btn-row">
-        <button id="tut-done-debrief" class="btn-sci active" type="button">🏆 View ★★★ Debrief</button>
-        <button id="tut-done-orbit" class="btn-sci" type="button">🛰️ Keep Flying</button>
-        <button id="tut-done-home" class="btn-sci" type="button">🏠 Return Home</button>
+        <button id="tut-done-debrief" class="btn-sci active" type="button">View Debrief</button>
+        <button id="tut-done-orbit" class="btn-sci" type="button">Keep Flying</button>
+        <button id="tut-done-home" class="btn-sci" type="button">Main Menu</button>
       </div>
     </div>
   `;
@@ -209,7 +209,7 @@ function getStepDescriptor(ctx) {
         target: '#segment-tabs [data-segment="launch"]',
         mode: 'backdrop',
         headline: 'Match Rocket & Budget',
-        prompt: 'Budget is over the $24M cap! Click the 🚀 Rocket tab to swap down from Falcon 9 rideshare.',
+        prompt: 'Budget exceeds the $24M cap. Click 03 Launch to swap down from Falcon 9 rideshare.',
         tip: 'Why it matters: Choosing a right-sized launcher keeps small missions profitable without wasting payload capacity.',
         assistLabel: 'Auto-Select Rocket →',
       };
@@ -241,7 +241,7 @@ function getStepDescriptor(ctx) {
           target: '#segment-tabs [data-segment="ground"]',
           mode: 'backdrop',
           headline: 'Upgrade Downlink Comms',
-          prompt: 'Last engineering fix: Data rate is bottlenecked! Click the 📡 Comms tab to upgrade your radio.',
+          prompt: 'Data rate is bottlenecked. Click 04 Comms to upgrade your radio transceiver.',
           tip: 'Why it matters: High-resolution thermal maps generate 1,500 MB/day—too fast for slow UHF beacons.',
           assistLabel: 'Auto-Equip Comms →',
         };
@@ -269,7 +269,7 @@ function getStepDescriptor(ctx) {
       target: '#launch-cta-btn',
       mode: 'backdrop',
       headline: 'CML 4 Clearance Unlocked!',
-      prompt: 'All 6 gauges are green! Click 🚀 ROLL OUT TO PAD to move your rocket onto Launchpad 39G.',
+      prompt: 'All 6 gauges are green! Click Roll Out to move your rocket onto Launchpad 39G.',
       tip: 'Why it matters: Only CML 4 designs achieve full Flight Readiness before orbital rollout.',
       assistLabel: 'Roll Out To Pad →',
     };
@@ -281,7 +281,7 @@ function getStepDescriptor(ctx) {
         target: '#launch-cta-btn',
         mode: 'backdrop',
         headline: 'Roll Out To Pad',
-        prompt: 'Click ROLL OUT TO PAD to enter the 3D coastal launch complex.',
+        prompt: 'Click Roll Out to enter the 3D coastal launch complex.',
         tip: 'Why it matters: Pre-launch hold-down clamps stabilize thrust until T-0 ignition.',
         assistLabel: 'Roll Out To Pad →',
       };
@@ -291,8 +291,8 @@ function getStepDescriptor(ctx) {
       return {
         target: '#lch-ignite-btn',
         mode: 'backdrop',
-        headline: 'Ignite Rocket Engines!',
-        prompt: 'Click PRESS [SPACE] OR CLICK TO IGNITE (or hit Spacebar) to launch into Sun-Synchronous LEO!',
+        headline: 'Ignite Rocket Engines',
+        prompt: 'Click IGNITE [SPACE] (or press Spacebar) to launch into Sun-Synchronous LEO.',
         tip: 'Why it matters: Umbilical swing arms retract at T-0 as full throttle clears the steel launch tower.',
         assistLabel: 'Ignite Now →',
       };
@@ -301,7 +301,7 @@ function getStepDescriptor(ctx) {
       target: '#stage-hud [data-lcam="hull"]',
       mode: 'clear',
       headline: 'Ascent & Fairing Separation',
-      prompt: 'Liftoff! Click 🎥 Rocket Hull Cam to inspect fairing separation above the cloud deck, or ride smoothly into orbit.',
+      prompt: 'Liftoff! Click Hull Cam to inspect fairing separation above the cloud deck, or ride smoothly into orbit.',
       tip: 'Why it matters: Upper stages jettison protective fairings above the atmosphere to deploy your 3D CubeSat.',
       assistLabel: 'Continue to Orbit →',
     };
@@ -313,7 +313,7 @@ function getStepDescriptor(ctx) {
         target: '#stage-switcher [data-stage="orbit"]',
         mode: 'backdrop',
         headline: 'Enter Orbit Operations',
-        prompt: 'Switch to 3. ORBIT to command live ground station passes.',
+        prompt: 'Switch to 03 ORBIT to command live ground station passes.',
         tip: 'Why it matters: Orbital ops combine real-time attitude, solar power, and RF line-of-sight links.',
         assistLabel: 'Enter Orbit →',
       };
@@ -331,8 +331,8 @@ function getStepDescriptor(ctx) {
     return {
       target: '#orb-transmit-btn',
       mode: 'backdrop',
-      headline: 'Beam Live Data Down!',
-      prompt: 'Line-of-sight locked at 1x speed! Click 📡 [SPACE] TRANSMIT SCIENCE (or press SPACE) to beam wildfire data.',
+      headline: 'Beam Live Data Down',
+      prompt: 'Line-of-sight locked at 1x speed! Click [SPC] DOWNLINK (or press Spacebar) to transmit science data.',
       tip: 'Why it matters: Executing passes on schedule converts onboard storage into science score before the next orbit.',
       assistLabel: 'Transmit Data Now →',
     };

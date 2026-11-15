@@ -7,13 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Orbitron:wght@600;700;900&display=swap" rel="stylesheet" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230284c7'/><text x='16' y='21' font-size='14' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='white'>GS</text></svg>" />
-  <link rel="stylesheet" href="./css/base.css" />
-  <link rel="stylesheet" href="./css/hud.css" />
-  <link rel="stylesheet" href="./css/menu-tutorial.css" />
-  <link rel="stylesheet" href="./css/hangar-launch.css" />
-  <link rel="stylesheet" href="./css/orbit.css" />
-  <link rel="stylesheet" href="./css/modals-debrief.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%230c0e12' stroke='%23f59e0b' stroke-width='2'/><text x='16' y='21' font-size='13' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%23fbbf24'>GS</text></svg>" />
+  <link rel="stylesheet" href="./css/base.css?v=20261116_tactical_hud" />
+  <link rel="stylesheet" href="./css/hud.css?v=20261116_tactical_hud" />
+  <link rel="stylesheet" href="./css/menu-tutorial.css?v=20261116_tactical_hud" />
+  <link rel="stylesheet" href="./css/hangar-launch.css?v=20261116_tactical_hud" />
+  <link rel="stylesheet" href="./css/orbit.css?v=20261116_tactical_hud" />
+  <link rel="stylesheet" href="./css/modals-debrief.css?v=20261116_tactical_hud" />
   <script type="importmap">
     {
       "imports": {
@@ -23,19 +23,25 @@
     }
   </script>
 </head>
-<body>
-  <div id="viewport-container" class="viewport-bg" data-stage="hangar"></div>
+<body data-stage="0">
+  <div id="viewport-container" class="viewport-bg" data-stage="showcase"></div>
   <div id="warp-flash" class="warp-flash" aria-hidden="true"></div>
   <div id="score-popups" class="score-popups" aria-live="polite"></div>
   <div id="game-tooltip" class="game-tooltip plate" hidden></div>
-  <button id="hud-restore-btn" class="hud-restore plate btn-sci" type="button" hidden>SHOW HUD [H]</button>
+  <button id="hud-restore-btn" class="hud-restore plate btn-sci" type="button" hidden>HUD <span class="keycap">H</span></button>
 
   <section id="title-overlay" class="title-overlay" aria-label="Main Menu">
     <div class="title-topbar">
-      <div class="title-version badge-tag">MDL-X FLIGHT SIM // v3.0</div>
+      <div class="title-version badge-tag">MDL-X // v3.0</div>
       <div class="title-audio-group">
-        <button id="title-music-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Ambient Space Synth Music">🎵 MUSIC: ON</button>
-        <button id="title-mute-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Sound Effects">🔊 SFX: ON</button>
+        <button id="title-music-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Music">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 12V3l7-1v9"/><circle cx="4" cy="12" r="2"/><circle cx="11" cy="11" r="2"/></svg>
+          <span class="audio-lbl">MUSIC: ON</span>
+        </button>
+        <button id="title-mute-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Sound">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h3l4-3v10L6 10H3z"/><path d="M12.5 5.5a4 4 0 0 1 0 5"/></svg>
+          <span class="audio-lbl">SFX: ON</span>
+        </button>
       </div>
     </div>
 
@@ -43,44 +49,37 @@
       <div class="hero-col">
         <div class="emblem-row">
           <svg class="orbit-emblem" viewBox="0 0 72 72" aria-hidden="true">
-            <circle cx="36" cy="36" r="10" fill="url(#coreGrad)" />
-            <ellipse class="ring-a" cx="36" cy="36" rx="30" ry="12" fill="none" stroke="#38bdf8" stroke-width="2" transform="rotate(-24 36 36)" />
-            <ellipse class="ring-b" cx="36" cy="36" rx="30" ry="12" fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-dasharray="6 4" transform="rotate(32 36 36)" />
-            <circle class="sat-dot" cx="62" cy="24" r="3.6" fill="#fef08a" />
-            <defs>
-              <radialGradient id="coreGrad" cx="40%" cy="35%" r="65%">
-                <stop offset="0%" stop-color="#e0f2fe" />
-                <stop offset="60%" stop-color="#0284c7" />
-                <stop offset="100%" stop-color="#0f172a" />
-              </radialGradient>
-            </defs>
+            <circle cx="36" cy="36" r="9" fill="#14171e" stroke="#f59e0b" stroke-width="2" />
+            <ellipse class="ring-a" cx="36" cy="36" rx="28" ry="11" fill="none" stroke="#f59e0b" stroke-width="1.8" transform="rotate(-24 36 36)" />
+            <ellipse class="ring-b" cx="36" cy="36" rx="28" ry="11" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="5 4" transform="rotate(32 36 36)" />
+            <circle class="sat-dot" cx="60" cy="25" r="3.2" fill="#fbbf24" />
           </svg>
-          <span class="title-eyebrow">ORBITAL MISSION ARCHITECTURE</span>
+          <span class="title-eyebrow">ORBITAL MISSION SIMULATOR</span>
         </div>
 
         <h1 class="game-logo">GOSPACE</h1>
-        <p class="title-sub">DESIGN &bull; LAUNCH &bull; COMMAND THE COSMOS</p>
+        <p class="title-sub">ARCHITECT &bull; LAUNCH &bull; COMMAND</p>
 
         <div class="hero-actions">
           <button id="mode-campaign-btn" class="menu-btn is-primary active" type="button">
-            <span class="menu-ico">▶</span>
-            <span class="menu-copy"><strong>PLAY SIMULATION</strong><small>Launch active contract with real mass &amp; budget</small></span>
+            <span class="menu-idx">01</span>
+            <span class="menu-copy"><strong>Campaign</strong><small>Launch active contract within real limits</small></span>
           </button>
           <button id="mode-sandbox-btn" class="menu-btn is-sandbox" type="button">
-            <span class="menu-ico">🛠️</span>
-            <span class="menu-copy"><strong>SANDBOX FREEPLAY</strong><small>Unlock unlimited budget &amp; rocket payload mass</small></span>
+            <span class="menu-idx">02</span>
+            <span class="menu-copy"><strong>Sandbox</strong><small>Unlimited budget &amp; launch mass</small></span>
           </button>
           <button id="how-to-play-btn" class="menu-btn" type="button">
-            <span class="menu-ico">📖</span>
-            <span class="menu-copy"><strong>HOW TO PLAY</strong><small>7-step interactive flight academy</small></span>
+            <span class="menu-idx">03</span>
+            <span class="menu-copy"><strong>Tutorial</strong><small>7-step interactive flight academy</small></span>
           </button>
         </div>
       </div>
 
       <div class="contract-col">
         <div class="contract-col-head">
-          <span class="contract-col-title">MISSION CONTRACTS</span>
-          <span id="title-mode-pill" class="badge-tag">SIMULATION MODE</span>
+          <span class="contract-col-title">CONTRACTS</span>
+          <span id="title-mode-pill" class="badge-tag">SIMULATION</span>
         </div>
         <div id="contract-grid" class="contract-grid"></div>
       </div>
@@ -88,127 +87,163 @@
 
     <div class="title-ticker plate">
       <span class="ticker-dot" aria-hidden="true"></span>
-      <span>SYSTEMS ONLINE // KEPLERIAN PHYSICS ACTIVE // 60 FPS TELEMETRY READY</span>
+      <span>SYS READY // KEPLERIAN 60 FPS</span>
     </div>
   </section>
 
   <div id="hud-layer" class="hud-layer">
     <header id="hud-top" class="hud-top plate">
       <div class="brand-cluster">
-        <div id="active-mission-pill" class="mission-chip brand-badge">
+        <div class="brand-wordmark" aria-label="GoSpace">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(-25 12 12)" />
+          </svg>
           <span class="brand-name">GOSPACE</span>
+        </div>
+        <div id="active-mission-pill" class="mission-chip brand-badge">
           <span id="scenario-badge" class="badge-tag">L1</span>
         </div>
-        <nav id="stage-switcher" class="stage-bar" aria-label="Mission Stages">
-          <button class="stage-btn active" data-stage="hangar" type="button">1. HANGAR</button>
-          <button class="stage-btn" data-stage="launch" type="button">2. PAD</button>
-          <button class="stage-btn" data-stage="orbit" type="button">3. ORBIT</button>
-          <button class="stage-btn" data-stage="review" type="button">4. DEBRIEF</button>
-        </nav>
       </div>
 
-      <div id="cml-xp-bar" class="cml-nodes" title="Concept Maturity (CML 1–4)">
-        <div class="node-dots" id="cml-dots">
-          <span class="cnode">1</span><span class="cnode">2</span><span class="cnode">3</span><span class="cnode">4</span>
+      <div class="topbar-center">
+        <nav id="stage-switcher" class="stage-bar" aria-label="Mission Stages">
+          <button class="stage-btn active" data-stage="hangar" type="button">01 HANGAR</button>
+          <button class="stage-btn" data-stage="launch" type="button">02 PAD</button>
+          <button class="stage-btn" data-stage="orbit" type="button">03 ORBIT</button>
+          <button class="stage-btn" data-stage="review" type="button">04 REVIEW</button>
+        </nav>
+
+        <div id="cml-xp-bar" class="cml-nodes" title="Concept Maturity Level (1–4)">
+          <div class="node-dots" id="cml-dots">
+            <span class="cnode">1</span><span class="cnode">2</span><span class="cnode">3</span><span class="cnode">4</span>
+          </div>
+          <span id="cml-badge" class="cml-text">CML 1</span>
         </div>
-        <span id="cml-badge" class="cml-text">CML 1 · CONCEPT</span>
       </div>
 
       <div class="topbar-utils">
-        <button id="music-toggle-btn" class="btn-sci audio-toggle-btn" type="button" title="Toggle Ambient Space Synth Music">🎵 Music</button>
-        <button id="mute-btn" class="btn-sci audio-toggle-btn" type="button" title="Toggle Sound Effects">🔊 SFX</button>
-        <button id="toggle-hud-btn" class="btn-sci" type="button" title="Hide HUD [H]">[H]</button>
-        <button id="menu-btn" class="btn-sci" type="button" aria-expanded="false">⚙️ Menu</button>
-        <button id="quit-mission-btn" class="btn-sci btn-quit-mission" type="button" title="Quit / Restart Mission [Esc]">🚪 Quit</button>
+        <button id="music-toggle-btn" class="btn-sci icon-toggle audio-toggle-btn" type="button" title="Toggle Music" aria-label="Toggle Music">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 12V3l7-1v9"/><circle cx="4" cy="12" r="2"/><circle cx="11" cy="11" r="2"/></svg>
+        </button>
+        <button id="mute-btn" class="btn-sci icon-toggle audio-toggle-btn" type="button" title="Toggle Sound" aria-label="Toggle Sound">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h3l4-3v10L6 10H3z"/><path d="M12.5 5.5a4 4 0 0 1 0 5"/></svg>
+        </button>
+        <button id="menu-btn" class="btn-sci icon-toggle" type="button" aria-expanded="false" title="Tools &amp; Help" aria-label="Tools and Help">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M6.4 6.2a1.7 1.7 0 0 1 3.2.8c0 1.2-1.6 1.5-1.6 2.5"/><circle cx="8" cy="11.8" r="0.6" fill="currentColor"/></svg>
+        </button>
+        <button id="toggle-hud-btn" class="btn-sci icon-toggle" type="button" title="Hide HUD [H]" aria-label="Hide HUD">H</button>
+        <button id="quit-mission-btn" class="btn-sci btn-quit-mission" type="button" title="Quit Mission [Esc]">Quit</button>
       </div>
     </header>
 
     <aside id="codex-menu" class="codex-menu plate" hidden>
       <label class="codex-row"><input type="checkbox" id="sandbox-toggle" /><span>Sandbox Freeplay</span></label>
-      <button id="save-load-btn" class="btn-sci" type="button">💾 Save / Compare Builds</button>
-      <button id="mel-toggle" class="btn-sci" type="button" aria-expanded="false">📋 Master Equipment List</button>
-      <button id="resources-btn" class="btn-sci" type="button">📚 Space Engineering Codex</button>
-      <button id="export-json-btn" class="btn-sci" type="button">📥 Export 3D Trajectory JSON</button>
-      <button id="replay-tutorial-btn" class="btn-sci" type="button">🎓 Replay Tutorial</button>
-      <button id="reopen-title-btn" class="btn-sci" type="button">🗺️ Mission Contracts</button>
+      <button id="mel-toggle" class="btn-sci" type="button" aria-expanded="false">Parts Manifest</button>
+      <button id="save-load-btn" class="btn-sci" type="button">Saved Builds</button>
+      <button id="export-json-btn" class="btn-sci" type="button">Export JSON</button>
+      <button id="resources-btn" class="btn-sci" type="button">Reference Codex</button>
+      <button id="replay-tutorial-btn" class="btn-sci" type="button">Replay Tutorial</button>
+      <button id="reopen-title-btn" class="btn-sci" type="button">Switch Contract</button>
     </aside>
 
     <div class="hud-mid">
-      <div class="left-hud-stack">
-        <div id="comms-banner" class="comms-banner plate" hidden>
-          <span class="eng-avatar" aria-hidden="true">👩‍🚀</span>
-          <span id="comms-text" class="comms-text"></span>
+      <div class="hud-col-left">
+        <div id="hangar-loadout" class="hangar-loadout plate">
+          <div class="loadout-header">
+            <span class="loadout-title">LOADOUT</span>
+            <div class="loadout-actions">
+              <button id="autobuild-btn" class="btn-autobuild" type="button" title="Equip optimal CML-4 build">Auto-Build</button>
+              <button class="btn-sci" data-action="toggle-manifest" type="button" title="Toggle Parts Manifest">Manifest</button>
+            </div>
+          </div>
+          <div class="loadout-nav">
+            <div id="segment-tabs" class="segment-pills" role="tablist">
+              <button class="seg-tab active" data-segment="user" type="button" role="tab">01 Goal</button>
+              <button class="seg-tab" data-segment="space" type="button" role="tab">02 Craft</button>
+              <button class="seg-tab" data-segment="launch" type="button" role="tab">03 Launch</button>
+              <button class="seg-tab" data-segment="ground" type="button" role="tab">04 Comms</button>
+            </div>
+            <div id="sub-pills" class="sub-pills"></div>
+          </div>
+          <div id="equipment-strip" class="equipment-strip"></div>
         </div>
-        <div id="mission-progress-bar" class="mission-progress-bar plate" aria-label="Mission Progress Tracker"></div>
-        <section id="decision-alert-hud" class="decision-alert-hud plate" aria-label="Mission Control Decision" hidden></section>
+
+        <aside id="orbit-objectives-sidebar" class="orbit-objectives-sidebar plate" aria-label="Orbit Objectives" hidden></aside>
+
+        <div class="left-hud-stack">
+          <div id="comms-banner" class="comms-banner plate" hidden>
+            <span class="comms-badge" aria-hidden="true">ENG</span>
+            <span id="comms-text" class="comms-text"></span>
+          </div>
+          <div id="mission-progress-bar" class="mission-progress-bar plate" hidden></div>
+        </div>
       </div>
-      <aside id="orbit-objectives-sidebar" class="orbit-objectives-sidebar plate" aria-label="Orbit Mission Objectives" hidden></aside>
-      <section id="hazard-alert-hud" class="hazard-alert-hud plate" hidden></section>
-      <div id="orbit-deploy-banner" class="orbit-deploy-banner plate" hidden>🛰️ DEPLOYING SOLAR ARRAYS &amp; HIGH-GAIN ANTENNA...</div>
-      <section id="stage-hud" class="stage-hud"></section>
-      <aside id="holo-scanner-card" class="holo-scanner-card plate" aria-label="Holo-Scanner Body Telemetry" hidden></aside>
-      <div id="center-action-hud" class="center-action-hud"></div>
-      <div id="review-overlay" class="review-overlay" hidden></div>
-      <div id="loss-overlay" class="loss-overlay" hidden></div>
-      <div id="briefing-overlay" class="briefing-overlay" hidden></div>
-      <div id="quit-modal-overlay" class="quit-modal-overlay" hidden></div>
-      <aside id="sensor-cam-pip" class="sensor-cam-pip plate" aria-label="Satellite Payload Sensor Cam" hidden>
-        <div class="sensor-pip-head">
-          <span id="sensor-pip-title" class="sensor-pip-title">📷 THERMAL IR · FLIR</span>
-          <span class="sensor-pip-head-right">
-            <span id="sensor-pip-light" class="sensor-pip-light">SUNLIT</span>
-            <button id="sensor-cam-close-btn" class="sensor-pip-close" type="button" aria-label="Close Sensor Cam">✕</button>
-          </span>
+
+      <div class="hud-col-center">
+        <div class="center-top-stack">
+          <div id="orbit-deploy-banner" class="orbit-deploy-banner plate" hidden>DEPLOYING ARRAYS...</div>
+          <section id="hazard-alert-hud" class="hazard-alert-hud plate" hidden></section>
+          <section id="decision-alert-hud" class="decision-alert-hud plate" aria-label="Mission Control Decision" hidden></section>
+          <aside id="holo-scanner-card" class="holo-scanner-card plate" aria-label="Holo-Scanner Body Telemetry" hidden></aside>
         </div>
-        <div class="sensor-pip-canvas-wrap">
-          <canvas id="sensor-cam-canvas" width="296" height="168"></canvas>
-          <div id="sensor-pip-overlay-msg" class="sensor-pip-overlay-msg" hidden></div>
-        </div>
-        <div id="sensor-pip-telem" class="sensor-pip-telem">0.0°N 0.0°E · NOMINAL</div>
-      </aside>
-      <section id="mel-drawer" class="mel-drawer plate" hidden>
-        <div class="drawer-head"><strong>MASTER EQUIPMENT LIST</strong><span id="mel-summary-meta" class="badge-tag">0 items</span></div>
-        <div id="mel-body" class="mel-body"></div>
-      </section>
+        <div id="center-action-hud" class="center-action-hud"></div>
+      </div>
+
+      <div class="hud-col-right">
+        <aside id="sensor-cam-pip" class="sensor-cam-pip plate" aria-label="Payload Sensor Cam" hidden>
+          <div class="sensor-pip-head">
+            <span id="sensor-pip-title" class="sensor-pip-title">SENSOR CAM</span>
+            <span class="sensor-pip-head-right">
+              <span id="sensor-pip-light" class="sensor-pip-light">SUN</span>
+              <button id="sensor-cam-close-btn" class="sensor-pip-close" type="button" aria-label="Close Sensor Cam">✕</button>
+            </span>
+          </div>
+          <div class="sensor-pip-canvas-wrap">
+            <canvas id="sensor-cam-canvas" width="240" height="140"></canvas>
+            <div id="sensor-pip-overlay-msg" class="sensor-pip-overlay-msg" hidden></div>
+          </div>
+          <div id="sensor-pip-telem" class="sensor-pip-telem">0.0°N 0.0°E · NOMINAL</div>
+        </aside>
+        <section id="stage-hud" class="stage-hud"></section>
+      </div>
     </div>
 
     <footer id="hud-bottom" class="hud-bottom">
-      <div id="hangar-loadout" class="hangar-loadout plate">
-        <div class="loadout-nav">
-          <div id="segment-tabs" class="segment-pills" role="tablist">
-            <button class="seg-tab active" data-segment="user" type="button" role="tab">🎯 Objective</button>
-            <button class="seg-tab" data-segment="space" type="button" role="tab">🛰️ Sat Bus &amp; Payload</button>
-            <button class="seg-tab" data-segment="launch" type="button" role="tab">🚀 Rocket</button>
-            <button class="seg-tab" data-segment="ground" type="button" role="tab">📡 Comms</button>
-          </div>
-          <div id="sub-pills" class="sub-pills"></div>
-        </div>
-        <div id="equipment-strip" class="equipment-strip"></div>
-      </div>
-
       <div id="status-cta-bar" class="status-cta-bar plate">
         <div id="resource-gauges" class="gauges-mini"></div>
-        <button id="autobuild-btn" class="btn-autobuild" type="button" title="Equip verified CML-4 winning build">🪄 Auto-Build</button>
-        <button id="launch-cta-btn" class="btn-rollout" type="button">🚀 ROLL OUT TO PAD</button>
+        <button id="launch-cta-btn" class="btn-rollout" type="button">Roll Out</button>
       </div>
     </footer>
+
+    <section id="mel-drawer" class="mel-drawer plate" hidden>
+      <div class="drawer-head">
+        <strong>MANIFEST</strong>
+        <span id="mel-summary-meta" class="badge-tag">0 items</span>
+      </div>
+      <div id="mel-body" class="mel-body"></div>
+    </section>
+    <div id="review-overlay" class="review-overlay" hidden></div>
+    <div id="loss-overlay" class="loss-overlay" hidden></div>
+    <div id="briefing-overlay" class="briefing-overlay" hidden></div>
+    <div id="quit-modal-overlay" class="quit-modal-overlay" hidden></div>
   </div>
 
   <dialog id="resources-modal" class="modal plate">
-    <div class="modal-head"><h2>SPACE ENGINEERING CODEX</h2><button class="btn-sci close-modal" data-close="resources-modal" type="button">Close</button></div>
+    <div class="modal-head"><h2>REFERENCE CODEX</h2><button class="btn-sci close-modal" data-close="resources-modal" type="button">Close</button></div>
     <ul id="resources-list" class="codex-list"></ul>
   </dialog>
 
   <dialog id="saveload-modal" class="modal plate">
-    <div class="modal-head"><h2>HANGAR POINT DESIGNS</h2><button class="btn-sci close-modal" data-close="saveload-modal" type="button">Close</button></div>
+    <div class="modal-head"><h2>SAVED BUILDS</h2><button class="btn-sci close-modal" data-close="saveload-modal" type="button">Close</button></div>
     <div class="save-form">
-      <input id="design-name-input" type="text" placeholder="Callsign (e.g., WildFireSat V2)" maxlength="48" />
-      <button id="save-design-btn" class="btn-sci active" type="button">Save Build</button>
+      <input id="design-name-input" type="text" placeholder="Callsign (e.g., WildFire V2)" maxlength="48" />
+      <button id="save-design-btn" class="btn-sci active" type="button">Save</button>
     </div>
     <div id="saved-designs-list" class="codex-list"></div>
     <div id="compare-box" class="compare-box"></div>
   </dialog>
 
-  <script type="module" src="./js/main.js"></script>
+  <script type="module" src="./js/main.js?v=20261116_tactical_hud"></script>
 </body>
 </html>
