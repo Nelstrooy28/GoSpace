@@ -238,6 +238,7 @@ function getStageHudOpts() {
     decisionPts: orbitTelemetry?.decisionPts ?? 0,
     batterySoc: orbitTelemetry?.batterySoc,
     launchInserted: runSession.launchInserted,
+    deployCompleted: Boolean(runSession.deployCompleted || (!orbitTelemetry?.deployActive && (orbitTelemetry?.deployProgress || 0) >= 0.99)),
     orbitObjectivesMet: runSession.orbitObjectivesMet
   };
 }
@@ -670,7 +671,11 @@ function init() {
   });
   document.getElementById('equipment-strip').addEventListener('mouseleave', () => { tip.hidden = true; });
 
-  document.getElementById('stage-switcher').addEventListener('click', (e) => { const b = e.target.closest('.stage-btn'); if (b) setStage(b.dataset.stage); });
+  document.getElementById('stage-switcher').addEventListener('click', (e) => {
+    const b = e.target.closest('.stage-btn');
+    if (!b || b.dataset.stage !== 'hangar') return;
+    setStage('hangar');
+  });
   document.getElementById('autobuild-btn')?.addEventListener('click', () => {
     const optimal = getOptimalLoadoutForMission(missionState.scenarioId);
     missionState = { ...missionState, ...optimal };
@@ -806,6 +811,12 @@ function init() {
       stage = 'hangar';
       orbitSessionDirty = true;
       renderAll(true);
+    } else if (e.target.closest('#rev-export-btn')) {
+      playEquip();
+      if (lastEval) {
+        exportMissionVizJSON(missionState, lastEval);
+        spawnPopup('📥 Trajectory JSON Exported!');
+      }
     } else if (e.target.closest('#rev-next-btn')) {
       playEquip();
       const idx = (SCENARIOS.findIndex((s) => s.id === missionState.scenarioId) + 1) % SCENARIOS.length;

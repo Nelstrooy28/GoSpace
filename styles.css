@@ -839,7 +839,7 @@ dialog button:hover {
   top: 58px;
   right: 12px;
   width: 336px;
-  max-height: calc(100vh - 80px);
+  max-height: calc(100vh - 132px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -981,6 +981,21 @@ dialog button:hover {
   border-color: rgba(56, 189, 248, 0.42) !important;
   box-shadow: 0 0 14px rgba(15, 23, 42, 0.5);
   opacity: 0.86;
+}
+
+#center-action-hud button.is-status-pill,
+.action-prompt.is-status-pill {
+  font-family: var(--font-ui) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.03em;
+  padding: 6px 14px !important;
+  border-radius: 999px !important;
+  background: rgba(6, 15, 34, 0.72) !important;
+  border: 1px solid rgba(56, 189, 248, 0.28) !important;
+  color: #cbd5e1 !important;
+  box-shadow: none !important;
+  opacity: 0.88;
 }
 
 .orb-head-pills {
@@ -2935,6 +2950,11 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 /* ================================================================
    STAGE LOCKS, PROGRESS TRACKER, DESIGN RISKS & DECISION CARDS
    ================================================================ */
+#stage-switcher .stage-btn.is-breadcrumb {
+  pointer-events: none;
+  cursor: default;
+}
+
 #stage-switcher .stage-btn.is-locked,
 #stage-switcher .stage-btn:disabled {
   opacity: 0.46;
@@ -2943,6 +2963,14 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   background: rgba(10, 18, 36, 0.65) !important;
   color: #94a3b8 !important;
   box-shadow: none !important;
+}
+
+#stage-switcher .stage-btn.is-breadcrumb.active {
+  opacity: 1 !important;
+  color: #fffbeb !important;
+  border-color: var(--amber) !important;
+  background: rgba(245, 158, 11, 0.24) !important;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.28) !important;
 }
 
 .btn-rollout.is-risk {
@@ -3220,7 +3248,7 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
    ================================================================ */
 #hazard-alert-hud,
 .hazard-alert-hud {
-  width: min(550px, calc(100vw - 360px));
+  width: clamp(320px, calc(100vw - 690px), 520px);
   padding: 13px 15px 14px;
   border-radius: 10px;
   border: 1.5px solid rgba(248, 113, 113, 0.78);
@@ -3875,6 +3903,8 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 #orbit-deploy-banner[hidden],
 #orbit-objectives-sidebar[hidden],
 #holo-scanner-card[hidden],
+#save-load-btn[hidden],
+#export-json-btn[hidden],
 #autobuild-btn[hidden],
 #hazard-alert-hud[hidden],
 #decision-alert-hud[hidden],

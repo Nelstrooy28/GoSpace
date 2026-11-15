@@ -200,12 +200,22 @@ export function renderHud(ev, stage, opts = {}) {
   document.querySelectorAll('#stage-switcher .stage-btn').forEach((b) => {
     const s = b.dataset.stage;
     const ok = Boolean(unlocked[s]);
-    b.disabled = !ok;
+    const isBreadcrumb = s !== 'hangar';
+    b.disabled = isBreadcrumb || !ok;
     b.classList.toggle('is-locked', !ok);
+    b.classList.toggle('is-breadcrumb', isBreadcrumb);
     b.classList.toggle('active', s === stage);
-    b.title = lockReasons[s] || '';
+    if (isBreadcrumb) b.setAttribute('tabindex', '-1');
+    else b.removeAttribute('tabindex');
+    b.title = isBreadcrumb
+      ? `${stageLabels[s]} (${ok ? 'Stage progress breadcrumb' : lockReasons[s] || 'Locked'})`
+      : lockReasons[s] || '';
     b.textContent = ok ? stageLabels[s] : `🔒 ${stageLabels[s]}`;
   });
+  const slBtn = document.getElementById('save-load-btn');
+  if (slBtn) slBtn.hidden = stage !== 'hangar';
+  const expBtn = document.getElementById('export-json-btn');
+  if (expBtn) expBtn.hidden = stage !== 'review';
 
   document.querySelectorAll('#cml-dots .cnode').forEach((el, idx) => {
     el.className = `cnode ${idx < cmlLevel ? (cmlLevel === 4 ? 'lit-max' : 'lit') : ''}`;
@@ -340,8 +350,11 @@ export function renderStageHud(stage, state, ev, opts) {
     if (risks.lowPowerMargin) riskMsgs.push('Eclipse Brownout Risk (2.5x drain)');
     if (risks.weakCommsMargin) riskMsgs.push('Packet Bottleneck (-50% downlink pts)');
     if (risks.wavelengthMismatch) riskMsgs.push('Wavelength Mismatch (-40% science)');
-    const testHazBtn = state.sandboxMode
-      ? '<button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Trigger Hazard</button>'
+    const testHazBtn = state.sandboxMode === true
+      ? '<button id="orb-test-hazard-btn" class="btn-sci" type="button">⚡ Trigger Hazard</button>'
+      : '';
+    const unfoldBtn = !opts.deployCompleted
+      ? '<button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Replay Zero-G Satellite Unfolding [U]">🛰️ Unfold Arrays [U]</button>'
       : '';
     const debOk = Boolean(opts.orbitObjectivesMet);
     const bufPkts = opts.onboardBuffer || 0;
@@ -365,7 +378,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.orbitWarp === 20 ? 'is-on' : ''}" data-warp="20" type="button">20x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
         ${testHazBtn}
-        <button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Replay Zero-G Satellite Unfolding [U]">🛰️ Replay Unfold [U]</button>
+        ${unfoldBtn}
         <button id="orb-sensorcam-btn" class="btn-sci ${opts.sensorCamOpen ? 'is-on' : ''}" type="button">📷 Sensor Cam [C]</button>
         <button id="hud-mission-guide-btn" class="btn-sci guide-pill" type="button">📋 Mission Guide</button>
         <button id="orb-debrief-btn" class="btn-sci ${debOk ? 'active' : ''}" type="button" ${debOk ? '' : 'disabled title="Complete Mission Objectives Sidebar tasks in Orbit to unlock Debrief"'}>${debOk ? '🏆 View Debrief' : '🔒 Debrief (Tasks)'}</button>
@@ -376,7 +389,7 @@ export function renderStageHud(stage, state, ev, opts) {
       </div>
       <div id="orbit-telem" class="telem-mono">Propagating Keplerian track...</div></div>`;
     actions.innerHTML = `<button id="orb-transmit-btn" class="action-prompt is-cyan" type="button" hidden>📡 [SPACE] TRANSMIT SCIENCE (+50)</button>
-      <button id="orb-scan-btn" class="action-prompt is-cyan is-standby" type="button">🔍 [E] SCAN SCIENCE ZONE (FLY INTO RING)</button>`;
+      <button id="orb-scan-btn" class="action-prompt is-status-pill" type="button" hidden>Next Scan Gate</button>`;
     return;
   }
   hud.innerHTML = ''; actions.innerHTML = '';
@@ -498,6 +511,7 @@ export function renderStageHud(stage, state, ev, opts) {
 
     <div class="debrief-footer-nav">
       <button id="rev-menu-btn" class="debrief-cta" type="button">🏠 BACK TO MENU</button>
+      <button id="rev-export-btn" class="debrief-cta" type="button">📥 EXPORT TRAJECTORY JSON</button>
       <button id="rev-next-btn" class="debrief-cta is-primary" type="button">▶ NEXT MISSION</button>
     </div>
   </div>`;
@@ -656,49 +670,58 @@ export function updateOrbitOverlay(t, objStatus = null) {
   }
   const tx = document.getElementById('orb-transmit-btn');
   if (tx) {
-    tx.hidden = destroyed || !t?.inLineOfSight;
     const dlPaused = (t?.commsPausedSec || 0) > 0;
+    const dlCooling = (t?.downlinkCooldownSec || 0) > 0 || Boolean(t?.stationPassCooldownActive);
+    const hasLinkLock = !destroyed && Boolean(t?.inLineOfSight);
+    const readyToTx = hasLinkLock && !t?.brownoutLocked && !dlPaused && !dlCooling && (bufPkts >= 1 || Boolean(t?.tutorialActive));
+    const showTxPill = readyToTx || (hasLinkLock && (bufPkts >= 1 || Boolean(t?.brownoutLocked) || dlPaused));
+    tx.hidden = !showTxPill;
     tx.disabled = Boolean(destroyed || t?.brownoutLocked || dlPaused);
-    tx.classList.remove('is-cooldown', 'is-standby');
+    tx.classList.remove('is-cooldown', 'is-standby', 'is-cyan', 'is-status-pill');
     if (t?.brownoutLocked) {
       tx.textContent = '🔋 BROWNOUT: RECHARGE TO 15% IN SUNLIGHT';
     } else if (dlPaused) {
       tx.textContent = `⏸️ DOWNLINK PAUSED (${t.commsPausedSec}s)`;
-    } else if ((t?.downlinkCooldownSec || 0) > 0 || t?.stationPassCooldownActive) {
-      tx.textContent = `⏳ DOWNLINK COOLDOWN (${t.downlinkCooldownSec || 1}s)`;
-      tx.classList.add('is-cooldown');
-    } else if (bufPkts < 1 && !t?.tutorialActive) {
-      tx.textContent = '📡 LINK LOCKED — CAPTURE SCIENCE [E] FIRST TO FILL BUFFER';
-      tx.classList.add('is-standby');
-    } else {
+    } else if (dlCooling) {
+      tx.textContent = `⏳ Downlink recharging (${t.downlinkCooldownSec || 1}s)`;
+      tx.classList.add('is-status-pill');
+    } else if (readyToTx) {
       let pts = 50;
       if (t?.designRisks?.weakCommsMargin) pts = Math.round(pts * 0.5);
       if (t?.designRisks?.wavelengthMismatch) pts = Math.round(pts * 0.6);
       if ((t?.omniReducedDownlinks || 0) > 0) pts = Math.round(pts * 0.7);
       const omniTag = (t?.omniReducedDownlinks || 0) > 0 ? ' · OMNI 70%' : '';
       const stLabel = t?.linkedStation || 'Ground Station';
+      tx.classList.add('is-cyan');
       tx.textContent = `📡 LINK LOCKED (${stLabel}) — PRESS [SPACE] TO DOWNLINK (${bufPkts} PKT · +${pts})${omniTag}`;
     }
   }
   const scanBtn = document.getElementById('orb-scan-btn');
   if (scanBtn) {
-    scanBtn.hidden = destroyed;
     scanBtn.disabled = destroyed;
-    scanBtn.classList.remove('is-swath-ready', 'is-cooldown', 'is-standby');
-    if (t?.swathReady) {
+    scanBtn.classList.remove('is-swath-ready', 'is-cooldown', 'is-standby', 'is-cyan', 'is-status-pill');
+    if (destroyed) {
+      scanBtn.hidden = true;
+    } else if (t?.swathReady) {
+      scanBtn.hidden = false;
       scanBtn.textContent = `🔬 IN SCAN GATE — PRESS [E] TO CAPTURE SCIENCE (+${t.swathZonePoints || 60})`;
       scanBtn.classList.add('is-swath-ready');
     } else if ((t?.swathCooldownSec || 0) > 0) {
-      scanBtn.textContent = `⏳ ${(t.swathZoneName || 'SCAN GATE').toUpperCase()} COOLDOWN (${t.swathCooldownSec}s)`;
-      scanBtn.classList.add('is-cooldown');
+      scanBtn.hidden = false;
+      scanBtn.textContent = `${t.swathZoneName || 'Scan Gate'} cooldown (${t.swathCooldownSec}s)`;
+      scanBtn.classList.add('is-status-pill');
     } else if (t?.nextZoneName) {
-      const degPart = typeof t.nextZoneDeg === 'number' && t.nextZoneDeg > 0 ? ` · ${t.nextZoneDeg}°` : '';
-      scanBtn.textContent = `🔍 NEXT SCAN GATE: ${t.nextZoneName}${degPart} (~${t.nextZoneEtaSec}s)`;
-      scanBtn.classList.add('is-standby');
+      scanBtn.hidden = false;
+      const degPart = typeof t.nextZoneDeg === 'number' && t.nextZoneDeg > 0 ? `${t.nextZoneDeg}°` : '~';
+      scanBtn.textContent = `Next Scan Gate: ${degPart} · ${t.nextZoneName}`;
+      scanBtn.classList.add('is-status-pill');
     } else {
-      scanBtn.textContent = '🔍 [E] CAPTURE SCIENCE (ENTER PULSING SCAN GATE)';
-      scanBtn.classList.add('is-standby');
+      scanBtn.hidden = true;
     }
+  }
+  const unfoldBtn = document.getElementById('orb-replay-unfold-btn');
+  if (unfoldBtn) {
+    unfoldBtn.hidden = destroyed || (!t?.deployActive && (t?.deployProgress || 0) >= 0.99);
   }
   const debBtn = document.getElementById('orb-debrief-btn');
   const dlDone = !destroyed && (objStatus ? Boolean(objStatus.canDebrief) : (t?.downlinkCount || 0) >= 1);
