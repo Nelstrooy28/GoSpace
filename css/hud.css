@@ -471,7 +471,7 @@ body.hud-collapsed #mel-drawer,
   align-items: center;
   gap: 0.57rem;
   width: 100%;
-  max-width: 34rem;
+  max-width: 46rem;
   pointer-events: none;
 }
 

@@ -33,6 +33,13 @@ export const SUB_TABS = {
   ground: [{ id: 'tx', label: 'Radio' }, { id: 'gs', label: 'Station' }]
 };
 
+// Hazard response risk tiers, keyed by the protocol's `tone`.
+const HAZARD_TONES = {
+  green: { label: 'Safe', icon: 'hull' },
+  amber: { label: 'Balanced', icon: 'power' },
+  red: { label: 'Risky', icon: 'science' }
+};
+
 const instMatchesBand = (i, bId) => i.band === bId || (i.extraBands || []).includes(bId);
 
 // Card states:
@@ -700,16 +707,20 @@ export function updateOrbitOverlay(t, objStatus = null) {
           <div class="hazard-bar-track"><div id="hazard-bar-fill" class="hazard-bar-fill" style="width:${haz.pct}%"></div></div>
           <div class="hazard-choices">
             ${(haz.choices || []).map((c) => {
-              const primaryBadge = c.badges && c.badges.length ? c.badges[0] : null;
-              const impactTag = c.lowBattWarn
-                ? `<span class="haz-badge is-bad">${svgIcon('battery')} ${esc(stripEmoji(c.lowBattText || 'LOW BATT'))}</span>`
-                : (primaryBadge ? `<span class="haz-badge is-${esc(primaryBadge.cls || 'warn')}">${esc(stripEmoji(primaryBadge.text))}</span>` : '');
-              return `<button class="hazard-choice-btn tone-${esc(c.tone || 'amber')}${c.lowBattWarn ? ' has-lowbatt' : ''}" data-choice-idx="${c.index}" type="button">
-                <div class="hazard-choice-top">
+              // Each response is a big tappable card: risk tier, full name, every effect.
+              const tone = HAZARD_TONES[c.tone] ? c.tone : 'amber';
+              const tier = HAZARD_TONES[tone];
+              const effects = (c.badges || []).map((b) => `<li class="haz-badge is-${esc(b.cls || 'warn')}">${esc(stripEmoji(b.text))}</li>`).join('');
+              const lowBatt = c.lowBattWarn
+                ? `<li class="haz-badge is-bad is-alert">${svgIcon('battery')}${esc(stripEmoji(c.lowBattText || 'LOW BATT'))}</li>`
+                : '';
+              return `<button class="hazard-choice-btn tone-${esc(tone)}${c.lowBattWarn ? ' has-lowbatt' : ''}" data-choice-idx="${c.index}" type="button" aria-label="${esc(`Option ${c.key}: ${stripEmoji(c.label)}. ${tier.label}.`)}">
+                <span class="hazard-choice-top">
                   <span class="hazard-keycap keycap">${esc(c.key)}</span>
-                  <span class="hazard-choice-label">${esc(stripEmoji(c.label))}</span>
-                </div>
-                ${impactTag ? `<div class="hazard-badges">${impactTag}</div>` : ''}
+                  <span class="hazard-tier">${svgIcon(tier.icon)}${tier.label}</span>
+                </span>
+                <span class="hazard-choice-label">${esc(stripEmoji(c.label))}</span>
+                <ul class="hazard-badges">${lowBatt}${effects}</ul>
               </button>`;
             }).join('')}
           </div>`;
