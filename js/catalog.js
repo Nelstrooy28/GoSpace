@@ -362,7 +362,9 @@ export function evaluateMissionDesign(state) {
     severity: state.sandboxMode || budgetOk ? 0 : Number(clampNum((usedM - budgetCap) / Math.max(1, budgetCap), 0.1, 2.5).toFixed(3)),
     debuffLabel: 'Over-Budget',
     orbitSideEffect: budgetOk ? 'Nominal' : 'In-Orbit Debuff: Score Bleed & -1 ★ Max Rating',
-    fixTab: 'Space / Launch / Ground'
+    fixTab: 'Pick cheaper parts in Craft, Launch or Comms',
+    fixSeg: 'space',
+    fixSub: 'bus'
   };
 
   const busCap = bus ? Number((bus.maxMassKg || (bus.massKg + (solar?.massKg || 0) + bus.payloadCapKg)).toFixed(1)) : Infinity;
@@ -393,7 +395,9 @@ export function evaluateMissionDesign(state) {
     severity: massOk ? 0 : Number(clampNum((totalMassKg - effectiveMassCap) / Math.max(1, effectiveMassCap), 0.1, 2.5).toFixed(3)),
     debuffLabel: 'Over-Mass',
     orbitSideEffect: massOk ? 'Nominal' : 'In-Orbit Debuff: Atmospheric Drag Hull Decay & Friction Sparks',
-    fixTab: effectiveMassCap === busCap ? 'Space -> Bus / Payload' : 'Launch -> Rocket'
+    fixTab: effectiveMassCap === busCap ? 'Craft → Bus or Payload' : 'Launch → Rocket',
+    fixSeg: effectiveMassCap === busCap ? 'space' : 'launch',
+    fixSub: effectiveMassCap === busCap ? 'bus' : 'veh'
   };
 
   const supplyW = avgGenW;
@@ -415,7 +419,9 @@ export function evaluateMissionDesign(state) {
     severity: powerOk ? 0 : Number(clampNum((demandW - supplyW) / Math.max(1, demandW), 0.10, 1.50).toFixed(3)),
     debuffLabel: 'Power Deficit',
     orbitSideEffect: powerOk ? 'Nominal' : 'In-Orbit Debuff: Battery Drain & Brownout Lockout',
-    fixTab: 'Space -> Solar / Prop & Thermal'
+    fixTab: 'Craft → Power or Thermal',
+    fixSeg: 'space',
+    fixSub: 'solar'
   };
 
   const realtimeBlocked = Boolean(lat?.id === 'realtime' && gs && !gs.realtimeCapable);
@@ -437,7 +443,9 @@ export function evaluateMissionDesign(state) {
     severity: dataOk ? 0 : Number(clampNum(Math.max((requiredMbps - downlinkMbps) / Math.max(0.5, requiredMbps), realtimeBlocked ? 0.45 : 0.15), 0.15, 1.50).toFixed(3)),
     debuffLabel: 'Data Bottleneck',
     orbitSideEffect: dataOk ? 'Nominal' : 'In-Orbit Debuff: Buffer Packet Loss & -50% Downlink Pts',
-    fixTab: 'Ground -> Transceiver & Station'
+    fixTab: 'Comms → Radio or Station',
+    fixSeg: 'ground',
+    fixSub: 'tx'
   };
 
   const targetYears = sc.minLifetimeYr ?? sc.minLifetime ?? 3;
@@ -458,7 +466,9 @@ export function evaluateMissionDesign(state) {
     severity: lifeOk ? 0 : Number(clampNum((targetYears - lifetimeYears) / Math.max(0.5, targetYears), 0.10, 1.25).toFixed(3)),
     debuffLabel: 'Low Shielding',
     orbitSideEffect: lifeOk ? 'Nominal' : 'In-Orbit Debuff: Radiation Hull Decay & +35% Hazard Damage',
-    fixTab: 'Space -> Bus / Solar / Thermal & Launch -> Orbit'
+    fixTab: 'Craft → Bus, Power or Thermal · Launch → Orbit',
+    fixSeg: 'space',
+    fixSub: 'bus'
   };
 
   const hasPayload = insts.length > 0;
@@ -490,7 +500,9 @@ export function evaluateMissionDesign(state) {
     severity: sciOk ? 0 : Number(clampNum((100 - Math.min(100, effectiveSciPct)) / 100 + (!wavelengthOk || !orbitOk ? 0.25 : 0), 0.20, 1.0).toFixed(3)),
     debuffLabel: 'Spectral Mismatch',
     orbitSideEffect: sciOk ? 'Nominal' : 'In-Orbit Debuff: -40% Scan Yield & Sensor Recalibration Drift',
-    fixTab: !hasPayload ? 'Space -> Payload' : (!wavelengthOk ? 'Objective -> Wavelength / Space -> Payload' : (!orbitOk ? 'Launch -> Orbit' : 'Space -> Payload'))
+    fixTab: !hasPayload ? 'Craft → Payload' : (!wavelengthOk ? 'Goal → Band · Craft → Payload' : (!orbitOk ? 'Launch → Orbit' : 'Craft → Payload')),
+    fixSeg: !hasPayload ? 'space' : (!wavelengthOk ? 'user' : (!orbitOk ? 'launch' : 'space')),
+    fixSub: !hasPayload ? 'inst' : (!wavelengthOk ? 'band' : (!orbitOk ? 'orbit' : 'inst'))
   };
 
   const constraints = {

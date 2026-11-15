@@ -44,18 +44,18 @@ function ensureDom() {
       <defs>
         <linearGradient id="tutArrowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stop-color="#38bdf8" />
-          <stop offset="100%" stop-color="#fbbf24" />
+          <stop offset="100%" stop-color="#a78bfa" />
         </linearGradient>
       </defs>
       <path id="tut-arrow-path" class="tut-arrow-path" d="" fill="none" stroke="url(#tutArrowGrad)" stroke-width="3" stroke-linecap="round" />
-      <polygon id="tut-arrow-head" class="tut-arrow-head" points="0,0 0,0 0,0" fill="#fbbf24" />
+      <polygon id="tut-arrow-head" class="tut-arrow-head" points="0,0 0,0 0,0" fill="#a78bfa" />
     </svg>
     <aside id="tut-coach-card" class="tut-card plate" role="dialog" aria-live="polite" aria-label="Flight Academy Coach">
       <div class="tut-card-head">
         <div class="tut-avatar-wrap">
           <svg class="tut-avatar" viewBox="0 0 44 44" aria-hidden="true">
             <circle cx="22" cy="22" r="19" fill="#0b1d3d" stroke="#38bdf8" stroke-width="2" />
-            <circle class="tut-visor-pulse" cx="22" cy="22" r="14" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 4" />
+            <circle class="tut-visor-pulse" cx="22" cy="22" r="14" fill="none" stroke="#5ee7ff" stroke-width="1.5" stroke-dasharray="5 4" />
             <rect x="12" y="15" width="20" height="11" rx="5" fill="#0284c7" stroke="#bae6fd" stroke-width="1.5" />
             <path d="M16 19 Q22 17 28 19" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" />
             <path d="M13 31 Q22 27 31 31" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" />

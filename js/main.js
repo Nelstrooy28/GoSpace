@@ -808,7 +808,23 @@ function init() {
       missionState[field] = id;
     }
     renderAll(true, FOCUS_MAP[field] || null);
-    if (btn.classList.contains('compat-bad')) playWarning(); else playEquip();
+    if (btn.classList.contains('compat-bad') || btn.classList.contains('is-off-target')) playWarning(); else playEquip();
+  });
+  // Clicking a red gauge jumps the loadout dock to the tab that fixes it.
+  document.getElementById('resource-gauges').addEventListener('click', (e) => {
+    const g = e.target.closest('.gm-item[data-fix-seg]');
+    if (!g || stage !== 'hangar' || !SUB_TABS[g.dataset.fixSeg]) return;
+    playHover();
+    activeSegment = g.dataset.fixSeg;
+    activeSub = SUB_TABS[activeSegment].some((t) => t.id === g.dataset.fixSub) ? g.dataset.fixSub : SUB_TABS[activeSegment][0].id;
+    renderAll(false);
+  });
+  document.getElementById('resource-gauges').addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.gm-item[data-fix-seg]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.target.closest('.gm-item').click();
+    }
   });
 
   const tip = document.getElementById('game-tooltip');

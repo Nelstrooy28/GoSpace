@@ -35,57 +35,69 @@ export const SUB_TABS = {
 
 const instMatchesBand = (i, bId) => i.band === bId || (i.extraBands || []).includes(bId);
 
-const cardHtml = ({ field, id, name, pills, selected, ok = true, multi = false, tip = '' }) => `
-  <button class="equip-card ${selected ? 'selected' : ''} ${ok ? '' : 'compat-bad'}" type="button"
+// Card states:
+//  - target: the contract's intended pick (green TARGET tag)
+//  - soft:   a valid choice that just isn't this contract's target. It stays
+//            neutral unless equipped, so the list isn't a wall of red "!".
+//  - ok=false (hard): a real compatibility error (red rim + "!").
+const cardHtml = ({ field, id, name, pills, selected, ok = true, soft = false, target = false, multi = false, tip = '' }) => {
+  const hardBad = !ok && !soft;
+  const softOff = !ok && soft;
+  const stateClass = [
+    selected ? 'selected' : '',
+    hardBad || (softOff && selected) ? 'compat-bad' : '',
+    target ? 'is-target' : '',
+    softOff && !selected ? 'is-off-target' : ''
+  ].filter(Boolean).join(' ');
+  let badge;
+  if (selected) badge = `<span class="equip-check-badge" title="Equipped" aria-label="Equipped">${svgIcon('check')}</span>`;
+  else if (target) badge = '<span class="spill ok equip-target-tag" title="Best pick for this contract">TARGET</span>';
+  else if (hardBad) badge = '<span class="spill bad" title="Not compatible with your current build">!</span>';
+  else badge = `<span class="spill ${softOff ? '' : 'ok'}">+</span>`;
+  return `
+  <button class="equip-card ${stateClass}" type="button"
     data-field="${field}" data-id="${id}" data-multi="${multi ? '1' : '0'}" data-tip="${esc(tip)}">
     <div class="equip-head equip-row-top">
       <span class="equip-name" title="${esc(name)}">${esc(name)}</span>
-      ${selected
-        ? `<span class="equip-check-badge" title="Equipped" aria-label="Equipped">${svgIcon('check')}</span>`
-        : `<span class="spill ${ok ? 'ok' : 'bad'}">${ok ? '+' : '!'}</span>`}
+      ${badge}
     </div>
     <div class="stat-pills equip-row-stats">${pills.slice(0, 3).map((p) => `<span class="spill">${esc(p)}</span>`).join('')}</div>
   </button>`;
+};
 
 const CONTRACT_ART = {
   'wildfiresat-l1': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
-    <path d="M-10 74 Q55 38 120 74 L120 105 L-10 105 Z" fill="#141821" stroke="#f59e0b" stroke-width="1.2"/>
-    <circle cx="42" cy="70" r="8" fill="#f59e0b" fill-opacity="0.25"/><circle cx="42" cy="70" r="3" fill="#fbbf24"/>
+    <path d="M-10 74 Q55 38 120 74 L120 105 L-10 105 Z" fill="#14204a" stroke="#5ee7ff" stroke-width="1.2"/>
+    <circle cx="42" cy="70" r="8" fill="#fbbf24" fill-opacity="0.25"/><circle cx="42" cy="70" r="3" fill="#fbbf24"/>
     <circle cx="71" cy="76" r="6" fill="#ef4444" fill-opacity="0.3"/><circle cx="71" cy="76" r="2.5" fill="#fbbf24"/>
     <path d="M10 34 Q56 14 100 38" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="4 3"/>
     <rect x="52" y="19" width="10" height="6" rx="1" fill="#fbbf24"/>
   </svg>`,
   'aurora-l1': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
     <path d="M10 34 Q36 16 58 32 T100 26" fill="none" stroke="#10b981" stroke-width="3" stroke-opacity="0.65" stroke-linecap="round"/>
-    <circle cx="55" cy="76" r="32" fill="#141821" stroke="#f59e0b" stroke-width="1.1"/>
+    <circle cx="55" cy="76" r="32" fill="#14204a" stroke="#5ee7ff" stroke-width="1.1"/>
     <path d="M26 52 Q55 24 84 52" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="3 3"/>
     <rect x="50" y="21" width="10" height="6" rx="1" fill="#10b981"/>
   </svg>`,
   'ocean-l2': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
     <circle cx="55" cy="52" r="28" fill="#111827" stroke="#38bdf8" stroke-width="1.2"/>
     <ellipse cx="55" cy="52" rx="15" ry="39" transform="rotate(14 55 52)" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="4 3"/>
-    <rect x="54" y="10" width="10" height="6" rx="1" fill="#f3f4f6" stroke="#f59e0b" stroke-width="0.8"/>
+    <rect x="54" y="10" width="10" height="6" rx="1" fill="#f3f4f6" stroke="#5ee7ff" stroke-width="0.8"/>
   </svg>`,
   'monsoon-l2': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
-    <circle cx="55" cy="58" r="27" fill="#141821" stroke="#f59e0b" stroke-width="1.2"/>
+    <circle cx="55" cy="58" r="27" fill="#14204a" stroke="#5ee7ff" stroke-width="1.2"/>
     <path d="M40 58 Q55 42 70 58 Q55 72 40 58 Z" fill="none" stroke="#d1d5db" stroke-width="1.8"/>
-    <rect x="47" y="12" width="18" height="5" rx="1" fill="#f59e0b"/>
+    <rect x="47" y="12" width="18" height="5" rx="1" fill="#fbbf24"/>
   </svg>`,
   'lunar-l3': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
     <circle cx="55" cy="50" r="27" fill="#272d38" stroke="#9ca3af" stroke-width="1"/>
     <ellipse cx="55" cy="73" rx="11" ry="4.5" fill="#111827" stroke="#38bdf8" stroke-width="1.2"/>
     <path d="M14 78 Q38 14 96 34" fill="none" stroke="#fbbf24" stroke-width="1.3" stroke-dasharray="4 3"/>
     <circle cx="84" cy="27" r="3" fill="#fbbf24"/>
   </svg>`,
   'asteroid-l3': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
     <polygon points="40,36 62,28 80,44 74,66 50,74 30,58" fill="#374151" stroke="#d1d5db" stroke-width="1.1"/>
-    <path d="M14 76 Q46 18 96 30" fill="none" stroke="#f59e0b" stroke-width="1.3" stroke-dasharray="4 3"/>
+    <path d="M14 76 Q46 18 96 30" fill="none" stroke="#5ee7ff" stroke-width="1.3" stroke-dasharray="4 3"/>
     <rect x="26" y="33" width="9" height="6" rx="1" fill="#fbbf24"/>
   </svg>`
 };
@@ -121,14 +133,18 @@ export function renderTitleOverlay(sandboxMode, activeScenarioId, progressMap = 
     const budBadge = sandboxMode
       ? '<span class="spill ok">INF</span>'
       : `<span class="spill ok">$${s.budgetLimitM}M</span>`;
+    // Mission-patch card: art sits in a glowing porthole whose ring colour
+    // tracks difficulty (tier 1 plasma, 2 nebula, 3 solar).
     return `
-    <div class="contract-card ${selected ? 'selected' : ''}" data-start-scenario="${s.id}" role="button" tabindex="0">
-      <div class="contract-art">${CONTRACT_ART[s.id] || ''}</div>
-      <div class="contract-body">
-        <div class="contract-top">
+    <div class="contract-card tier-${diffStars} ${selected ? 'selected' : ''}" data-start-scenario="${s.id}" role="button" tabindex="0" aria-label="${esc(`${m.title}: ${m.obj}`)}">
+      <div class="contract-head">
+        <div class="contract-porthole"><div class="contract-art">${CONTRACT_ART[s.id] || ''}</div></div>
+        <div class="contract-head-meta">
           <span class="contract-stars" aria-label="Difficulty ${diffStars} of 3">${svgStars(diffStars, 3)}</span>
           ${statusBadge}
         </div>
+      </div>
+      <div class="contract-body">
         <h3 class="contract-title">${esc(m.title)}</h3>
         <p class="contract-obj">${esc(m.obj)}</p>
         <div class="contract-footer">
@@ -137,7 +153,7 @@ export function renderTitleOverlay(sandboxMode, activeScenarioId, progressMap = 
             ${budBadge}
             <span class="spill">${s.minLifetimeYr}YR</span>
           </div>
-          <span class="btn-sci contract-cta ${selected ? 'active' : ''}">DEPLOY</span>
+          <span class="btn-sci contract-cta ${selected ? 'is-primary' : ''}">${svgIcon('rocket')}Launch</span>
         </div>
       </div>
     </div>`;
@@ -154,16 +170,16 @@ export function renderLoadoutDock(segment, subGroup, state, evaluation) {
   }).join('');
 
   let cards = [];
-  if (activeSub === 'obj') cards = CATALOG.user.objectives.map((o) => cardHtml({ field: 'userObjective', id: o.id, name: o.name, selected: state.userObjective === o.id, ok: o.id === sc.targetObjective, pills: [o.band.toUpperCase()], tip: o.tip }));
-  else if (activeSub === 'band') cards = CATALOG.user.wavelengths.map((w) => cardHtml({ field: 'wavelengthBand', id: w.id, name: w.name, selected: state.wavelengthBand === w.id, ok: w.id === sc.targetBand, pills: [w.id === sc.targetBand ? 'TARGET' : 'ALT'], tip: w.tip }));
-  else if (activeSub === 'lat') cards = CATALOG.user.latencies.map((l) => cardHtml({ field: 'latencyTier', id: l.id, name: l.name, selected: state.latencyTier === l.id, ok: l.id === sc.targetLatency, pills: [l.id === sc.targetLatency ? 'OPTIMAL' : 'TRADE'], tip: l.tip }));
+  if (activeSub === 'obj') cards = CATALOG.user.objectives.map((o) => cardHtml({ field: 'userObjective', id: o.id, name: o.name, selected: state.userObjective === o.id, ok: o.id === sc.targetObjective, soft: true, target: o.id === sc.targetObjective, pills: [o.band.toUpperCase()], tip: o.tip }));
+  else if (activeSub === 'band') cards = CATALOG.user.wavelengths.map((w) => cardHtml({ field: 'wavelengthBand', id: w.id, name: w.name, selected: state.wavelengthBand === w.id, ok: w.id === sc.targetBand, soft: true, target: w.id === sc.targetBand, pills: [w.id === sc.targetBand ? 'TARGET' : 'ALT'], tip: w.tip }));
+  else if (activeSub === 'lat') cards = CATALOG.user.latencies.map((l) => cardHtml({ field: 'latencyTier', id: l.id, name: l.name, selected: state.latencyTier === l.id, ok: l.id === sc.targetLatency, soft: true, target: l.id === sc.targetLatency, pills: [l.id === sc.targetLatency ? 'OPTIMAL' : 'TRADE'], tip: l.tip }));
   else if (activeSub === 'bus') cards = CATALOG.space.buses.map((b) => cardHtml({ field: 'busId', id: b.id, name: b.name, selected: state.busId === b.id, ok: true, pills: [`$${b.costM}M`, `${b.payloadSlots} SLOT`, `${b.payloadCapKg}kg`], tip: b.tip }));
   else if (activeSub === 'inst') cards = CATALOG.space.instruments.map((i) => cardHtml({ field: 'instrumentIds', id: i.id, name: i.name, multi: true, selected: state.instrumentIds.includes(i.id), ok: instMatchesBand(i, state.wavelengthBand) && (!bus || i.classes.includes(bus.busClass)), pills: [`$${i.costM}M`, `${i.massKg}kg`, `${i.powerW}W`], tip: `${i.tip} (+${i.sci} Sci)` }));
   else if (activeSub === 'solar') cards = CATALOG.space.solarArrays.map((s) => cardHtml({ field: 'solarId', id: s.id, name: s.name, selected: state.solarId === s.id, ok: true, pills: [`$${s.costM}M`, `+${s.genW}W`, s.zeroEclipseLoss ? 'RTG' : `${s.massKg}kg`], tip: s.tip }));
   else if (activeSub === 'therm') cards = CATALOG.space.thermalAdcs.map((t) => cardHtml({ field: 'thermalId', id: t.id, name: t.name, selected: state.thermalId === t.id, ok: (state.wavelengthBand !== 'cryo-ir' || t.cryoCapable) && (!sc.requiresIon || t.ionDrive), pills: [`$${t.costM}M`, `${t.powerW}W`, t.ionDrive ? 'ION' : (t.cryoCapable ? 'CRYO' : `+${t.lifeBonus}yr`)], tip: t.tip }));
   else if (activeSub === 'skin') cards = CATALOG.space.hullSkins.map((k) => cardHtml({ field: 'hullSkinId', id: k.id, name: k.name, selected: (state.hullSkinId || 'gold-kapton') === k.id, ok: true, pills: ['FREE', k.colorHex.toUpperCase()], tip: k.tip }));
   else if (activeSub === 'veh') cards = CATALOG.launch.vehicles.map((v) => cardHtml({ field: 'vehicleId', id: v.id, name: v.name, selected: state.vehicleId === v.id, ok: true, pills: [`$${v.costM}M`, `${v.maxPayloadKg}kg`, v.deepSpaceCapable ? 'DEEP' : 'LEO'], tip: v.tip }));
-  else if (activeSub === 'orbit') cards = CATALOG.launch.orbits.map((o) => cardHtml({ field: 'orbitId', id: o.id, name: o.name, selected: state.orbitId === o.id, ok: o.id === sc.targetOrbit, pills: [`e=${o.e}`, `${o.iDeg}°`, o.deepSpace ? 'DEEP' : 'LEO'], tip: o.tip }));
+  else if (activeSub === 'orbit') cards = CATALOG.launch.orbits.map((o) => cardHtml({ field: 'orbitId', id: o.id, name: o.name, selected: state.orbitId === o.id, ok: o.id === sc.targetOrbit, soft: true, target: o.id === sc.targetOrbit, pills: [`e=${o.e}`, `${o.iDeg}°`, o.deepSpace ? 'DEEP' : 'LEO'], tip: o.tip }));
   else if (activeSub === 'tx') cards = CATALOG.ground.transceivers.map((t) => cardHtml({ field: 'transceiverId', id: t.id, name: t.name, selected: state.transceiverId === t.id, ok: true, pills: [`$${t.costM}M`, `${t.mbps}Mb`, t.deepSpace ? 'DEEP' : `${t.massKg}kg`], tip: t.tip }));
   else cards = CATALOG.ground.stations.map((g) => cardHtml({ field: 'stationId', id: g.id, name: g.name, selected: state.stationId === g.id, ok: true, pills: [`$${g.costM}M`, `${g.passMinDay}m/d`, g.deepSpace ? 'DSN' : 'POLAR'], tip: g.tip }));
 
@@ -192,8 +208,20 @@ function getGaugeRows(ev) {
     warn: Boolean(item.ok && item.warnNearCap),
     reason: item.limitReason,
     orbitSideEffect: item.orbitSideEffect,
-    fixTab: item.fixTab
+    fixTab: item.fixTab,
+    fixSeg: item.fixSeg,
+    fixSub: item.fixSub
   }));
+}
+
+// Short names for launch-button risk summary, keyed by warning segment.
+const RISK_SEGMENT_LABEL = { Cost: 'Budget', Space: 'Craft', Launch: 'Launch', Ground: 'Comms', User: 'Goal', System: 'Parts' };
+
+function summarizeRisks(ev) {
+  const failing = getGaugeRows(ev).filter((g) => !g.ok).map((g) => g.key);
+  if (failing.length) return failing;
+  // No red gauge, but rule warnings remain (band, orbit, cryo, ...): name their tabs.
+  return [...new Set((ev.warnings || []).map((w) => RISK_SEGMENT_LABEL[w.segment] || w.segment))];
 }
 
 export function renderHud(ev, stage, opts = {}) {
@@ -251,10 +279,12 @@ export function renderHud(ev, stage, opts = {}) {
     const toneClass = g.ok ? (g.warn ? 'warn' : 'ok') : 'bad';
     const itemTone = g.ok ? (g.warn ? 'is-near-cap' : 'is-nominal') : 'is-violation';
     const valClass = [g.isInf ? 'is-inf' : '', g.ok ? 'is-ok' : 'is-bad'].filter(Boolean).join(' ');
+    const canJump = !g.ok && stage === 'hangar' && g.fixSeg;
     const sideHtml = !g.ok
-      ? `<div class="gm-tip-debuff">${esc(g.orbitSideEffect)}</div><div class="gm-tip-fix">Fix: ${esc(g.fixTab)}</div>`
+      ? `<div class="gm-tip-debuff">${esc(g.orbitSideEffect)}</div><div class="gm-tip-fix">Fix: ${esc(g.fixTab)}</div>${canJump ? '<div class="gm-tip-jump">Click to open that tab</div>' : ''}`
       : `<div class="gm-tip-ok">Nominal</div>`;
-    return `<div class="gm-item ${itemTone}" tabindex="0" data-constraint="${g.key}" aria-label="${esc(`${g.title} ${g.val}: ${g.reason}`)}">
+    const jumpAttrs = canJump ? ` data-fix-seg="${esc(g.fixSeg)}" data-fix-sub="${esc(g.fixSub || '')}" role="button"` : '';
+    return `<div class="gm-item ${itemTone}${canJump ? ' is-jump' : ''}" tabindex="0" data-constraint="${g.key}"${jumpAttrs} aria-label="${esc(`${g.title} ${g.val}: ${g.reason}${canJump ? `. Fix: ${g.fixTab}` : ''}`)}">
       <div class="gm-top"><span>${svgIcon(g.icon)}${g.key}</span><b class="${valClass}">${esc(g.val)}</b></div>
       <div class="gm-bar"><div class="gm-fill ${toneClass}" style="width:${g.pct}%"></div></div>
       <div class="gm-tooltip" role="tooltip">
@@ -276,7 +306,15 @@ export function renderHud(ev, stage, opts = {}) {
   cta.classList.toggle('is-risk', stage === 'hangar' && hasRisks);
   if (stage === 'hangar') {
     cta.disabled = !allPopulated;
-    cta.innerHTML = !allPopulated ? `${svgIcon('lock')}Equip Parts` : (hasRisks ? `${svgIcon('warning')}Launch Risks` : `${svgIcon('rocket')}Roll Out`);
+    if (!allPopulated) {
+      cta.innerHTML = `${svgIcon('lock')}Equip Parts`;
+    } else if (hasRisks) {
+      const risks = summarizeRisks(ev);
+      const n = risks.length;
+      cta.innerHTML = `${svgIcon('warning')}<span class="cta-stack"><span class="cta-main">Launch Anyway</span><span class="cta-sub">${n} issue${n === 1 ? '' : 's'}: ${esc(risks.slice(0, 3).join(' · '))}${n > 3 ? ' …' : ''}</span></span>`;
+    } else {
+      cta.innerHTML = `${svgIcon('rocket')}Roll Out`;
+    }
     cta.title = !allPopulated ? 'Equip all 4 mission segments' : (hasRisks ? warnings.map((w) => w.text).join(' | ') : 'Roll out to launchpad');
   } else if (stage === 'launch') {
     const readyOrbit = Boolean(unlocked.orbit);

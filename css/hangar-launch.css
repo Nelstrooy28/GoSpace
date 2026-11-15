@@ -1,8 +1,8 @@
 /* GoSpace — Stage 01 Hangar Loadout, Stage 02 Launchpad & Parts Manifest (fluid rem) */
 
 .hangar-loadout {
-  width: 19.5rem;
-  max-width: min(20.5rem, 32vw);
+  width: max(23rem, 340px);
+  max-width: min(26rem, 36vw);
   max-height: 100%;
   min-height: 0;
   padding: 0.58rem;
@@ -38,7 +38,6 @@
 
 #hangar-loadout .btn-autobuild,
 #hangar-loadout .btn-sci {
-  --cut: 0.36rem;
   height: 1.75rem;
   min-height: 0;
   padding: 0 0.55rem 0 0.65rem;
@@ -67,7 +66,6 @@
 }
 
 #hangar-loadout .seg-tab {
-  --cut: 0.34rem;
   height: 1.9rem;
   min-height: 0;
   padding: 0 0.22rem 0 0.32rem;
@@ -84,20 +82,29 @@
   height: 0.88rem;
 }
 
+/* Sub-tabs always sit on one row: chips share the width and shrink
+   instead of wrapping a lone chip (e.g. "Hull") onto a second line. */
 .sub-pills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.29rem;
+  min-width: 0;
 }
 
 #hangar-loadout .sub-chip {
-  --cut: 0.3rem;
-  height: 1.62rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1.75rem;
   min-height: 0;
-  padding: 0 0.5rem 0 0.58rem;
-  font-family: var(--font-mono);
+  padding: 0 0.32rem 0 0.4rem;
+  font-family: var(--font-ui);
   font-size: var(--fs-xs);
+  font-weight: 700;
   color: var(--text-dim);
+}
+
+#hangar-loadout .sub-chip.active {
+  color: var(--accent-bright);
 }
 
 .equipment-strip {
@@ -112,7 +119,6 @@
 }
 
 #hangar-loadout .equip-card {
-  --cut: 0.44rem;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -136,6 +142,31 @@
   --fill: linear-gradient(180deg, rgba(239, 68, 68, 0.20) 0%, rgba(239, 68, 68, 0.08) 100%), var(--graphite);
   --rim: var(--rim-crimson);
   --bar: var(--status-bad);
+}
+
+/* Contract's intended pick: green edge + TARGET tag */
+#hangar-loadout .equip-card.is-target:not(.selected) {
+  --rim: var(--rim-emerald);
+  --bar: var(--status-good);
+}
+
+/* Valid but off-contract choice: calm, slightly dimmed, no red */
+#hangar-loadout .equip-card.is-off-target {
+  --bar: rgba(156, 163, 175, 0.35);
+}
+
+#hangar-loadout .equip-card.is-off-target .equip-name {
+  color: var(--text-dim);
+}
+
+#hangar-loadout .equip-card.is-off-target:not(:disabled):hover .equip-name {
+  color: var(--text-main);
+}
+
+.equip-target-tag {
+  flex-shrink: 0;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .equip-row-top {
@@ -169,7 +200,7 @@
   font-weight: 700;
   color: var(--ink);
   background: var(--accent-bright);
-  clip-path: polygon(0.2rem 0, 100% 0, 100% calc(100% - 0.2rem), calc(100% - 0.2rem) 100%, 0 100%, 0 0.2rem);
+  border-radius: var(--r-sm);
   flex-shrink: 0;
 }
 
@@ -191,7 +222,6 @@
 }
 
 .cam-pill-card .btn-sci {
-  --cut: 0.36rem;
   height: 1.9rem;
   min-height: 0;
   padding: 0 0.64rem 0 0.72rem;
@@ -204,7 +234,7 @@
    STAGE 02 LAUNCHPAD / ASCENT TELEMETRY
    ------------------------------------------------------------------ */
 .ascent-card {
-  width: 18.2rem;
+  width: max(21.5rem, 320px);
   max-width: calc(100vw - 1.4rem);
   padding: 0.64rem 0.72rem;
   display: flex;
@@ -226,15 +256,23 @@
   white-space: nowrap;
 }
 
+/* Long phase names (e.g. VACUUM ORBIT INSERTION) drop to a second row
+   instead of pushing the Skip button out of the card. */
+.ascent-card .card-head {
+  flex-wrap: wrap;
+  row-gap: 0.36rem;
+}
+
 .ascent-head-right {
   display: flex;
   align-items: center;
   gap: 0.36rem;
   flex-shrink: 0;
+  margin-left: auto;
+  max-width: 100%;
 }
 
 .skip-launch-btn {
-  --cut: 0.3rem;
   height: 1.62rem;
   min-height: 0;
   padding: 0 0.52rem 0 0.58rem !important;
@@ -257,6 +295,7 @@
   padding: 0.29rem 0.5rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
   display: flex;
   flex-direction: column;
   gap: 0.07rem;
@@ -302,6 +341,7 @@
   padding: 0.29rem 0.5rem;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -325,7 +365,6 @@
 }
 
 .ascent-cam-row .btn-sci {
-  --cut: 0.3rem;
   height: 1.72rem;
   min-height: 0;
   padding: 0 0.2rem;
@@ -334,7 +373,6 @@
 }
 
 #center-action-hud #lch-ignite-btn.action-prompt.is-ignite {
-  --cut: 0.6rem;
   height: 2.85rem;
   padding: 0 1.45rem 0 1.55rem;
   font-family: var(--font-ui);
@@ -342,7 +380,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   margin-bottom: 0.72rem;
-  box-shadow: 0 0 1.7rem rgba(245, 158, 11, 0.38);
+  box-shadow: 0 0 1.7rem rgba(94, 231, 255, 0.38);
 }
 
 /* ------------------------------------------------------------------

@@ -8,12 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%230c0e12' stroke='%23f59e0b' stroke-width='2'/><text x='16' y='21' font-size='13' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%23fbbf24'>GS</text></svg>" />
-  <link rel="stylesheet" href="./css/base.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/hud.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/menu-tutorial.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/hangar-launch.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/orbit.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/modals-debrief.css?v=20261115_rem_chamfer" />
+  <link rel="stylesheet" href="./css/base.css?v=20261115_space_holo" />
+  <link rel="stylesheet" href="./css/hud.css?v=20261115_space_holo" />
+  <link rel="stylesheet" href="./css/menu-tutorial.css?v=20261115_space_holo" />
+  <link rel="stylesheet" href="./css/hangar-launch.css?v=20261115_space_holo" />
+  <link rel="stylesheet" href="./css/orbit.css?v=20261115_space_holo" />
+  <link rel="stylesheet" href="./css/modals-debrief.css?v=20261115_space_holo" />
   <script type="importmap">
     {
       "imports": {
@@ -31,8 +31,18 @@
   <button id="hud-restore-btn" class="hud-restore btn-sci" type="button" hidden><i data-gi="hud"></i>HUD <span class="keycap">H</span></button>
 
   <section id="title-overlay" class="title-overlay" aria-label="Main Menu">
+    <!-- Deep-space backdrop: parallax star layers, nebula glow, orbit rings, shooting star -->
+    <div class="title-sky" aria-hidden="true">
+      <div class="sky-nebula"></div>
+      <div class="sky-stars sky-stars-far"></div>
+      <div class="sky-stars sky-stars-near"></div>
+      <div class="sky-ring sky-ring-a"></div>
+      <div class="sky-ring sky-ring-b"></div>
+      <div class="sky-comet"></div>
+    </div>
+
     <div class="title-topbar">
-      <div class="title-version badge-tag">MDL-X // v3.0</div>
+      <div class="title-version badge-tag"><span class="beacon-dot" aria-hidden="true"></span>MDL-X // v3.0</div>
       <div class="title-audio-group">
         <button id="title-music-btn" class="btn-sci title-audio-btn" type="button" title="Toggle Music">
           <i data-gi="music-on" class="when-on"></i><i data-gi="music-off" class="when-off"></i>
@@ -47,45 +57,86 @@
 
     <div class="title-stage">
       <div class="hero-col">
-        <div class="emblem-row">
-          <svg class="orbit-emblem" viewBox="0 0 72 72" aria-hidden="true">
-            <circle cx="36" cy="36" r="9" fill="#14171e" stroke="#f59e0b" stroke-width="2" />
-            <ellipse class="ring-a" cx="36" cy="36" rx="28" ry="11" fill="none" stroke="#f59e0b" stroke-width="1.8" transform="rotate(-24 36 36)" />
-            <ellipse class="ring-b" cx="36" cy="36" rx="28" ry="11" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="5 4" transform="rotate(32 36 36)" />
-            <circle class="sat-dot" cx="60" cy="25" r="3.2" fill="#fbbf24" />
+        <div class="hero-head">
+          <!-- Animated mission emblem: gas-giant planet, tilted rings, orbiting satellite -->
+          <svg class="orbit-emblem" viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+              <radialGradient id="embPlanet" cx="38%" cy="32%" r="70%">
+                <stop offset="0%" stop-color="#e0fbff" />
+                <stop offset="28%" stop-color="#5ee7ff" />
+                <stop offset="62%" stop-color="#4f46e5" />
+                <stop offset="100%" stop-color="#1e1b4b" />
+              </radialGradient>
+              <linearGradient id="embRing" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#5ee7ff" stop-opacity="0.15" />
+                <stop offset="50%" stop-color="#b9f6ff" stop-opacity="0.95" />
+                <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.2" />
+              </linearGradient>
+              <radialGradient id="embGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#5ee7ff" stop-opacity="0.45" />
+                <stop offset="100%" stop-color="#5ee7ff" stop-opacity="0" />
+              </radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="58" fill="url(#embGlow)" />
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#5ee7ff" stroke-opacity="0.22" stroke-dasharray="1.5 5" />
+            <path d="M16 70 A46 16 -14 0 1 104 50" fill="none" stroke="url(#embRing)" stroke-width="3" stroke-linecap="round" opacity="0.55" />
+            <circle cx="60" cy="60" r="21" fill="url(#embPlanet)" />
+            <path d="M42 54 Q60 49 78 54" fill="none" stroke="#e0fbff" stroke-opacity="0.35" stroke-width="1.6" />
+            <path d="M40.5 63 Q60 68 79.5 63" fill="none" stroke="#1e1b4b" stroke-opacity="0.45" stroke-width="2" />
+            <path d="M104 50 A46 16 -14 0 1 16 70" fill="none" stroke="url(#embRing)" stroke-width="3" stroke-linecap="round" />
+            <g class="emb-sat">
+              <g transform="translate(60 8)">
+                <rect x="-2.6" y="-2.6" width="5.2" height="5.2" rx="1" fill="#e0fbff" />
+                <rect x="-11" y="-1.6" width="7" height="3.2" rx="0.6" fill="#5ee7ff" />
+                <rect x="4" y="-1.6" width="7" height="3.2" rx="0.6" fill="#5ee7ff" />
+              </g>
+            </g>
+            <circle class="emb-star s1" cx="18" cy="24" r="1.6" fill="#ffffff" />
+            <circle class="emb-star s2" cx="101" cy="92" r="1.3" fill="#b9f6ff" />
+            <circle class="emb-star s3" cx="96" cy="20" r="1.1" fill="#c4b5fd" />
           </svg>
-          <span class="title-eyebrow">ORBITAL MISSION SIMULATOR</span>
+          <div class="hero-titles">
+            <span class="title-eyebrow">ORBITAL MISSION SIMULATOR</span>
+            <h1 class="game-logo" aria-label="GoSpace"><span class="logo-go">GO</span><span class="logo-space">SPACE</span></h1>
+            <p class="title-sub">ARCHITECT <span class="sub-dot" aria-hidden="true"></span> LAUNCH <span class="sub-dot" aria-hidden="true"></span> COMMAND</p>
+          </div>
         </div>
 
-        <h1 class="game-logo">GOSPACE</h1>
-        <p class="title-sub">ARCHITECT &bull; LAUNCH &bull; COMMAND</p>
-
-        <div class="hero-actions">
+        <nav class="hero-actions" aria-label="Game modes">
           <button id="mode-campaign-btn" class="menu-btn is-primary active" type="button">
             <span class="menu-idx"><i data-gi="rocket"></i></span>
-            <span class="menu-copy"><strong>Campaign</strong><small>Launch active contract within real limits</small></span>
+            <span class="menu-copy"><strong>Campaign</strong><small>Fly real contracts with real limits</small></span>
+            <i data-gi="chevron-right" class="menu-go"></i>
           </button>
           <button id="mode-sandbox-btn" class="menu-btn is-sandbox" type="button">
             <span class="menu-idx"><i data-gi="autobuild"></i></span>
             <span class="menu-copy"><strong>Sandbox</strong><small>Unlimited budget &amp; launch mass</small></span>
+            <i data-gi="chevron-right" class="menu-go"></i>
           </button>
           <button id="how-to-play-btn" class="menu-btn" type="button">
             <span class="menu-idx"><i data-gi="help"></i></span>
             <span class="menu-copy"><strong>Tutorial</strong><small>7-step interactive flight academy</small></span>
+            <i data-gi="chevron-right" class="menu-go"></i>
           </button>
-        </div>
+        </nav>
+
+        <ul class="hero-stats" aria-label="Game at a glance">
+          <li><i data-gi="goal"></i><b>6</b><span>Contracts</span></li>
+          <li><i data-gi="spacecraft"></i><b>45+</b><span>Parts</span></li>
+          <li><i data-gi="orbit"></i><b>4</b><span>Stages</span></li>
+        </ul>
       </div>
 
-      <div class="contract-col">
+      <div class="contract-col plate">
         <div class="contract-col-head">
-          <span class="contract-col-title">CONTRACTS</span>
+          <span class="contract-col-title">MISSION BOARD</span>
           <span id="title-mode-pill" class="badge-tag">SIMULATION</span>
         </div>
         <div id="contract-grid" class="contract-grid"></div>
       </div>
     </div>
 
-    <div class="title-ticker plate">
+    <div class="title-ticker">
       <span class="ticker-dot" aria-hidden="true"></span>
       <span>SYS READY // KEPLERIAN 60 FPS</span>
     </div>
@@ -120,16 +171,16 @@
       </div>
 
       <div class="topbar-utils">
-        <button id="music-toggle-btn" class="btn-sci icon-toggle audio-toggle-btn" type="button" title="Toggle Music" aria-label="Toggle Music">
-          <i data-gi="music-on" class="when-on"></i><i data-gi="music-off" class="when-off"></i>
+        <button id="music-toggle-btn" class="btn-sci icon-toggle has-lbl audio-toggle-btn" type="button" title="Toggle Music" aria-label="Toggle Music">
+          <i data-gi="music-on" class="when-on"></i><i data-gi="music-off" class="when-off"></i><span class="util-lbl">Music</span>
         </button>
-        <button id="mute-btn" class="btn-sci icon-toggle audio-toggle-btn" type="button" title="Toggle Sound" aria-label="Toggle Sound">
-          <i data-gi="sfx-on" class="when-on"></i><i data-gi="sfx-off" class="when-off"></i>
+        <button id="mute-btn" class="btn-sci icon-toggle has-lbl audio-toggle-btn" type="button" title="Toggle Sound" aria-label="Toggle Sound">
+          <i data-gi="sfx-on" class="when-on"></i><i data-gi="sfx-off" class="when-off"></i><span class="util-lbl">Sound</span>
         </button>
-        <button id="menu-btn" class="btn-sci icon-toggle" type="button" aria-expanded="false" title="Tools &amp; Help" aria-label="Tools and Help">
-          <i data-gi="help"></i>
+        <button id="menu-btn" class="btn-sci icon-toggle has-lbl" type="button" aria-expanded="false" title="Tools &amp; Help" aria-label="Tools and Help">
+          <i data-gi="help"></i><span class="util-lbl">Tools</span>
         </button>
-        <button id="toggle-hud-btn" class="btn-sci icon-toggle" type="button" title="Hide HUD [H]" aria-label="Hide HUD"><i data-gi="hud"></i></button>
+        <button id="toggle-hud-btn" class="btn-sci icon-toggle has-lbl" type="button" title="Hide HUD [H]" aria-label="Hide HUD"><i data-gi="hud"></i><span class="util-lbl">Hide HUD</span></button>
         <button id="quit-mission-btn" class="btn-sci btn-quit-mission" type="button" title="Quit Mission [Esc]"><i data-gi="quit"></i><span>Quit</span></button>
       </div>
     </header>
@@ -241,6 +292,6 @@
     <div id="compare-box" class="compare-box"></div>
   </dialog>
 
-  <script type="module" src="./js/main.js?v=20261115_rem_chamfer"></script>
+  <script type="module" src="./js/main.js?v=20261115_space_holo"></script>
 </body>
 </html>
