@@ -1,4 +1,4 @@
-import { CATALOG, CELESTIAL_DATABASE, OFFICIAL_RESOURCES, SCENARIOS, getMissionOrbitGuide } from './catalog.js';
+import { CATALOG, CELESTIAL_DATABASE, OFFICIAL_RESOURCES, SCENARIOS, getMissionOrbitGuide, getOrbitObjectivesStatus } from './catalog.js';
 import { playRankStamp, playStarChime } from './sfx.js';
 
 let debriefTimers = [];
@@ -123,7 +123,7 @@ export function renderTitleOverlay(sandboxMode, activeScenarioId, progressMap = 
         ? '<span class="contract-status-badge is-progress">In Progress</span>'
         : '<span class="contract-status-badge">Not Started</span>');
     const budBadge = sandboxMode
-      ? '<span class="spill ok"><span class="inf-sym">∞</span> UNLIMITED</span>'
+      ? '<span class="spill ok" title="Unlimited Sandbox Budget"><span class="inf-sym">∞</span></span>'
       : `<span class="spill ok">$${s.budgetLimitM}M</span>`;
     return `
     <div class="contract-card ${selected ? 'selected' : ''}" data-start-scenario="${s.id}" role="button" tabindex="0">
@@ -177,8 +177,8 @@ export function renderLoadoutDock(segment, subGroup, state, evaluation) {
 function getGaugeRows(ev) {
   const { metrics, scenario, sandboxMode } = ev;
   return [
-    { key: 'BUD', label: 'Budget', val: sandboxMode ? '∞ UNLIMITED' : `$${metrics.budget.usedM}/${metrics.budget.limitM}M`, pct: sandboxMode ? 100 : Math.min(100, metrics.budget.pct), ok: sandboxMode || metrics.budget.usedM <= metrics.budget.limitM },
-    { key: 'MASS', label: 'Mass', val: sandboxMode ? `${metrics.mass.totalKg}kg / ∞` : `${metrics.mass.totalKg}/${metrics.mass.launchLimitKg}kg`, pct: sandboxMode ? 100 : Math.min(100, (metrics.mass.totalKg / Math.max(metrics.mass.launchLimitKg, 1)) * 100), ok: sandboxMode || metrics.mass.totalKg <= metrics.mass.launchLimitKg },
+    { key: 'BUD', label: 'Budget', val: sandboxMode ? '∞' : `$${metrics.budget.usedM}/${metrics.budget.limitM}M`, isInf: sandboxMode, tip: sandboxMode ? 'Unlimited Sandbox Budget' : '', pct: sandboxMode ? 100 : Math.min(100, metrics.budget.pct), ok: sandboxMode || metrics.budget.usedM <= metrics.budget.limitM },
+    { key: 'MASS', label: 'Mass', val: sandboxMode ? `${metrics.mass.totalKg}kg / ∞` : `${metrics.mass.totalKg}/${metrics.mass.launchLimitKg}kg`, isInf: false, tip: sandboxMode ? 'Unlimited Rocket Payload Mass' : '', pct: sandboxMode ? 100 : Math.min(100, (metrics.mass.totalKg / Math.max(metrics.mass.launchLimitKg, 1)) * 100), ok: sandboxMode || metrics.mass.totalKg <= metrics.mass.launchLimitKg },
     { key: 'PWR', label: 'Power', val: `${metrics.powerMargin}%`, pct: Math.max(0, Math.min(100, metrics.powerMargin + 30)), ok: metrics.powerMargin >= 5 },
     { key: 'DATA', label: 'Data', val: `${metrics.dataMargin}%`, pct: Math.max(0, Math.min(100, metrics.dataMargin + 25)), ok: metrics.dataMargin >= 5 },
     { key: 'LIFE', label: 'Life', val: `${metrics.lifetimeYears}/${scenario.minLifetimeYr}yr`, pct: Math.min(100, (metrics.lifetimeYears / scenario.minLifetimeYr) * 100), ok: metrics.lifetimeYears >= scenario.minLifetimeYr },
@@ -195,7 +195,7 @@ export function renderHud(ev, stage, opts = {}) {
     hangar: 'Mission Hangar assembly',
     launch: unlocked.launch ? 'Roll out to launchpad' : 'Locked: Equip all 4 core mission segments first',
     orbit: unlocked.orbit ? 'Orbital operations' : 'Locked: Complete rocket launch sequence first',
-    review: unlocked.review ? 'Mission Debrief' : 'Locked: Complete at least 1 Science Downlink in Orbit first'
+    review: unlocked.review ? 'Mission Debrief' : 'Locked: Complete Mission Objectives in Orbit first'
   };
   document.querySelectorAll('#stage-switcher .stage-btn').forEach((b) => {
     const s = b.dataset.stage;
@@ -241,7 +241,8 @@ export function renderHud(ev, stage, opts = {}) {
   document.getElementById('resource-gauges').innerHTML = getGaugeRows(ev).map((g) => {
     const lit = Math.max(1, Math.round((g.pct / 100) * 5));
     const cells = [0, 1, 2, 3, 4].map((i) => `<span class="seg-cell ${i < lit ? (g.ok ? 'on-ok' : 'on-bad') : ''}"></span>`).join('');
-    return `<div class="gm-item"><div class="gm-top"><span>${g.key}</span><b>${esc(g.val)}</b></div><div class="seg-meter">${cells}</div></div>`;
+    const tipAttr = g.tip ? ` title="${esc(g.tip)}"` : '';
+    return `<div class="gm-item"${tipAttr}><div class="gm-top"><span>${g.key}</span><b class="${g.isInf ? 'is-inf' : ''}">${esc(g.val)}</b></div><div class="seg-meter">${cells}</div></div>`;
   }).join('');
 
   const autoBtn = document.getElementById('autobuild-btn');
@@ -266,8 +267,8 @@ export function renderHud(ev, stage, opts = {}) {
     const canFinish = Boolean(run.orbitObjectivesMet);
     cta.disabled = !canFinish;
     cta.classList.toggle('is-ready', canFinish);
-    cta.textContent = canFinish ? '🏁 COMPLETE MISSION' : '🔒 COMPLETE 1 DOWNLINK FIRST';
-    cta.title = canFinish ? 'Open Mission Debrief' : 'Fly into a green Ground Station cone and press [SPACE] first';
+    cta.textContent = canFinish ? '🏁 COMPLETE MISSION' : '🔒 FINISH OBJECTIVES FIRST';
+    cta.title = canFinish ? 'Open Mission Debrief' : 'Complete the Mission Objectives Sidebar tasks in Orbit first';
   } else {
     cta.disabled = false;
     cta.textContent = '🔄 HANGAR';
@@ -275,7 +276,7 @@ export function renderHud(ev, stage, opts = {}) {
   }
 
   document.getElementById('mel-summary-meta').textContent = sandboxMode
-    ? `${mel.length} · ${metrics.mass.totalKg}kg · ∞ UNLIMITED`
+    ? `${mel.length} · ${metrics.mass.totalKg}kg · ∞`
     : `${mel.length} · ${metrics.mass.totalKg}kg · $${metrics.budget.usedM}M`;
   document.getElementById('mel-body').innerHTML = `<table class="mel-table"><thead><tr><th>Seg</th><th>Item</th><th>Mass</th><th>Pwr</th><th>Cost</th></tr></thead><tbody>`
     + mel.map((r) => `<tr><td>${esc(r.segment)}</td><td>${esc(r.item)}</td><td>${r.massKg}kg</td><td>${r.powerW}W</td><td>$${r.costM}M</td></tr>`).join('') + '</tbody></table>';
@@ -359,7 +360,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Replay Zero-G Satellite Unfolding [U]">🛰️ Replay Unfold [U]</button>
         <button id="orb-sensorcam-btn" class="btn-sci ${opts.sensorCamOpen ? 'is-on' : ''}" type="button">📷 Sensor Cam [C]</button>
         <button id="hud-mission-guide-btn" class="btn-sci guide-pill" type="button">📋 Mission Guide</button>
-        <button id="orb-debrief-btn" class="btn-sci ${debOk ? 'active' : ''}" type="button" ${debOk ? '' : 'disabled title="Complete at least 1 Science Downlink in Orbit to unlock Debrief"'}>${debOk ? '🏆 View Debrief' : '🔒 Debrief (0/1 Downlink)'}</button>
+        <button id="orb-debrief-btn" class="btn-sci ${debOk ? 'active' : ''}" type="button" ${debOk ? '' : 'disabled title="Complete Mission Objectives Sidebar tasks in Orbit to unlock Debrief"'}>${debOk ? '🏆 View Debrief' : '🔒 Debrief (Tasks)'}</button>
       </div>
       <div class="hull-meter-row">
         <div class="hull-meter-head"><span>HULL INTEGRITY</span><span id="orb-hull-pct">${opts.hullIntegrity ?? 100}%</span></div>
@@ -481,7 +482,7 @@ export function renderStageHud(stage, state, ev, opts) {
           <span class="holo-pill">🧰 Bus: ${esc(busObj?.name || state.busId)}</span>
         </div>
         <div class="holo-telemetry-mini">
-          <span>Budget ${sandboxMode ? '∞ UNLIMITED' : `$${metrics.budget.usedM}M`}</span>
+          <span title="${sandboxMode ? 'Unlimited Sandbox Budget' : ''}">Budget ${sandboxMode ? '∞' : `$${metrics.budget.usedM}M`}</span>
           <span>Power ${metrics.powerMargin}%</span>
           <span>Science ${metrics.scienceScore}%</span>
         </div>
@@ -548,7 +549,7 @@ export function updateLaunchOverlay(t) {
   const ign = document.getElementById('lch-ignite-btn'); if (ign) ign.hidden = !t.armed;
 }
 
-export function updateOrbitOverlay(t) {
+export function updateOrbitOverlay(t, objStatus = null) {
   const d = document.getElementById('orbit-telem');
   if (d && t) {
     const flags = [];
@@ -650,11 +651,13 @@ export function updateOrbitOverlay(t) {
     }
   }
   const debBtn = document.getElementById('orb-debrief-btn');
-  const dlDone = (t?.downlinkCount || 0) >= 1;
+  const dlDone = objStatus ? Boolean(objStatus.canDebrief) : (t?.downlinkCount || 0) >= 1;
   if (debBtn) {
     debBtn.disabled = !dlDone;
     debBtn.classList.toggle('active', dlDone);
-    debBtn.textContent = dlDone ? '🏆 View Debrief' : `🔒 Debrief (${Math.min(t?.downlinkCount || 0, 1)}/1 Downlink)`;
+    debBtn.textContent = dlDone
+      ? '🏆 View Debrief'
+      : `🔒 Debrief (${objStatus ? `${objStatus.completedCount}/${objStatus.totalCount}` : `${Math.min(t?.downlinkCount || 0, 1)}/1`})`;
   }
   const sm = document.getElementById('orb-safemode-btn'); if (sm) sm.hidden = !(t?.inEclipse || t?.stormActive) || Boolean(t?.safeModeActive);
   const db = document.getElementById('orbit-deploy-banner');
@@ -837,4 +840,48 @@ export function renderDecisionCard(decision) {
     const tp = document.getElementById('decision-timer-pill');
     if (tp) tp.textContent = `${decision.remainingSec.toFixed(1)}s`;
   }
+}
+
+export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run = null, collapsed = false) {
+  const box = document.getElementById('orbit-objectives-sidebar');
+  if (!box) return;
+  if (stage !== 'orbit') {
+    box.hidden = true;
+    box.dataset.renderKey = '';
+    return null;
+  }
+  box.hidden = false;
+  box.classList.toggle('is-collapsed', Boolean(collapsed));
+  const status = getOrbitObjectivesStatus(state, telemetry, run);
+  const sig = `${status.scenarioId}|${status.isSandbox ? 1 : 0}|${collapsed ? 1 : 0}|${status.completedCount}|${status.canDebrief ? 1 : 0}|${status.tasks.map((t) => `${t.progressText}:${t.badgeText}`).join('|')}`;
+  if (box.dataset.renderKey === sig) return status;
+  box.dataset.renderKey = sig;
+
+  box.innerHTML = `<div class="orb-obj-head">
+      <div class="orb-obj-head-top">
+        <strong class="orb-obj-name" title="${esc(status.scenarioName)}">${esc(status.scenarioName)}</strong>
+        <button id="orb-obj-collapse-btn" class="orb-obj-collapse" type="button" aria-expanded="${collapsed ? 'false' : 'true'}" title="${collapsed ? 'Expand Mission Objectives' : 'Collapse Mission Objectives'}">${collapsed ? '▸' : '▾'}</button>
+      </div>
+      <div class="orb-obj-subrow">
+        <span class="orb-obj-kicker">${esc(status.isSandbox ? 'SANDBOX OPTIONAL' : 'MISSION OBJECTIVES')}</span>
+        <span class="orb-obj-count ${status.canDebrief ? 'is-done' : ''}">${status.completedCount} / ${status.totalCount} Complete</span>
+      </div>
+    </div>
+    <div class="orb-obj-track"><div class="orb-obj-fill" style="width:${status.pct}%"></div></div>
+    <div class="orb-obj-body">
+      <ul class="orb-obj-list">
+        ${status.tasks.map((t) => `
+          <li class="orb-obj-item ${t.complete ? 'is-complete' : (t.isWarning ? 'is-risk' : 'is-pending')}">
+            <div class="orb-obj-row-top">
+              <span class="orb-obj-label">${esc(t.title)}</span>
+              <span class="orb-obj-val">${esc(t.progressText)}</span>
+            </div>
+            <div class="orb-obj-pill ${t.complete ? 'is-ok' : (t.isWarning ? 'is-bad' : 'is-wait')}">${esc(t.badgeText)}</div>
+          </li>`).join('')}
+      </ul>
+      <button id="orb-obj-debrief-btn" class="orb-obj-footer-btn ${status.canDebrief ? 'is-unlocked' : ''}" type="button" ${status.canDebrief ? '' : 'disabled'}>
+        ${status.canDebrief ? '🏆 FINISH MISSION &amp; DEBRIEF ▶' : '🔒 Finish Incomplete Tasks'}
+      </button>
+    </div>`;
+  return status;
 }

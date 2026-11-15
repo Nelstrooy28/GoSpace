@@ -1,4 +1,4 @@
-import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign, getOptimalLoadoutForMission } from './catalog.js';
+import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign, getOptimalLoadoutForMission, getOrbitObjectivesStatus } from './catalog.js';
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
@@ -6,7 +6,7 @@ import { activateSafeMode, clearHoloSelection, focusCelestialBody, getHoloBodySc
 import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
 import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
-import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderMissionBriefing, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
+import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderMissionBriefing, renderOrbitObjectivesSidebar, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
 const STORAGE_ACTIVE = 'gospace_active_v1', STORAGE_SAVED = 'gospace_saved_v1', STORAGE_PROGRESS = 'gospace_progress_v2';
 const readJson = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch { return fb; } };
@@ -21,6 +21,8 @@ function createFreshRunSession(missionId) {
     scansCompleted: 0,
     anomaliesResolved: 0,
     hullIntegrity: 100,
+    deployCompleted: false,
+    holoInspected: false,
     orbitObjectivesMet: false,
     launchCompleted: false,
     launchInserted: false,
@@ -31,7 +33,7 @@ function createFreshRunSession(missionId) {
 let stage = 'hangar', titleOpen = true, activeSegment = 'user', activeSub = 'obj', lastEval = null;
 let missionState = (() => { const s = readJson(STORAGE_ACTIVE, null); return s?.scenarioId ? s : createInitialState('wildfiresat-l1', false); })();
 let runSession = createFreshRunSession(missionState.scenarioId);
-let activeScene = null, hudHidden = false, codexOpen = false, briefingOpen = false, sensorCamOpen = false, selectedHoloId = null, focusedHoloId = null;
+let activeScene = null, hudHidden = false, codexOpen = false, briefingOpen = false, sensorCamOpen = false, objectivesCollapsed = false, selectedHoloId = null, focusedHoloId = null;
 let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 25, orbitCam = 'full';
 let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0, orbitSessionDirty = true;
 
@@ -45,8 +47,23 @@ function resetRunSession(missionId) {
   focusedHoloId = null;
   briefingOpen = false;
   sensorCamOpen = false;
+  objectivesCollapsed = false;
   orbitWarp = 25;
   orbitCam = 'full';
+}
+
+function syncOrbitObjectives(t = orbitTelemetry) {
+  if (t && !t.deployActive && (t.deployProgress || 0) >= 0.99) {
+    runSession.deployCompleted = true;
+  }
+  const objStatus = getOrbitObjectivesStatus(missionState, t, runSession);
+  const prevMet = runSession.orbitObjectivesMet;
+  runSession.orbitObjectivesMet = objStatus.canDebrief;
+  renderOrbitObjectivesSidebar(stage === 'orbit' && !titleOpen ? 'orbit' : stage, missionState, t, runSession, objectivesCollapsed);
+  if (prevMet !== runSession.orbitObjectivesMet && lastEval) {
+    renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
+  }
+  return objStatus;
 }
 
 function getProgressMap() {
@@ -122,7 +139,7 @@ function setStage(nextStage, keepOrbit = false, forceUnlock = false) {
       ? '🔒 Equip all 4 mission segments first to unlock Launch!'
       : (nextStage === 'orbit'
         ? '🔒 Complete Rocket Launch sequence first to unlock Orbit!'
-        : '🔒 Complete at least 1 Science Downlink in Orbit to unlock Debrief!');
+        : '🔒 Complete Mission Objectives in Orbit first to unlock Debrief!');
     spawnPopup(lockMsg);
     return false;
   }
@@ -220,17 +237,14 @@ function mountLiveOrbit(vp, isVictory = false) {
     runSession.scansCompleted = t.asteroidsScanned || 0;
     runSession.anomaliesResolved = t.anomaliesResolved || 0;
     runSession.hullIntegrity = t.hullIntegrity ?? 100;
-    const prevMet = runSession.orbitObjectivesMet;
-    runSession.orbitObjectivesMet = (t.downlinkCount || 0) >= 1 && (t.hullIntegrity ?? 100) > 0;
-    if (!prevMet && runSession.orbitObjectivesMet) {
-      renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
-    }
-    updateOrbitOverlay(t);
+    const objStatus = syncOrbitObjectives(t);
+    updateOrbitOverlay(t, objStatus);
     if (window.__MISSION_DEBUG__) {
       window.__MISSION_DEBUG__.orbitTelemetry = t;
       window.__MISSION_DEBUG__.orbitScore = orbitScore;
       window.__MISSION_DEBUG__.briefingPaused = t.briefingPaused;
       window.__MISSION_DEBUG__.runSession = { ...runSession };
+      window.__MISSION_DEBUG__.objectivesStatus = objStatus;
       window.__MISSION_DEBUG__.unlockedStages = getUnlockedStages(lastEval);
     }
     notifyTutorialState();
@@ -240,6 +254,8 @@ function mountLiveOrbit(vp, isVictory = false) {
     sensorCam: sensorCamOpen && !isVictory,
     onSelectHolo: (holoId) => {
       selectedHoloId = holoId;
+      if (holoId) runSession.holoInspected = true;
+      syncOrbitObjectives(orbitTelemetry);
       renderHoloScannerCard(selectedHoloId, focusedHoloId);
       updateDebug(lastEval);
     },
@@ -253,9 +269,11 @@ function mountLiveOrbit(vp, isVictory = false) {
         runSession.currentScore = orbitScore;
         if (typeof ev.anomaliesResolved === 'number') runSession.anomaliesResolved = ev.anomaliesResolved;
         if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
+        syncOrbitObjectives(orbitTelemetry);
         spawnPopup(ev.toast || `+${ev.scoreDelta ?? 0} PTS · ANOMALY MITIGATED!`);
       } else if (ev.type === 'expire') {
         if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
+        syncOrbitObjectives(orbitTelemetry);
         spawnPopup('💥 ANOMALY TIMED OUT — -26% HULL & -18% BATTERY!');
       }
     }
@@ -374,6 +392,7 @@ function renderAll(rebuildScene = true, focusTag = null) {
   } else unmountAll();
 
   renderStageHud(stage, missionState, lastEval, getStageHudOpts());
+  renderOrbitObjectivesSidebar(titleOpen ? 'showcase' : stage, missionState, orbitTelemetry, runSession, objectivesCollapsed);
   renderMissionBriefing(lastEval, stage, briefingOpen && !titleOpen && stage !== 'review');
   renderHoloScannerCard(stage === 'orbit' && !titleOpen && !briefingOpen ? selectedHoloId : null, focusedHoloId);
   if (titleOpen || stage !== 'orbit') setHazardTension(false);
@@ -390,7 +409,7 @@ const handleTransmit = () => {
     runSession.currentScore = orbitScore;
     runSession.downlinksCompleted += 1;
     if (orbitTelemetry) orbitTelemetry.downlinkCount = Math.max(orbitTelemetry.downlinkCount || 0, runSession.downlinksCompleted);
-    runSession.orbitObjectivesMet = runSession.downlinksCompleted >= 1 && (orbitTelemetry?.hullIntegrity ?? runSession.hullIntegrity) > 0;
+    syncOrbitObjectives(orbitTelemetry);
     let suffix = r.weakComms ? ' · BOTTLENECK -50%' : (r.wavelengthMismatch ? ' · MISMATCH -40%' : '');
     if (r.omniReduced) suffix += ' · OMNI 70%';
     spawnPopup(`+${r.points} DATA DOWNLINKED (${r.station})${suffix}!`);
@@ -406,7 +425,20 @@ const handleTransmit = () => {
   }
 };
 const handleSafeMode = () => { const r = activateSafeMode(); orbitScore += r.points; spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`); };
-const handleScanAsteroid = () => { const r = scanAsteroid(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`); } };
+const handleScanAsteroid = () => {
+  const r = scanAsteroid();
+  if (r.ok) {
+    orbitScore += r.points;
+    runSession.currentScore = orbitScore;
+    runSession.scansCompleted += 1;
+    if (orbitTelemetry) {
+      orbitTelemetry.asteroidsScanned = Math.max(orbitTelemetry.asteroidsScanned || 0, runSession.scansCompleted);
+      orbitTelemetry.missionScore = Math.max(orbitTelemetry.missionScore || 0, orbitScore);
+    }
+    syncOrbitObjectives(orbitTelemetry);
+    spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`);
+  }
+};
 const handleHazardChoice = (choiceIdx = 0) => { resolveOrbitHazardChoice(choiceIdx); };
 
 function init() {
@@ -620,6 +652,16 @@ function init() {
   document.getElementById('briefing-overlay')?.addEventListener('click', (e) => {
     if (e.target.closest('#brief-close-btn')) closeMissionBriefing(false);
     else if (e.target.closest('#brief-start-btn')) closeMissionBriefing(true);
+  });
+  document.getElementById('orbit-objectives-sidebar')?.addEventListener('click', (e) => {
+    if (e.target.closest('#orb-obj-collapse-btn')) {
+      playHover();
+      objectivesCollapsed = !objectivesCollapsed;
+      renderOrbitObjectivesSidebar(stage === 'orbit' && !titleOpen ? 'orbit' : stage, missionState, orbitTelemetry, runSession, objectivesCollapsed);
+    } else if (e.target.closest('#orb-obj-debrief-btn')) {
+      playEquip();
+      setStage('review');
+    }
   });
   document.getElementById('hazard-alert-hud').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-choice-idx]');

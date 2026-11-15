@@ -763,3 +763,132 @@ export function getHazardProtocol(kind, missionState, batterySoc = 84) {
     choices
   };
 }
+
+export const ORBIT_MISSION_TARGETS = {
+  'wildfiresat-l1': { downlinks: 2, mode: 'score', scienceTarget: 100, scienceLabel: 'Thermal Science Return' },
+  'aurora-l1': { downlinks: 2, mode: 'scan', scanTarget: 1, scienceLabel: 'Target Scan [E]' },
+  'ocean-l2': { downlinks: 3, mode: 'score', scienceTarget: 150, scienceLabel: 'Ocean Spectra Return' },
+  'monsoon-l2': { downlinks: 3, mode: 'score', scienceTarget: 150, scienceLabel: 'Cyclone Radar Return' },
+  'lunar-l3': { downlinks: 3, mode: 'scan', scanTarget: 2, scienceLabel: 'Deep-Space Scans [E]' },
+  'asteroid-l3': { downlinks: 3, mode: 'scan', scanTarget: 2, scienceLabel: 'Asteroid Scans [E]' }
+};
+
+export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
+  const scenarioId = state?.scenarioId || 'wildfiresat-l1';
+  const scenario = SCENARIOS.find((s) => s.id === scenarioId) || SCENARIOS[0];
+  const isSandbox = Boolean(state?.sandboxMode);
+
+  const deployProgress = telemetry?.deployProgress ?? 0;
+  const deployDone = Boolean(run?.deployCompleted || (telemetry && !telemetry.deployActive && deployProgress >= 0.99));
+  const dl = Math.max(telemetry?.downlinkCount || 0, run?.downlinksCompleted || 0);
+  const scans = Math.max(telemetry?.asteroidsScanned || 0, run?.scansCompleted || 0);
+  const score = Math.max(telemetry?.missionScore || 0, run?.currentScore || 0);
+  const hazResolved = Math.max(telemetry?.anomaliesResolved || 0, run?.anomaliesResolved || 0);
+  const hull = Math.max(0, Math.round(telemetry?.hullIntegrity ?? run?.hullIntegrity ?? 100));
+  const holoDone = Boolean(run?.holoInspected || telemetry?.selectedHoloId);
+
+  if (isSandbox) {
+    const tasks = [
+      {
+        id: 'unfold',
+        title: 'Deploy Arrays ([U] / Auto)',
+        progressText: deployDone ? '1 / 1' : `${Math.round(deployProgress * 100)}%`,
+        complete: deployDone,
+        badgeText: deployDone ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+        required: false
+      },
+      {
+        id: 'downlink',
+        title: 'Transmit 1 Downlink ([SPACE])',
+        progressText: `${Math.min(dl, 1)} / 1`,
+        complete: dl >= 1,
+        badgeText: dl >= 1 ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+        required: true
+      },
+      {
+        id: 'holo',
+        title: 'Inspect Planet Holo-Card',
+        progressText: holoDone ? '1 / 1' : '0 / 1',
+        complete: holoDone,
+        badgeText: holoDone ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+        required: false
+      },
+      {
+        id: 'hazard',
+        title: 'Resolve 1 Space Hazard',
+        progressText: `${Math.min(hazResolved, 1)} / 1`,
+        complete: hazResolved >= 1,
+        badgeText: hazResolved >= 1 ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+        required: false
+      }
+    ];
+    const completedCount = tasks.filter((item) => item.complete).length;
+    const canDebrief = dl >= 1 && hull > 0;
+    return {
+      isSandbox: true,
+      scenarioId,
+      scenarioName: scenario.name,
+      subtitle: 'SANDBOX EXPLORER (OPTIONAL)',
+      tasks,
+      completedCount,
+      totalCount: tasks.length,
+      pct: Math.round((completedCount / tasks.length) * 100),
+      canDebrief
+    };
+  }
+
+  const tgt = ORBIT_MISSION_TARGETS[scenarioId] || ORBIT_MISSION_TARGETS['wildfiresat-l1'];
+  const sciMet = tgt.mode === 'scan' ? scans >= tgt.scanTarget : score >= tgt.scienceTarget;
+  const sciProgress = tgt.mode === 'scan'
+    ? `${Math.min(scans, tgt.scanTarget)} / ${tgt.scanTarget}`
+    : `${Math.min(score, tgt.scienceTarget)} / ${tgt.scienceTarget} PTS`;
+
+  const tasks = [
+    {
+      id: 'unfold',
+      title: 'Deploy Arrays ([U] / Auto)',
+      progressText: deployDone ? '100%' : `${Math.round(deployProgress * 100)}%`,
+      complete: deployDone,
+      badgeText: deployDone ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+      required: true
+    },
+    {
+      id: 'downlink',
+      title: 'Ground Downlinks ([SPACE])',
+      progressText: `${Math.min(dl, tgt.downlinks)} / ${tgt.downlinks}`,
+      complete: dl >= tgt.downlinks,
+      badgeText: dl >= tgt.downlinks ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+      required: true
+    },
+    {
+      id: 'science',
+      title: tgt.scienceLabel,
+      progressText: sciProgress,
+      complete: sciMet,
+      badgeText: sciMet ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+      required: true
+    },
+    {
+      id: 'integrity',
+      title: 'Spacecraft Integrity',
+      progressText: `${hull}%`,
+      complete: hull >= 40,
+      isWarning: hull < 40,
+      badgeText: hull >= 40 ? '✅ INTACT' : '⚠️ AT RISK',
+      required: true
+    }
+  ];
+  const completedCount = tasks.filter((item) => item.complete).length;
+  const canDebrief = tasks.every((item) => item.complete) && hull > 0;
+  return {
+    isSandbox: false,
+    scenarioId,
+    scenarioName: scenario.name,
+    subtitle: `${scenario.tag} · OBJECTIVES`,
+    tasks,
+    completedCount,
+    totalCount: tasks.length,
+    pct: Math.round((completedCount / tasks.length) * 100),
+    canDebrief
+  };
+}

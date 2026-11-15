@@ -1340,11 +1340,26 @@ dialog button:hover {
 .gm-top {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 4px;
+  white-space: nowrap;
+  min-height: 19px;
+  line-height: 1;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--muted);
+}
+
+.gm-top b {
+  white-space: nowrap;
+}
+
+.gm-top b.is-inf {
+  font-family: var(--font-hud);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 800;
+  color: #e9d5ff;
 }
 
 .gm-val {
@@ -1450,6 +1465,7 @@ dialog button:hover {
 #hud-layer:has(#review-overlay:not([hidden])) .left-hud-stack,
 #hud-layer:has(#review-overlay:not([hidden])) #comms-banner,
 #hud-layer:has(#review-overlay:not([hidden])) #mission-progress-bar,
+#hud-layer:has(#review-overlay:not([hidden])) #orbit-objectives-sidebar,
 #hud-layer:has(#review-overlay:not([hidden])) #decision-alert-hud,
 #hud-layer:has(#review-overlay:not([hidden])) #stage-hud,
 #hud-layer:has(#review-overlay:not([hidden])) #center-action-hud,
@@ -2126,14 +2142,14 @@ button.guide-pill:hover {
 #sensor-cam-pip,
 .sensor-cam-pip {
   position: fixed;
-  bottom: 78px;
-  left: 14px;
-  width: 356px;
+  bottom: 76px;
+  left: 16px;
+  width: 290px;
   z-index: 27;
-  padding: 9px 10px 8px;
+  padding: 7px 9px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   pointer-events: auto;
   border: 1.5px solid rgba(56, 189, 248, 0.62);
   border-top: 3px solid #22d3ee;
@@ -2205,7 +2221,8 @@ button.guide-pill:hover {
 
 #sensor-cam-canvas {
   width: 100%;
-  height: auto;
+  height: 144px;
+  object-fit: cover;
   display: block;
   border-radius: 6px;
   border: 1px solid rgba(56, 189, 248, 0.35);
@@ -2693,9 +2710,10 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 #holo-scanner-card,
 .holo-scanner-card {
   position: fixed;
-  top: 110px;
-  left: 12px;
-  width: min(402px, calc(100vw - 24px));
+  top: 108px;
+  right: 360px;
+  left: auto;
+  width: min(390px, calc(100vw - 690px));
   max-height: calc(100vh - 182px);
   overflow-y: auto;
   overflow-x: hidden;
@@ -2710,10 +2728,6 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   gap: 8px;
   pointer-events: auto;
   z-index: 28;
-}
-
-#hud-layer:has(#holo-scanner-card:not([hidden])) #sensor-cam-pip {
-  left: 424px;
 }
 
 .holo-scan-head {
@@ -3343,6 +3357,224 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   color: #fed7aa;
 }
 
+/* ================================================================
+   ORBIT MISSION OBJECTIVES SIDEBAR (#orbit-objectives-sidebar)
+   ================================================================ */
+#viewport-container[data-stage="orbit"] ~ #hud-layer .left-hud-stack {
+  left: 320px;
+  width: min(560px, calc(100vw - 680px));
+}
+
+#viewport-container[data-stage="orbit"] ~ #hud-layer #mission-progress-bar {
+  display: none !important;
+}
+
+#orbit-objectives-sidebar,
+.orbit-objectives-sidebar {
+  position: fixed;
+  top: 84px;
+  left: 16px;
+  width: 290px;
+  max-height: calc(100vh - 385px);
+  overflow-y: auto;
+  padding: 8px 10px;
+  border-radius: 11px;
+  border: 1.5px solid rgba(56, 189, 248, 0.48);
+  border-left: 4px solid #38bdf8;
+  background: linear-gradient(160deg, rgba(8, 19, 42, 0.88), rgba(4, 10, 24, 0.92));
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.65), 0 0 20px rgba(56, 189, 248, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+  z-index: 27;
+}
+
+.orb-obj-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.orb-obj-head-top,
+.orb-obj-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.orb-obj-kicker {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: #67e8f9;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.orb-obj-name {
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orb-obj-count {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fde68a;
+  white-space: nowrap;
+}
+
+.orb-obj-count.is-done {
+  color: #34d399;
+}
+
+.orb-obj-collapse {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: rgba(15, 29, 58, 0.85);
+  color: #e0f2fe;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.orb-obj-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  overflow: hidden;
+}
+
+.orb-obj-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #34d399);
+  transition: width 0.25s ease;
+}
+
+.orb-obj-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+#orbit-objectives-sidebar.is-collapsed .orb-obj-body,
+#orbit-objectives-sidebar.is-collapsed .orb-obj-track {
+  display: none;
+}
+
+.orb-obj-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.orb-obj-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(12, 22, 44, 0.84);
+}
+
+.orb-obj-item.is-complete {
+  border-color: rgba(52, 211, 153, 0.52);
+  background: rgba(6, 56, 42, 0.42);
+}
+
+.orb-obj-item.is-risk {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: rgba(92, 20, 26, 0.45);
+}
+
+.orb-obj-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.orb-obj-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.2;
+}
+
+.orb-obj-val {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: #7dd3fc;
+  white-space: nowrap;
+}
+
+.orb-obj-pill {
+  align-self: flex-start;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.orb-obj-pill.is-ok {
+  color: #34d399;
+}
+
+.orb-obj-pill.is-wait {
+  color: #cbd5e1;
+}
+
+.orb-obj-pill.is-bad {
+  color: #fca5a5;
+}
+
+.orb-obj-footer-btn {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.9);
+  color: #94a3b8;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  cursor: not-allowed;
+}
+
+.orb-obj-footer-btn.is-unlocked {
+  cursor: pointer;
+  border-color: #34d399;
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #ecfdf5;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.45);
+}
+
+.orb-obj-footer-btn.is-unlocked:hover {
+  filter: brightness(1.08);
+}
+
 /* Always honor HTML [hidden] above all ID display rules */
 [hidden],
 #hangar-loadout[hidden],
@@ -3351,6 +3583,7 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 #briefing-overlay[hidden],
 #sensor-cam-pip[hidden],
 #orbit-deploy-banner[hidden],
+#orbit-objectives-sidebar[hidden],
 #holo-scanner-card[hidden],
 #autobuild-btn[hidden],
 #hazard-alert-hud[hidden],
