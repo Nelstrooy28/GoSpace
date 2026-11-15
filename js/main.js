@@ -6,7 +6,7 @@ import { activateSafeMode, clearHoloSelection, focusCelestialBody, getHoloBodySc
 import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
 import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
-import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderMissionBriefing, renderOrbitObjectivesSidebar, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
+import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderLossOfVehicleModal, renderMissionBriefing, renderOrbitObjectivesSidebar, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
 const STORAGE_ACTIVE = 'gospace_active_v1', STORAGE_SAVED = 'gospace_saved_v1', STORAGE_PROGRESS = 'gospace_progress_v2';
 const readJson = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch { return fb; } };
@@ -36,8 +36,20 @@ let runSession = createFreshRunSession(missionState.scenarioId);
 let activeScene = null, hudHidden = false, codexOpen = false, briefingOpen = false, sensorCamOpen = false, objectivesCollapsed = false, selectedHoloId = null, focusedHoloId = null;
 let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 25, orbitCam = 'full';
 let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0, orbitSessionDirty = true;
+let lossModalTimer = 0, lossModalOpen = false, lossReason = '';
+
+function clearLossModalState() {
+  if (lossModalTimer) {
+    clearTimeout(lossModalTimer);
+    lossModalTimer = 0;
+  }
+  lossModalOpen = false;
+  lossReason = '';
+  renderLossOfVehicleModal(false);
+}
 
 function resetRunSession(missionId) {
+  clearLossModalState();
   runSession = createFreshRunSession(missionId);
   orbitScore = 0;
   orbitTelemetry = null;
@@ -59,7 +71,7 @@ function syncOrbitObjectives(t = orbitTelemetry) {
   const objStatus = getOrbitObjectivesStatus(missionState, t, runSession);
   const prevMet = runSession.orbitObjectivesMet;
   runSession.orbitObjectivesMet = objStatus.canDebrief;
-  renderOrbitObjectivesSidebar(stage === 'orbit' && !titleOpen ? 'orbit' : stage, missionState, t, runSession, objectivesCollapsed);
+  renderOrbitObjectivesSidebar(stage === 'orbit' && !titleOpen ? 'orbit' : stage, missionState, t, runSession, objectivesCollapsed, lastEval);
   if (prevMet !== runSession.orbitObjectivesMet && lastEval) {
     renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
   }
@@ -114,6 +126,7 @@ function updateDebug(ev) {
     cleanroomActive: activeScene === 'hangar', meshCount: activeScene === 'hangar' ? getMeshCount() : 0,
     launchActive: activeScene === 'launch', launchTelemetry,
     orbitActive: activeScene === 'orbit', orbitTelemetry, orbitScore,
+    isDestroyed: Boolean(orbitTelemetry?.isDestroyed), lossModalOpen, lossReason,
     briefingOpen, briefingPaused: Boolean(orbitTelemetry?.briefingPaused ?? (activeScene === 'orbit' && briefingOpen)),
     sensorCamOpen, sensorCamMode: getSensorCamMode(missionState).mode,
     selectedHoloId, focusedHoloId, getHoloScreenPos: getHoloBodyScreenPos,
@@ -149,6 +162,7 @@ function setStage(nextStage, keepOrbit = false, forceUnlock = false) {
   }
   const prevStage = stage;
   stage = nextStage; codexOpen = false;
+  if (stage !== 'orbit' || keepOrbit === false) clearLossModalState();
   if (stage === 'orbit' && prevStage === 'launch' && !isTutorialActive()) briefingOpen = true;
   else if (stage !== 'orbit') {
     briefingOpen = false;
@@ -170,6 +184,7 @@ function setStage(nextStage, keepOrbit = false, forceUnlock = false) {
 }
 
 function openMissionBriefing() {
+  if (orbitTelemetry?.isDestroyed) return;
   briefingOpen = true;
   codexOpen = false;
   applyChrome();
@@ -192,7 +207,7 @@ function closeMissionBriefing(confirm = false) {
 }
 
 function handleReplayUnfold() {
-  if (stage !== 'orbit' || titleOpen || briefingOpen) return;
+  if (stage !== 'orbit' || titleOpen || briefingOpen || orbitTelemetry?.isDestroyed) return;
   if (replayOrbitDeployment()) {
     orbitCam = 'chase';
     focusedHoloId = null;
@@ -221,6 +236,7 @@ function getStageHudOpts() {
 
 function toggleSensorCam(forceState = null) {
   if (stage !== 'orbit' || titleOpen) return;
+  if (orbitTelemetry?.isDestroyed && forceState !== false) return;
   sensorCamOpen = forceState === null ? !sensorCamOpen : Boolean(forceState);
   playEquip();
   setSensorCamEnabled(sensorCamOpen);
@@ -229,6 +245,7 @@ function toggleSensorCam(forceState = null) {
 }
 
 function mountLiveOrbit(vp, isVictory = false) {
+  clearLossModalState();
   unmountAll(); orbitTelemetry = null; orbitScore = 0; orbitSessionDirty = false;
   mountOrbit(vp, missionState, lastEval, (t) => {
     orbitTelemetry = t; orbitScore = t.missionScore || 0; orbitWarp = t.timeWarp ?? orbitWarp;
@@ -242,6 +259,9 @@ function mountLiveOrbit(vp, isVictory = false) {
     if (window.__MISSION_DEBUG__) {
       window.__MISSION_DEBUG__.orbitTelemetry = t;
       window.__MISSION_DEBUG__.orbitScore = orbitScore;
+      window.__MISSION_DEBUG__.isDestroyed = Boolean(t.isDestroyed);
+      window.__MISSION_DEBUG__.lossModalOpen = lossModalOpen;
+      window.__MISSION_DEBUG__.lossReason = lossReason;
       window.__MISSION_DEBUG__.briefingPaused = t.briefingPaused;
       window.__MISSION_DEBUG__.runSession = { ...runSession };
       window.__MISSION_DEBUG__.objectivesStatus = objStatus;
@@ -275,6 +295,24 @@ function mountLiveOrbit(vp, isVictory = false) {
         if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
         syncOrbitObjectives(orbitTelemetry);
         spawnPopup('💥 ANOMALY TIMED OUT — -26% HULL & -18% BATTERY!');
+      } else if (ev.type === 'destroyed') {
+        lossReason = ev.reason || 'Severe Hull Failure';
+        runSession.hullIntegrity = 0;
+        sensorCamOpen = false;
+        setSensorCamEnabled(false);
+        const objStatus = syncOrbitObjectives(orbitTelemetry);
+        updateOrbitOverlay(orbitTelemetry, objStatus);
+        spawnPopup('💥 HULL BREACHED (0%) — VEHICLE LOST!');
+        if (lossModalTimer) clearTimeout(lossModalTimer);
+        lossModalTimer = setTimeout(() => {
+          lossModalTimer = 0;
+          if (stage === 'orbit' && !titleOpen) {
+            lossModalOpen = true;
+            renderLossOfVehicleModal(true, lossReason, lastEval);
+            updateDebug(lastEval);
+          }
+        }, 2000);
+        updateDebug(lastEval);
       }
     }
   });
@@ -391,8 +429,10 @@ function renderAll(rebuildScene = true, focusTag = null) {
     }
   } else unmountAll();
 
+  if (titleOpen || stage !== 'orbit') clearLossModalState();
+
   renderStageHud(stage, missionState, lastEval, getStageHudOpts());
-  renderOrbitObjectivesSidebar(titleOpen ? 'showcase' : stage, missionState, orbitTelemetry, runSession, objectivesCollapsed);
+  renderOrbitObjectivesSidebar(titleOpen ? 'showcase' : stage, missionState, orbitTelemetry, runSession, objectivesCollapsed, lastEval);
   renderMissionBriefing(lastEval, stage, briefingOpen && !titleOpen && stage !== 'review');
   renderHoloScannerCard(stage === 'orbit' && !titleOpen && !briefingOpen ? selectedHoloId : null, focusedHoloId);
   if (titleOpen || stage !== 'orbit') setHazardTension(false);
@@ -403,6 +443,7 @@ function renderAll(rebuildScene = true, focusTag = null) {
 
 const openSaveModal = () => { renderSavedModal(readJson(STORAGE_SAVED, []), lastEval); document.getElementById('saveload-modal').showModal(); };
 const handleTransmit = () => {
+  if (orbitTelemetry?.isDestroyed) return;
   const r = transmitScience();
   if (r.ok) {
     orbitScore += r.points;
@@ -424,8 +465,14 @@ const handleTransmit = () => {
     spawnPopup(`⏸️ Downlink paused (${r.pausedSec}s)`);
   }
 };
-const handleSafeMode = () => { const r = activateSafeMode(); orbitScore += r.points; spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`); };
+const handleSafeMode = () => {
+  if (orbitTelemetry?.isDestroyed) return;
+  const r = activateSafeMode();
+  if (r.points > 0) orbitScore += r.points;
+  spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`);
+};
 const handleScanAsteroid = () => {
+  if (orbitTelemetry?.isDestroyed) return;
   const r = scanAsteroid();
   if (r.ok) {
     orbitScore += r.points;
@@ -439,7 +486,10 @@ const handleScanAsteroid = () => {
     spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`);
   }
 };
-const handleHazardChoice = (choiceIdx = 0) => { resolveOrbitHazardChoice(choiceIdx); };
+const handleHazardChoice = (choiceIdx = 0) => {
+  if (orbitTelemetry?.isDestroyed) return;
+  resolveOrbitHazardChoice(choiceIdx);
+};
 
 function init() {
   let lastTitleHover = null;
@@ -612,11 +662,12 @@ function init() {
       renderHoloScannerCard(selectedHoloId, focusedHoloId);
     }
     else if (e.target.closest('[data-warp]')) { orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp); setOrbitTimeWarp(orbitWarp); renderStageHud(stage, missionState, lastEval, getStageHudOpts()); }
-    else if (e.target.closest('#orb-test-hazard-btn')) { if (missionState.sandboxMode) triggerTestHazard(); }
+    else if (e.target.closest('#orb-test-hazard-btn')) { if (missionState.sandboxMode && !orbitTelemetry?.isDestroyed) triggerTestHazard(); }
     else if (e.target.closest('#orb-replay-unfold-btn')) handleReplayUnfold();
     else if (e.target.closest('#orb-sensorcam-btn')) toggleSensorCam();
     else if (e.target.closest('#hud-mission-guide-btn')) { playEquip(); openMissionBriefing(); }
     else if (e.target.closest('#orb-debrief-btn')) {
+      if (orbitTelemetry?.isDestroyed) { playWarning(); return; }
       if (runSession.orbitObjectivesMet) { playEquip(); setStage('review', true); }
       else { playWarning(); spawnPopup('🔒 Complete at least 1 Science Downlink in Orbit first!'); }
     }
@@ -657,10 +708,43 @@ function init() {
     if (e.target.closest('#orb-obj-collapse-btn')) {
       playHover();
       objectivesCollapsed = !objectivesCollapsed;
-      renderOrbitObjectivesSidebar(stage === 'orbit' && !titleOpen ? 'orbit' : stage, missionState, orbitTelemetry, runSession, objectivesCollapsed);
+      renderOrbitObjectivesSidebar(stage === 'orbit' && !titleOpen ? 'orbit' : stage, missionState, orbitTelemetry, runSession, objectivesCollapsed, lastEval);
     } else if (e.target.closest('#orb-obj-debrief-btn')) {
+      if (orbitTelemetry?.isDestroyed) { playWarning(); return; }
       playEquip();
       setStage('review');
+    }
+  });
+  document.getElementById('loss-overlay')?.addEventListener('click', (e) => {
+    if (e.target.closest('#loss-hangar-btn')) {
+      playEquip();
+      clearLossModalState();
+      resetRunSession(missionState.scenarioId);
+      runSession.launchCompleted = false;
+      setStage('hangar');
+      spawnPopup('🔧 Returned to Hangar — fix highlighted debuffs before launch!');
+    } else if (e.target.closest('#loss-retry-btn')) {
+      playEquip();
+      clearLossModalState();
+      orbitScore = 0;
+      orbitTelemetry = null;
+      orbitSessionDirty = true;
+      runSession.currentScore = 0;
+      runSession.hullIntegrity = 100;
+      runSession.downlinksCompleted = 0;
+      runSession.scansCompleted = 0;
+      runSession.anomaliesResolved = 0;
+      runSession.deployCompleted = false;
+      runSession.orbitObjectivesMet = false;
+      setStage('orbit', false, true);
+    } else if (e.target.closest('#loss-menu-btn')) {
+      playEquip();
+      clearLossModalState();
+      triggerWarpFlash();
+      titleOpen = true;
+      stage = 'hangar';
+      orbitSessionDirty = true;
+      renderAll(true);
     }
   });
   document.getElementById('hazard-alert-hud').addEventListener('click', (e) => {
@@ -712,6 +796,7 @@ function init() {
       return;
     }
     if (k === 'h' && !titleOpen) { hudHidden = !hudHidden; applyChrome(); updateDebug(lastEval); }
+    else if (orbitTelemetry?.isDestroyed || lossModalOpen) return;
     else if (e.code === 'Space' && !titleOpen) {
       if (stage === 'launch') { e.preventDefault(); triggerIgnition(); }
       else if (stage === 'orbit') { e.preventDefault(); handleTransmit(); }

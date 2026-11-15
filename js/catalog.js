@@ -354,7 +354,8 @@ export function evaluateMissionDesign(state) {
     lowPowerMargin: powerMargin < 5,
     weakCommsMargin: dataMargin < 5 || Boolean(lat?.id === 'realtime' && gs && !gs.realtimeCapable) || Boolean(orbit.deepSpace && !tx?.deepSpace),
     wavelengthMismatch: Boolean(band && band.id !== sc.targetBand) || insts.some((i) => (band && !instMatchesBand(i, band.id)) || !instMatchesBand(i, sc.targetBand)),
-    budgetOverrun: !state.sandboxMode && usedM > sc.budgetLimitM
+    budgetOverrun: !state.sandboxMode && usedM > sc.budgetLimitM,
+    lowLifetime: lifetimeYears < sc.minLifetimeYr
   };
 
   const cmlLevel = !allPopulated ? 1 : (warnings.length === 0 ? 4 : (warnings.length <= 2 ? 3 : 2));
@@ -823,7 +824,8 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       }
     ];
     const completedCount = tasks.filter((item) => item.complete).length;
-    const canDebrief = dl >= 1 && hull > 0;
+    const destroyed = Boolean(telemetry?.isDestroyed || hull <= 0);
+    const canDebrief = dl >= 1 && hull > 0 && !destroyed;
     return {
       isSandbox: true,
       scenarioId,
@@ -833,6 +835,7 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       completedCount,
       totalCount: tasks.length,
       pct: Math.round((completedCount / tasks.length) * 100),
+      isDestroyed: destroyed,
       canDebrief
     };
   }
@@ -842,6 +845,7 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
   const sciProgress = tgt.mode === 'scan'
     ? `${Math.min(scans, tgt.scanTarget)} / ${tgt.scanTarget}`
     : `${Math.min(score, tgt.scienceTarget)} / ${tgt.scienceTarget} PTS`;
+  const destroyed = Boolean(telemetry?.isDestroyed || hull <= 0);
 
   const tasks = [
     {
@@ -871,15 +875,15 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
     {
       id: 'integrity',
       title: 'Spacecraft Integrity',
-      progressText: `${hull}%`,
-      complete: hull >= 40,
-      isWarning: hull < 40,
-      badgeText: hull >= 40 ? '✅ INTACT' : '⚠️ AT RISK',
+      progressText: destroyed ? '0%' : `${hull}%`,
+      complete: !destroyed && hull >= 40,
+      isWarning: destroyed || hull < 40,
+      badgeText: destroyed ? '💥 0% DESTROYED' : (hull >= 40 ? '✅ INTACT' : '⚠️ AT RISK'),
       required: true
     }
   ];
   const completedCount = tasks.filter((item) => item.complete).length;
-  const canDebrief = tasks.every((item) => item.complete) && hull > 0;
+  const canDebrief = tasks.every((item) => item.complete) && hull > 0 && !destroyed;
   return {
     isSandbox: false,
     scenarioId,
@@ -889,6 +893,71 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
     completedCount,
     totalCount: tasks.length,
     pct: Math.round((completedCount / tasks.length) * 100),
+    isDestroyed: destroyed,
     canDebrief
   };
+}
+
+export function getOrbitActiveDebuffs(ev, telemetry = null) {
+  if (!ev) return [];
+  const risks = ev.designRisks || {};
+  const sandbox = Boolean(ev.sandboxMode);
+  const metrics = ev.metrics || {};
+  const debuffs = [];
+
+  if (risks.massOverrun) {
+    debuffs.push({
+      id: 'mass',
+      icon: '🔥',
+      title: 'Over-Mass',
+      effect: 'Atmospheric Drag: -0.5% Hull/s',
+      firing: Boolean(telemetry && !telemetry.briefingPaused && !telemetry.isDestroyed)
+    });
+  }
+  if (risks.lowPowerMargin || (metrics.powerMargin ?? 0) < 0) {
+    debuffs.push({
+      id: 'power',
+      icon: '⚡',
+      title: 'Power Deficit',
+      effect: 'Eclipse Brownout: 2.5x Batt Drain',
+      firing: Boolean(telemetry?.inEclipse || telemetry?.brownoutLocked)
+    });
+  }
+  if (risks.weakCommsMargin) {
+    debuffs.push({
+      id: 'comms',
+      icon: '📡',
+      title: 'Comms Bottleneck',
+      effect: 'Packet Loss: -50% Downlink Pts',
+      firing: Boolean(telemetry?.inLineOfSight)
+    });
+  }
+  if (risks.wavelengthMismatch) {
+    debuffs.push({
+      id: 'band',
+      icon: '🔬',
+      title: 'Wavelength Mismatch',
+      effect: 'Spectral Noise: -40% Science',
+      firing: Boolean(telemetry?.inLineOfSight)
+    });
+  }
+  if (!sandbox && risks.budgetOverrun) {
+    debuffs.push({
+      id: 'budget',
+      icon: '💰',
+      title: 'Over-Budget',
+      effect: 'Cost Overrun: -200 Pts & -1 ★ Cap',
+      firing: false
+    });
+  }
+  if (risks.lowLifetime) {
+    debuffs.push({
+      id: 'life',
+      icon: '🛡️',
+      title: 'Fragile Frame',
+      effect: 'Fragile Frame: +35% Hazard Damage',
+      firing: Boolean(telemetry?.hazardState?.activeHazard)
+    });
+  }
+  return debuffs;
 }

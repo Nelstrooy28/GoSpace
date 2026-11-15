@@ -4,9 +4,9 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { generateOrbitTrack, propagateOrbit } from './missionVizPropagator.js';
 import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpaceTexture } from './solarSystem.js';
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
-import { applyHullDelta, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=15';
+import { applyHullDelta, clearActiveHazard, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=16';
 import { isTutorialActive } from './tutorial.js';
-import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSafeMode, playWarning } from './sfx.js';
+import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSafeMode, playSpacecraftExplosion, playWarning } from './sfx.js';
 
 const EARTH_R = 2.0, KM_TO_SCENE = EARTH_R / 6371;
 const EPOCH_UTC_MS = Date.UTC(2026, 10, 15, 14, 0, 0);
@@ -19,7 +19,7 @@ const STATIONS = [
 ];
 
 let renderer = null, bloomComp = null, scene = null, camera = null, controls = null, resizeObserver = null, spaceEnv = null, envRT = null;
-let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = null, auroraMat = null, earthshineLight = null;
+let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = null, earthshineLight = null;
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, downlinkRig = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
 let gsNodes = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
@@ -29,6 +29,8 @@ let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
 let downlinkPts = 0, anomalyPts = 0, scanPts = 0, decisionPts = 0;
 let brownoutLocked = false, sensorOfflineUntil = 0, solarChargePauseUntil = 0, commsPauseUntil = 0, omniReducedDownlinks = 0, dragLossKm = 0, dragHullAccum = 0;
+let isDestroyed = false, destructionReason = '', explosionRig = null, explosionElapsed = 0, shakeRemaining = 0;
+const tmpShake = new THREE.Vector3();
 let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
 let hazardEventCb = null, hazardFx = null, dodgeT = 0, heaterGlowT = 0, repairSweepT = 0, sparkFlashUntil = 0;
 let deployActive = false, deployCompleted = false, deployElapsed = 0, deployProgress = 1, deployStageMask = 0;
@@ -247,86 +249,119 @@ function makeAtmosphereRimMaterial() {
   });
 }
 
-function makeAuroraCurtainGeo(signY, segs = 128, rings = 8) {
-  const pos = [];
-  const uvs = [];
-  const idx = [];
-  const colatBase = (22 * Math.PI) / 180; // ~68 deg N/S geomagnetic latitude
-  for (let r = 0; r <= rings; r += 1) {
-    const v = r / rings;
-    const rad = EARTH_R * (1.032 + v * 0.135);
-    const latTilt = colatBase + (v - 0.5) * 0.036;
-    for (let s = 0; s <= segs; s += 1) {
-      const u = s / segs;
-      const theta = u * Math.PI * 2;
-      const ripple = 0.052 * Math.sin(theta * 2.0 + 0.7 * signY) + 0.024 * Math.cos(theta * 5.0 - 0.4);
-      const phi = latTilt + ripple;
-      const xz = Math.sin(phi) * rad;
-      const y = signY * Math.cos(phi) * rad;
-      pos.push(Math.cos(theta) * xz, y, Math.sin(theta) * xz);
-      uvs.push(u, v);
+function createExplosionRig(centerPos, forwardDir) {
+  const grp = new THREE.Group();
+  grp.position.copy(centerPos);
+
+  const light = new THREE.PointLight(0xffa94d, 16, 22);
+  grp.add(light);
+
+  const fireball = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 24, 18),
+    new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  grp.add(fireball);
+
+  const shockRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.13, 0.23, 48),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.92, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  shockRing.rotation.set(0.65, 0.3, 0.4);
+  grp.add(shockRing);
+
+  const amberRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.16, 0.025, 10, 44),
+    new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  amberRing.rotation.set(-0.4, 0.7, 0.2);
+  grp.add(amberRing);
+
+  const solarMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.72, roughness: 0.25, emissive: 0x0f172a, emissiveIntensity: 0.35, side: THREE.DoubleSide });
+  const foilMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.88, roughness: 0.22, emissive: 0x92400e, emissiveIntensity: 0.28, side: THREE.DoubleSide });
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.82, roughness: 0.28 });
+
+  const pieces = [];
+  const totalCount = 26;
+  for (let i = 0; i < totalCount; i += 1) {
+    let mesh;
+    let isEmber = false;
+    if (i < 8) {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(0.13 + Math.random() * 0.12, 0.014, 0.08 + Math.random() * 0.08), solarMat);
+    } else if (i < 16) {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(0.08 + Math.random() * 0.08, 0.012, 0.07 + Math.random() * 0.07), foilMat);
+    } else if (i < 22) {
+      mesh = i % 2 === 0
+        ? new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.18 + Math.random() * 0.12, 6), metalMat)
+        : new THREE.Mesh(new THREE.BoxGeometry(0.07 + Math.random() * 0.06, 0.05 + Math.random() * 0.05, 0.06), metalMat);
+    } else {
+      isEmber = true;
+      mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.032 + Math.random() * 0.02, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xfb923c, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
     }
+    const theta = Math.random() * Math.PI * 2;
+    const zDir = Math.random() * 2 - 1;
+    const rPlane = Math.sqrt(Math.max(0, 1 - zDir * zDir));
+    const dir = new THREE.Vector3(rPlane * Math.cos(theta), zDir, rPlane * Math.sin(theta));
+    const speed = 0.85 + Math.random() * 2.15;
+    const vel = dir.multiplyScalar(speed);
+    if (forwardDir) vel.addScaledVector(forwardDir, 0.25);
+    mesh.position.copy(vel).multiplyScalar(0.04);
+    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    grp.add(mesh);
+    pieces.push({
+      mesh,
+      vel,
+      rotVel: new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9),
+      isEmber
+    });
   }
-  const row = segs + 1;
-  for (let r = 0; r < rings; r += 1) {
-    for (let s = 0; s < segs; s += 1) {
-      const a = r * row + s;
-      const b = a + 1;
-      const c = a + row;
-      const d = c + 1;
-      idx.push(a, b, c, b, d, c);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
-  return geo;
+  scene.add(grp);
+  return { grp, light, fireball, shockRing, amberRing, pieces };
 }
 
-function createPolarAuroraGroup() {
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uSunDir: { value: SUN_DIR } },
-    vertexShader: `
-      varying vec2 vUv; varying vec3 vWorldPos;
-      void main() {
-        vUv = uv;
-        vec4 wp = modelMatrix * vec4(position, 1.0);
-        vWorldPos = wp.xyz;
-        gl_Position = projectionMatrix * viewMatrix * wp;
-      }
-    `,
-    fragmentShader: `
-      uniform float uTime; uniform vec3 uSunDir;
-      varying vec2 vUv; varying vec3 vWorldPos;
-      void main() {
-        float altFade = smoothstep(0.0, 0.24, vUv.y) * smoothstep(1.0, 0.42, vUv.y);
-        float wave = sin(vUv.x * 18.8495 + uTime * 0.65) * 1.9 + cos(vUv.x * 31.4159 - uTime * 0.42) * 1.1;
-        float raysA = pow(max(0.0, sin(vUv.x * 88.0 + wave - uTime * 1.55) * 0.5 + 0.5), 2.1);
-        float raysB = pow(max(0.0, cos(vUv.x * 164.0 - wave * 0.6 + uTime * 2.1) * 0.5 + 0.5), 1.6);
-        float arcEnv = smoothstep(0.18, 0.88, sin(vUv.x * 12.5664 + uTime * 0.28) * 0.5 + 0.55);
+function triggerSpacecraftExplosion(reason = 'Unmitigated Orbital Hazard') {
+  if (isDestroyed || victoryMode || showcaseMode || !scene) return;
+  isDestroyed = true;
+  destructionReason = reason;
+  clearActiveHazard();
+  stormUntil = 0;
+  sparkFlashUntil = 0;
+  heaterGlowT = 0;
+  dodgeT = 0;
+  deployActive = false;
 
-        float sunDot = dot(normalize(vWorldPos), normalize(uSunDir));
-        float nightWeight = mix(0.46, 1.18, smoothstep(0.28, -0.32, sunDot));
+  if (satMesh) satMesh.visible = false;
+  if (targetReticle) targetReticle.visible = false;
+  if (velArrow) velArrow.visible = false;
+  if (beamLine) beamLine.visible = false;
+  if (downlinkRig) downlinkRig.grp.visible = false;
+  if (scanLine) scanLine.visible = false;
+  if (hazardFx?.worldFx) hazardFx.worldFx.visible = false;
 
-        vec3 emerald = vec3(0.08, 0.96, 0.55);
-        vec3 violet = vec3(0.72, 0.36, 1.0);
-        vec3 col = mix(emerald, violet, smoothstep(0.18, 0.82, vUv.y));
+  if (camera && controls) {
+    followHoloId = null;
+    cameraMode = 'chase';
+    const curOff = camera.position.clone().sub(tmpSat);
+    const curDist = curOff.length();
+    const viewDir = curDist > 0.05 ? curOff.normalize() : new THREE.Vector3(0.7, 0.45, 0.85).normalize();
+    const goalDist = Math.min(Math.max(curDist, 2.2), 3.4);
+    camTween.active = true;
+    camTween.t = 0;
+    camTween.dur = 0.42;
+    camTween.fromPos.copy(camera.position);
+    camTween.toPos.copy(tmpSat).addScaledVector(viewDir, goalDist);
+    camTween.fromTarget.copy(controls.target);
+    camTween.toTarget.copy(tmpSat);
+  }
 
-        float intensity = altFade * (0.34 + raysA * 0.78 + raysB * 0.42) * (0.52 + 0.56 * arcEnv) * nightWeight;
-        intensity = clamp(intensity * 1.32, 0.0, 0.96);
-        gl_FragColor = vec4(col * intensity, intensity);
-      }
-    `,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-    depthWrite: false
-  });
-  const grp = new THREE.Group();
-  grp.add(new THREE.Mesh(makeAuroraCurtainGeo(1), mat), new THREE.Mesh(makeAuroraCurtainGeo(-1), mat));
-  return { grp, mat };
+  explosionRig = createExplosionRig(tmpSat, tmpZ);
+  explosionElapsed = 0;
+  shakeRemaining = 0.6;
+  playSpacecraftExplosion();
+  lastHudMs = 0;
+  hazardEventCb?.({ type: 'destroyed', reason: destructionReason, hullIntegrity: 0 });
 }
 
 function createDownlinkStreamRig() {
@@ -930,9 +965,6 @@ function buildWorld(missionState, evaluation) {
   earthGroup.add(cloudMesh);
   atmoMat = makeAtmosphereRimMaterial();
   earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.088, 48, 32), atmoMat));
-  const auroraRig = createPolarAuroraGroup();
-  auroraMat = auroraRig.mat;
-  earthGroup.add(auroraRig.grp);
 
   const umbra = new THREE.Mesh(
     new THREE.CylinderGeometry(EARTH_R * 0.65, EARTH_R * 0.96, 26, 32, 1, true),
@@ -1077,13 +1109,12 @@ function buildWorld(missionState, evaluation) {
 
 function animate() {
   rafId = requestAnimationFrame(animate);
-  const now = performance.now(), realDt = Math.min(clock.getDelta(), 0.05), simDt = briefingPaused ? 0 : realDt * timeWarp;
+  const now = performance.now(), realDt = Math.min(clock.getDelta(), 0.05), simDt = (briefingPaused || isDestroyed) ? 0 : realDt * timeWarp;
   simTime += simDt; sunElapsed += realDt;
 
   if (showcaseMode) {
     if (earthGroup) earthGroup.rotation.y += realDt * 0.018;
     if (cloudMesh) cloudMesh.rotation.y += realDt * 0.024;
-    if (auroraMat) auroraMat.uniforms.uTime.value = sunElapsed;
     spaceEnv?.update(realDt, sunElapsed, camera?.position, camera?.quaternion);
     if (satMesh) {
       satMesh.position.set(1.55, 1.32 + Math.sin(sunElapsed * 0.85) * 0.045, 2.05);
@@ -1111,13 +1142,14 @@ function animate() {
 
   if (earthGroup) earthGroup.rotation.y += simDt * ((Math.PI * 2) / 86400);
   if (cloudMesh) cloudMesh.rotation.y += realDt * 0.015;
-  if (auroraMat) auroraMat.uniforms.uTime.value = sunElapsed;
   spaceEnv?.update(realDt, sunElapsed, camera?.position, camera?.quaternion);
 
   const prop = propagateOrbit(orbitEl, simTime), nextP = propagateOrbit(orbitEl, simTime + 5);
-  tmpSat.set(prop.position[0] * KM_TO_SCENE, prop.position[1] * KM_TO_SCENE, prop.position[2] * KM_TO_SCENE);
-  tmpNext.set(nextP.position[0] * KM_TO_SCENE, nextP.position[1] * KM_TO_SCENE, nextP.position[2] * KM_TO_SCENE);
-  if (satMesh) {
+  if (!isDestroyed) {
+    tmpSat.set(prop.position[0] * KM_TO_SCENE, prop.position[1] * KM_TO_SCENE, prop.position[2] * KM_TO_SCENE);
+    tmpNext.set(nextP.position[0] * KM_TO_SCENE, nextP.position[1] * KM_TO_SCENE, nextP.position[2] * KM_TO_SCENE);
+  }
+  if (satMesh && !isDestroyed) {
     satMesh.position.copy(tmpSat);
     // Nadir Orientation: +Y science payload & comms deck points straight toward Earth center (0,0,0);
     // +Z aligns with prograde velocity tangent; +/-X solar wings extend perpendicular to orbital plane.
@@ -1239,13 +1271,40 @@ function animate() {
   updateOrbitHazards(realDt, {
     inEclipse: prop.inEclipse,
     timeWarp,
-    tutorialActive: isTutorialActive() || victoryMode || briefingPaused
+    tutorialActive: isTutorialActive() || victoryMode || briefingPaused,
+    destroyed: isDestroyed
   });
   const hazardSnap = getHazardSnapshot();
   const activeHaz = hazardSnap.activeHazard;
   const activeKind = activeHaz?.kind || null;
 
-  if (satModel) {
+  if (explosionRig) {
+    explosionElapsed += realDt;
+    const fbT = Math.min(1, explosionElapsed / 0.9);
+    explosionRig.fireball.scale.setScalar(1 + fbT * 8.5);
+    explosionRig.fireball.material.opacity = Math.max(0, 1 - fbT);
+    explosionRig.fireball.material.color.setHex(fbT < 0.35 ? 0xfff3c4 : (fbT < 0.7 ? 0xfb923c : 0xef4444));
+    explosionRig.light.intensity = 16 * Math.max(0, 1 - explosionElapsed / 0.85);
+
+    const ringT = Math.min(1, explosionElapsed / 1.15);
+    explosionRig.shockRing.scale.setScalar(1 + ringT * 12);
+    explosionRig.shockRing.material.opacity = Math.max(0, 0.92 * (1 - ringT));
+    explosionRig.amberRing.scale.setScalar(1 + ringT * 9.5);
+    explosionRig.amberRing.material.opacity = Math.max(0, 0.88 * (1 - ringT));
+
+    explosionRig.pieces.forEach((p) => {
+      p.mesh.position.addScaledVector(p.vel, realDt * 0.85);
+      p.vel.multiplyScalar(Math.max(0.92, 1 - realDt * 0.22));
+      p.mesh.rotation.x += p.rotVel.x * realDt;
+      p.mesh.rotation.y += p.rotVel.y * realDt;
+      p.mesh.rotation.z += p.rotVel.z * realDt;
+      if (p.isEmber) {
+        p.mesh.material.opacity = Math.max(0, 1 - explosionElapsed / 1.5);
+      }
+    });
+  }
+
+  if (satModel && !isDestroyed) {
     if (deployActive && !briefingPaused && !victoryMode) {
       deployElapsed += realDt;
       deployProgress = Math.min(1, deployElapsed / DEPLOY_DURATION_SEC);
@@ -1342,13 +1401,16 @@ function animate() {
   const solarPaused = now < solarChargePauseUntil;
   const commsPaused = now < commsPauseUntil || now < sensorOfflineUntil;
   const risks = evalRef?.designRisks || {};
-  const canDegrade = !showcaseMode && !victoryMode && !briefingPaused && !isTutorialActive();
+  const canDegrade = !showcaseMode && !victoryMode && !briefingPaused && !isTutorialActive() && !isDestroyed;
   if (canDegrade && risks.massOverrun) {
     dragHullAccum += realDt * 0.5;
     dragLossKm += realDt * 0.85;
     if (dragHullAccum >= 0.5) {
-      applyHullDelta(-dragHullAccum, 10);
+      const nextHull = applyHullDelta(-dragHullAccum, 0);
       dragHullAccum = 0;
+      if (nextHull <= 0) {
+        triggerSpacecraftExplosion('Severe Atmospheric Drag Decay');
+      }
     }
   }
   hazardNow = prop.inEclipse || stormActive || Boolean(activeHaz);
@@ -1377,7 +1439,7 @@ function animate() {
     tmpNorm.copy(activeGs.localNorm).applyQuaternion(earthGroup.quaternion);
     const losDot = tmpSat.clone().sub(tmpGs).normalize().dot(tmpNorm);
     const rangeOk = orbitEl.deepSpace ? true : tmpSat.distanceTo(tmpGs) < 5.6;
-    const losOk = losDot > 0.08 && rangeOk && !stormActive && !gimbalJammed && !commsPaused;
+    const losOk = !isDestroyed && losDot > 0.08 && rangeOk && !stormActive && !gimbalJammed && !commsPaused;
 
     if (activeGs.cone) {
       activeGs.cone.material.opacity = losOk
@@ -1487,10 +1549,12 @@ function animate() {
       batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
       linkedStation: activeStationName, missionScore, downlinkCount, flareMitigated, asteroidsScanned,
       downlinkPts, anomalyPts, scanPts, decisionPts,
-      hullIntegrity: hazardSnap.hullIntegrity,
+      hullIntegrity: isDestroyed ? 0 : hazardSnap.hullIntegrity,
+      isDestroyed,
+      destructionReason,
       anomaliesResolved: hazardSnap.anomaliesResolved,
       anomaliesMissed: hazardSnap.anomaliesMissed,
-      hazardState: hazardSnap,
+      hazardState: isDestroyed ? { ...hazardSnap, hullIntegrity: 0, activeHazard: null, resolvedBanner: '' } : hazardSnap,
       designRisks: risks,
       metText: formatMetClock(simTime),
       utcText: formatUtcClock(simTime),
@@ -1502,7 +1566,20 @@ function animate() {
     });
   }
   controls.update();
+  let appliedShake = false;
+  if (shakeRemaining > 0 && camera && controls) {
+    shakeRemaining = Math.max(0, shakeRemaining - realDt);
+    const amp = Math.pow(shakeRemaining / 0.6, 1.5) * 0.095;
+    tmpShake.set((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp);
+    camera.position.add(tmpShake);
+    controls.target.add(tmpShake);
+    appliedShake = true;
+  }
   bloomComp ? bloomComp.composer.render() : renderer.render(scene, camera);
+  if (appliedShake && camera && controls) {
+    camera.position.sub(tmpShake);
+    controls.target.sub(tmpShake);
+  }
 }
 
 export function getSensorCamMode(missionState = stateRef) {
@@ -1788,7 +1865,7 @@ export function setOrbitBriefingPaused(paused) {
 }
 export const isOrbitBriefingPaused = () => briefingPaused;
 export function replayOrbitDeployment() {
-  if (showcaseMode || victoryMode || briefingPaused) return false;
+  if (showcaseMode || victoryMode || briefingPaused || isDestroyed) return false;
   startOrbitDeployment(true);
   lastHudMs = 0;
   return true;
@@ -1921,17 +1998,21 @@ export function seekOrbitToPass(leadSeconds = 110) {
   }
   return false;
 }
-export const triggerOrbitStorm = () => { stormUntil = performance.now() + 6000; playWarning(); };
+export const triggerOrbitStorm = () => { if (!isDestroyed) { stormUntil = performance.now() + 6000; playWarning(); } };
 export function triggerTestHazard(forcedKind = null) {
+  if (isDestroyed) return null;
   return triggerRandomHazard(forcedKind);
 }
 export function repairActiveHazard(key = null) {
+  if (isDestroyed) return { ok: false, reason: 'destroyed' };
   return resolveActiveHazard(key);
 }
 export function resolveOrbitHazardChoice(choiceIdx = 0) {
+  if (isDestroyed) return { ok: false, reason: 'destroyed' };
   return resolveActiveHazardChoice(choiceIdx);
 }
 export function transmitScience() {
+  if (isDestroyed) return { ok: false, reason: 'destroyed', points: 0, station: 'None' };
   const now = performance.now();
   if (brownoutLocked) return { ok: false, reason: 'brownout', points: 0, station: activeStationName };
   if (now < commsPauseUntil || now < sensorOfflineUntil) {
@@ -1957,13 +2038,14 @@ export function transmitScience() {
   return { ok: true, points: pts, station: activeStationName, omniReduced, weakComms: Boolean(risks.weakCommsMargin), wavelengthMismatch: Boolean(risks.wavelengthMismatch) };
 }
 export function activateSafeMode() {
+  if (isDestroyed) return { ok: false, points: 0, hazard: false };
   safeModeUntil = performance.now() + 6500; batterySoc = Math.min(100, batterySoc + 8);
   const pts = hazardNow ? 75 : 25; anomalyPts += pts; missionScore += pts;
   if (hazardNow) flareMitigated += 1;
   playSafeMode(); return { ok: true, points: pts, hazard: hazardNow };
 }
 export function scanAsteroid() {
-  if (!spaceEnv) return { ok: false, points: 0 };
+  if (!spaceEnv || isDestroyed) return { ok: false, points: 0 };
   const { target } = spaceEnv.findNearestTarget(tmpSat);
   const risks = evalRef?.designRisks || {};
   const pts = risks.wavelengthMismatch ? Math.round(target.points * 0.6) : target.points;
@@ -1977,7 +2059,10 @@ export function applyOrbitDecisionEffect({ scoreDelta = 0, hullDelta = 0, batter
     decisionPts += scoreDelta;
     missionScore += scoreDelta;
   }
-  if (hullDelta) applyHullDelta(hullDelta, 5);
+  if (hullDelta) {
+    const h = applyHullDelta(hullDelta, 0);
+    if (h <= 0) triggerSpacecraftExplosion('Critical Command Overload');
+  }
   if (batteryDelta) {
     batterySoc = Math.max(0, Math.min(100, batterySoc + batteryDelta));
     if (batterySoc <= 0.1 && evalRef?.designRisks?.lowPowerMargin) brownoutLocked = true;
@@ -1999,6 +2084,7 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
   downlinkPts = 0; anomalyPts = 0; scanPts = 0; decisionPts = 0; lastAutoFlare = 14; lastHudMs = 0; lastCamMs = 0;
   brownoutLocked = false; sensorOfflineUntil = 0; solarChargePauseUntil = 0; commsPauseUntil = 0; omniReducedDownlinks = 0; dragLossKm = 0; dragHullAccum = 0;
+  isDestroyed = false; destructionReason = ''; explosionRig = null; explosionElapsed = 0; shakeRemaining = 0;
   sensorCamEnabled = Boolean(options.sensorCam);
   dodgeT = 0; heaterGlowT = 0; repairSweepT = 0; sparkFlashUntil = 0;
   holoTargets = {}; holoProxies = []; gsHoloProxies = []; earthSolidMesh = null; earthOuterProxy = null;
@@ -2042,6 +2128,9 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
         if (res.kind === 'cryo' && (res.batteryDelta || 0) <= -20) heaterGlowT = 1.0;
         if ((res.hullDelta || 0) <= -10) sparkFlashUntil = nowMs + 950;
         lastHudMs = 0;
+        if (res.hullIntegrity <= 0) {
+          triggerSpacecraftExplosion(`High-Risk ConOps (${res.title})`);
+        }
         hazardEventCb?.({ type: 'resolve', ...res });
       },
       onExpire: (exp) => {
@@ -2051,6 +2140,9 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
         if (exp.kind === 'cme') stormUntil = 0;
         sparkFlashUntil = performance.now() + 1200;
         lastHudMs = 0;
+        if (exp.hullIntegrity <= 0) {
+          triggerSpacecraftExplosion(`Unmitigated Orbital Hazard (${exp.title})`);
+        }
         hazardEventCb?.({ type: 'expire', ...exp });
       }
     });
@@ -2178,8 +2270,9 @@ export function unmountOrbit() {
     scene = null;
   }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
-  earthGroup = earthMat = cloudMesh = atmoMat = auroraMat = earthshineLight = satMesh = targetReticle = thrusterGlow = beamLine = downlinkRig = scanLine = null;
-  orbitLine = ribbonMesh = velArrow = lineColorAttr = ribbonColorAttr = hazardFx = null;
+  earthGroup = earthMat = cloudMesh = atmoMat = earthshineLight = satMesh = targetReticle = thrusterGlow = beamLine = downlinkRig = scanLine = null;
+  orbitLine = ribbonMesh = velArrow = lineColorAttr = ribbonColorAttr = hazardFx = explosionRig = null;
+  isDestroyed = false; destructionReason = ''; explosionElapsed = 0; shakeRemaining = 0;
   hazardEventCb = null;
   resetOrbitHazards();
   gsNodes = []; gsHoloProxies = []; holoProxies = []; holoTargets = {};

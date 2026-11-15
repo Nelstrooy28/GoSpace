@@ -91,10 +91,12 @@ export function resolveActiveHazardChoice(choiceIdx = 0) {
   const resolved = activeHazard;
   activeHazard = null;
   const scoreDelta = chosen.scoreDelta || 0;
-  const hullDelta = chosen.hullDelta || 0;
+  const rawHullDelta = chosen.hullDelta || 0;
+  const hazMult = evalRef?.designRisks?.lowLifetime ? 1.35 : 1.0;
+  const hullDelta = rawHullDelta < 0 ? Math.round(rawHullDelta * hazMult) : rawHullDelta;
   anomaliesResolved += 1;
-  hullIntegrity = Math.max(5, Math.min(100, hullIntegrity + hullDelta));
-  resolvedBannerUntil = performance.now() + 3600;
+  hullIntegrity = Math.max(0, Math.min(100, hullIntegrity + hullDelta));
+  resolvedBannerUntil = hullIntegrity > 0 ? performance.now() + 3600 : 0;
   resolvedBannerText = chosen.toast;
   scheduleNext();
   if (hullDelta <= -10) playWarning(); else playRepairSuccess();
@@ -132,7 +134,13 @@ export function resolveActiveHazard(key = null) {
   return resolveActiveHazardChoice(0);
 }
 
-export function applyHullDelta(delta, minHull = 5) {
+export function clearActiveHazard() {
+  activeHazard = null;
+  resolvedBannerUntil = 0;
+  resolvedBannerText = '';
+}
+
+export function applyHullDelta(delta, minHull = 0) {
   hullIntegrity = Math.max(minHull, Math.min(100, hullIntegrity + Number(delta || 0)));
   return Math.round(hullIntegrity);
 }
@@ -140,8 +148,8 @@ export function applyHullDelta(delta, minHull = 5) {
 /**
  * Advances real-time countdowns for scheduled and active hazards.
  */
-export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tutorialActive = false } = {}) {
-  if (tutorialActive) return;
+export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tutorialActive = false, destroyed = false } = {}) {
+  if (tutorialActive || destroyed) return;
 
   if (activeHazard) {
     activeHazard.remainingSec = Math.max(0, activeHazard.remainingSec - realDt);
@@ -149,15 +157,17 @@ export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tu
       const missed = activeHazard;
       activeHazard = null;
       anomaliesMissed += 1;
-      hullIntegrity = Math.max(5, hullIntegrity - missed.hullLossOnMiss);
-      resolvedBannerUntil = performance.now() + 3600;
-      resolvedBannerText = `💥 RESPONSE TIMED OUT — -${missed.hullLossOnMiss}% HULL & -${missed.batteryLossOnMiss}% BATTERY!`;
+      const hazMult = evalRef?.designRisks?.lowLifetime ? 1.35 : 1.0;
+      const effHullLoss = Math.round(missed.hullLossOnMiss * hazMult);
+      hullIntegrity = Math.max(0, hullIntegrity - effHullLoss);
+      resolvedBannerUntil = hullIntegrity > 0 ? performance.now() + 3600 : 0;
+      resolvedBannerText = `💥 RESPONSE TIMED OUT — -${effHullLoss}% HULL & -${missed.batteryLossOnMiss}% BATTERY!`;
       scheduleNext();
       playHullSpark();
       callbacks.onExpire?.({
         kind: missed.kind,
         title: missed.title,
-        hullLoss: missed.hullLossOnMiss,
+        hullLoss: effHullLoss,
         batteryLoss: missed.batteryLossOnMiss,
         dataLossRatio: missed.dataLossRatio,
         hullIntegrity,

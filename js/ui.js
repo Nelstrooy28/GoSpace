@@ -1,4 +1,4 @@
-import { CATALOG, CELESTIAL_DATABASE, OFFICIAL_RESOURCES, SCENARIOS, getMissionOrbitGuide, getOrbitObjectivesStatus } from './catalog.js';
+import { CATALOG, CELESTIAL_DATABASE, OFFICIAL_RESOURCES, SCENARIOS, getMissionOrbitGuide, getOrbitActiveDebuffs, getOrbitObjectivesStatus } from './catalog.js';
 import { playRankStamp, playStarChime } from './sfx.js';
 
 let debriefTimers = [];
@@ -550,18 +550,23 @@ export function updateLaunchOverlay(t) {
 }
 
 export function updateOrbitOverlay(t, objStatus = null) {
+  const destroyed = Boolean(t?.isDestroyed || (t?.hullIntegrity ?? 100) <= 0);
   const d = document.getElementById('orbit-telem');
   if (d && t) {
-    const flags = [];
-    if ((t.solarPausedSec || 0) > 0) flags.push(`SOLAR PAUSED ${t.solarPausedSec}s`);
-    if ((t.commsPausedSec || 0) > 0) flags.push(`DL PAUSED ${t.commsPausedSec}s`);
-    if ((t.omniReducedDownlinks || 0) > 0) flags.push('OMNI 70%');
-    const flagStr = flags.length ? ` · ${flags.join(' · ')}` : '';
-    d.textContent = `ALT ${t.altitudeKm}km · ${t.speedKms}km/s · ${t.stormActive ? 'SOLAR FLARE!' : (t.inEclipse ? 'ECLIPSE' : 'SUNLIT')} | BATT ${t.batterySoc}%${flagStr} · ${t.nearestNeaId || 'NEA'}`;
+    if (destroyed) {
+      d.textContent = '💥 HULL BREACHED (0%) — VEHICLE LOST';
+    } else {
+      const flags = [];
+      if ((t.solarPausedSec || 0) > 0) flags.push(`SOLAR PAUSED ${t.solarPausedSec}s`);
+      if ((t.commsPausedSec || 0) > 0) flags.push(`DL PAUSED ${t.commsPausedSec}s`);
+      if ((t.omniReducedDownlinks || 0) > 0) flags.push('OMNI 70%');
+      const flagStr = flags.length ? ` · ${flags.join(' · ')}` : '';
+      d.textContent = `ALT ${t.altitudeKm}km · ${t.speedKms}km/s · ${t.stormActive ? 'SOLAR FLARE!' : (t.inEclipse ? 'ECLIPSE' : 'SUNLIT')} | BATT ${t.batterySoc}%${flagStr} · ${t.nearestNeaId || 'NEA'}`;
+    }
   }
   document.getElementById('orb-score-pill')?.replaceChildren(document.createTextNode(`SCORE ${t.missionScore}`));
   document.querySelectorAll('#stage-hud [data-warp]').forEach((b) => b.classList.toggle('is-on', Number(b.dataset.warp) === Number(t?.timeWarp)));
-  const hull = Math.max(0, Math.min(100, t?.hullIntegrity ?? 100));
+  const hull = destroyed ? 0 : Math.max(0, Math.min(100, t?.hullIntegrity ?? 100));
   const hullPct = document.getElementById('orb-hull-pct'); if (hullPct) hullPct.textContent = `${hull}%`;
   const hullFill = document.getElementById('orb-hull-fill');
   if (hullFill) {
@@ -571,7 +576,10 @@ export function updateOrbitOverlay(t, objStatus = null) {
   const hazBox = document.getElementById('hazard-alert-hud');
   const hs = t?.hazardState;
   if (hazBox && hs) {
-    if (hs.activeHazard) {
+    if (destroyed) {
+      hazBox.hidden = true;
+      hazBox.dataset.renderKey = '';
+    } else if (hs.activeHazard) {
       const haz = hs.activeHazard;
       const renderKey = `${haz.kind}|${hs.lowBattery ? 1 : 0}|${haz.choices?.length || 0}`;
       hazBox.hidden = false;
@@ -634,9 +642,9 @@ export function updateOrbitOverlay(t, objStatus = null) {
   if (eclBadge) eclBadge.hidden = !t?.inEclipse;
   const tx = document.getElementById('orb-transmit-btn');
   if (tx) {
-    tx.hidden = !t?.inLineOfSight;
+    tx.hidden = destroyed || !t?.inLineOfSight;
     const dlPaused = (t?.commsPausedSec || 0) > 0;
-    tx.disabled = Boolean(t?.brownoutLocked || dlPaused);
+    tx.disabled = Boolean(destroyed || t?.brownoutLocked || dlPaused);
     if (t?.brownoutLocked) {
       tx.textContent = '🔋 BROWNOUT: RECHARGE TO 15% IN SUNLIGHT';
     } else if (dlPaused) {
@@ -650,8 +658,13 @@ export function updateOrbitOverlay(t, objStatus = null) {
       tx.textContent = `📡 [SPACE] TRANSMIT SCIENCE (+${pts})${omniTag}`;
     }
   }
+  const scanBtn = document.getElementById('orb-scan-btn');
+  if (scanBtn) {
+    scanBtn.hidden = destroyed;
+    scanBtn.disabled = destroyed;
+  }
   const debBtn = document.getElementById('orb-debrief-btn');
-  const dlDone = objStatus ? Boolean(objStatus.canDebrief) : (t?.downlinkCount || 0) >= 1;
+  const dlDone = !destroyed && (objStatus ? Boolean(objStatus.canDebrief) : (t?.downlinkCount || 0) >= 1);
   if (debBtn) {
     debBtn.disabled = !dlDone;
     debBtn.classList.toggle('active', dlDone);
@@ -659,7 +672,7 @@ export function updateOrbitOverlay(t, objStatus = null) {
       ? '🏆 View Debrief'
       : `🔒 Debrief (${objStatus ? `${objStatus.completedCount}/${objStatus.totalCount}` : `${Math.min(t?.downlinkCount || 0, 1)}/1`})`;
   }
-  const sm = document.getElementById('orb-safemode-btn'); if (sm) sm.hidden = !(t?.inEclipse || t?.stormActive) || Boolean(t?.safeModeActive);
+  const sm = document.getElementById('orb-safemode-btn'); if (sm) sm.hidden = destroyed || !(t?.inEclipse || t?.stormActive) || Boolean(t?.safeModeActive);
   const db = document.getElementById('orbit-deploy-banner');
   if (db) {
     const active = Boolean(t?.deployActive && !t?.briefingPaused);
@@ -842,7 +855,7 @@ export function renderDecisionCard(decision) {
   }
 }
 
-export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run = null, collapsed = false) {
+export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run = null, collapsed = false, evaluation = null) {
   const box = document.getElementById('orbit-objectives-sidebar');
   if (!box) return;
   if (stage !== 'orbit') {
@@ -853,9 +866,23 @@ export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run
   box.hidden = false;
   box.classList.toggle('is-collapsed', Boolean(collapsed));
   const status = getOrbitObjectivesStatus(state, telemetry, run);
-  const sig = `${status.scenarioId}|${status.isSandbox ? 1 : 0}|${collapsed ? 1 : 0}|${status.completedCount}|${status.canDebrief ? 1 : 0}|${status.tasks.map((t) => `${t.progressText}:${t.badgeText}`).join('|')}`;
+  const debuffs = evaluation ? getOrbitActiveDebuffs(evaluation, telemetry) : [];
+  const debuffSig = debuffs.map((d) => `${d.id}:${d.firing ? 1 : 0}`).join(',');
+  const sig = `${status.scenarioId}|${status.isSandbox ? 1 : 0}|${collapsed ? 1 : 0}|${status.isDestroyed ? 1 : 0}|${status.completedCount}|${status.canDebrief ? 1 : 0}|${status.tasks.map((t) => `${t.progressText}:${t.badgeText}`).join('|')}|${debuffSig}`;
   if (box.dataset.renderKey === sig) return status;
   box.dataset.renderKey = sig;
+
+  const debuffsHtml = debuffs.length
+    ? `<div class="orb-debuffs-list">${debuffs.map((d) => `
+        <div class="orb-debuff-pill ${d.firing ? 'is-firing' : ''}">
+          <div class="orb-debuff-top"><span>${d.icon} ${esc(d.title)}</span>${d.firing ? '<span class="orb-debuff-live">ACTIVE</span>' : ''}</div>
+          <div class="orb-debuff-eff">${esc(d.effect)}</div>
+        </div>`).join('')}</div>`
+    : '<div class="orb-debuff-nominal">✅ ZERO DESIGN DEBUFFS — NOMINAL</div>';
+
+  const destroyedBanner = status.isDestroyed && status.isSandbox
+    ? '<div class="orb-obj-destroyed-tag">💥 0% DESTROYED — VEHICLE LOST</div>'
+    : '';
 
   box.innerHTML = `<div class="orb-obj-head">
       <div class="orb-obj-head-top">
@@ -879,9 +906,49 @@ export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run
             <div class="orb-obj-pill ${t.complete ? 'is-ok' : (t.isWarning ? 'is-bad' : 'is-wait')}">${esc(t.badgeText)}</div>
           </li>`).join('')}
       </ul>
+      ${destroyedBanner}
+      <div class="orb-debuffs-sec">
+        <div class="orb-debuffs-head">⚠️ ACTIVE DESIGN DEBUFFS</div>
+        ${debuffsHtml}
+      </div>
       <button id="orb-obj-debrief-btn" class="orb-obj-footer-btn ${status.canDebrief ? 'is-unlocked' : ''}" type="button" ${status.canDebrief ? '' : 'disabled'}>
-        ${status.canDebrief ? '🏆 FINISH MISSION &amp; DEBRIEF ▶' : '🔒 Finish Incomplete Tasks'}
+        ${status.isDestroyed ? '💥 VEHICLE LOST (0% HULL)' : (status.canDebrief ? '🏆 FINISH MISSION &amp; DEBRIEF ▶' : '🔒 Finish Incomplete Tasks')}
       </button>
     </div>`;
   return status;
+}
+
+export function renderLossOfVehicleModal(open, reason = '', ev = null) {
+  const el = document.getElementById('loss-overlay');
+  if (!el) return;
+  if (!open) {
+    el.hidden = true;
+    el.dataset.key = '';
+    el.innerHTML = '';
+    return;
+  }
+  const debuffs = ev ? getOrbitActiveDebuffs(ev, null) : [];
+  const scName = ev?.scenario?.name || 'Orbital Mission';
+  const key = `${scName}|${reason}|${debuffs.map((d) => d.id).join(',')}`;
+  el.hidden = false;
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+
+  const causeText = reason || 'Unmitigated Orbital Hazard';
+  const debuffNote = debuffs.length
+    ? `<div class="loss-debuffs"><strong>Contributing Constraints:</strong> ${debuffs.map((d) => `${d.icon} ${esc(d.title)} (${esc(d.effect)})`).join(' · ')}</div>`
+    : '';
+
+  el.innerHTML = `<div class="loss-card plate" role="alertdialog" aria-modal="true" aria-labelledby="loss-title">
+      <div class="loss-kicker">EMERGENCY TELEMETRY LOSS // STAGE 3 FAILURE</div>
+      <h2 id="loss-title" class="loss-title">💥 LOSS OF VEHICLE — HULL BREACHED (0%)</h2>
+      <p class="loss-desc">Telemetry carrier lost for <strong>${esc(scName)}</strong> after structural integrity dropped to zero.</p>
+      <div class="loss-cause-box"><span>PRIMARY CAUSE</span><strong>${esc(causeText)}</strong></div>
+      ${debuffNote}
+      <div class="loss-actions">
+        <button id="loss-hangar-btn" class="loss-btn is-fix" type="button">🔧 FIX DESIGN IN HANGAR</button>
+        <button id="loss-retry-btn" class="loss-btn is-retry" type="button">🔄 RETRY ORBIT</button>
+        <button id="loss-menu-btn" class="loss-btn is-menu" type="button">🏠 BACK TO MENU</button>
+      </div>
+    </div>`;
 }

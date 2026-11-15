@@ -3374,9 +3374,10 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   position: fixed;
   top: 84px;
   left: 16px;
-  width: 290px;
-  max-height: calc(100vh - 385px);
+  width: 316px;
+  max-height: calc(100vh - 170px);
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 8px 10px;
   border-radius: 11px;
   border: 1.5px solid rgba(56, 189, 248, 0.48);
@@ -3389,6 +3390,10 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   gap: 5px;
   pointer-events: auto;
   z-index: 27;
+}
+
+#hud-layer:has(#sensor-cam-pip:not([hidden])) #orbit-objectives-sidebar {
+  max-height: calc(100vh - 385px);
 }
 
 .orb-obj-head {
@@ -3575,12 +3580,244 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   filter: brightness(1.08);
 }
 
+.orb-obj-destroyed-tag {
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1.5px solid #f87171;
+  background: rgba(127, 29, 29, 0.72);
+  color: #fecaca;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.orb-debuffs-sec {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(56, 189, 248, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.orb-debuffs-head {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #fde68a;
+}
+
+.orb-debuffs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.orb-debuff-pill {
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(69, 26, 3, 0.48);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.orb-debuff-pill.is-firing {
+  border-color: rgba(248, 113, 113, 0.92);
+  background: rgba(127, 29, 29, 0.65);
+  animation: debuffPulse 1.15s ease-in-out infinite;
+}
+
+@keyframes debuffPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.55);
+    border-color: rgba(248, 113, 113, 0.95);
+  }
+  50% {
+    box-shadow: 0 0 12px 2px rgba(251, 146, 60, 0.65);
+    border-color: rgba(251, 191, 36, 0.95);
+  }
+}
+
+.orb-debuff-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: #fef3c7;
+  line-height: 1.2;
+}
+
+.orb-debuff-live {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fca5a5;
+  white-space: nowrap;
+}
+
+.orb-debuff-eff {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fde68a;
+  line-height: 1.22;
+}
+
+.orb-debuff-pill.is-firing .orb-debuff-eff {
+  color: #fecaca;
+}
+
+.orb-debuff-nominal {
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(52, 211, 153, 0.48);
+  background: rgba(6, 78, 59, 0.45);
+  color: #a7f3d0;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+#loss-overlay,
+.loss-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(circle at center, rgba(127, 29, 29, 0.48), rgba(2, 6, 16, 0.84));
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.loss-card {
+  width: min(620px, 94vw);
+  padding: 22px 24px;
+  border-radius: 14px;
+  border: 2px solid rgba(248, 113, 113, 0.85);
+  background: linear-gradient(165deg, rgba(32, 10, 16, 0.96), rgba(9, 13, 28, 0.97));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.82), 0 0 38px rgba(239, 68, 68, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loss-kicker {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fca5a5;
+}
+
+.loss-title {
+  margin: 0;
+  font-family: var(--font-hud);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #fef2f2;
+  text-shadow: 0 0 18px rgba(239, 68, 68, 0.55);
+}
+
+.loss-desc {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: #e2e8f0;
+}
+
+.loss-cause-box {
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: 1.5px solid rgba(251, 146, 60, 0.72);
+  background: rgba(127, 29, 29, 0.46);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.loss-cause-box span {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #fdba74;
+}
+
+.loss-cause-box strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff7ed;
+}
+
+.loss-debuffs {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(69, 26, 3, 0.42);
+  font-size: 14px;
+  line-height: 1.4;
+  color: #fde68a;
+}
+
+.loss-actions {
+  margin-top: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.loss-btn {
+  padding: 11px 12px;
+  border-radius: 9px;
+  border: 1.5px solid transparent;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+
+.loss-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.loss-btn.is-fix {
+  border-color: #fbbf24;
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  color: #0f172a;
+}
+
+.loss-btn.is-retry {
+  border-color: #38bdf8;
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #f0f9ff;
+}
+
+.loss-btn.is-menu {
+  border-color: rgba(148, 163, 184, 0.55);
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+}
+
 /* Always honor HTML [hidden] above all ID display rules */
 [hidden],
 #hangar-loadout[hidden],
 #title-overlay[hidden],
 #review-overlay[hidden],
 #briefing-overlay[hidden],
+#loss-overlay[hidden],
 #sensor-cam-pip[hidden],
 #orbit-deploy-banner[hidden],
 #orbit-objectives-sidebar[hidden],

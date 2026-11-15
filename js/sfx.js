@@ -172,3 +172,38 @@ export function stopRocketRumbling() {
     src.stop(t + 0.28); sub.stop(t + 0.28);
   } catch { /* ignore */ }
 }
+
+export function playSpacecraftExplosion() {
+  const c = ensureCtx(); if (!c) return;
+  const now = c.currentTime;
+  const dur = 1.35;
+  const len = Math.floor(c.sampleRate * dur);
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const data = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i += 1) {
+    last = (last + 0.08 * (Math.random() * 2 - 1)) / 1.08;
+    data[i] = last * 4.5 * Math.pow(Math.max(0, 1 - i / len), 1.35);
+  }
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const lpf = c.createBiquadFilter();
+  lpf.type = 'lowpass';
+  lpf.frequency.setValueAtTime(540, now);
+  lpf.frequency.exponentialRampToValueAtTime(55, now + dur);
+  const boomGain = c.createGain();
+  boomGain.gain.setValueAtTime(0.001, now);
+  boomGain.gain.linearRampToValueAtTime(0.32, now + 0.02);
+  boomGain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  src.connect(lpf);
+  lpf.connect(boomGain);
+  boomGain.connect(c.destination);
+  src.start(now);
+  src.stop(now + dur + 0.05);
+
+  tone(110, 24, 0.9, 'sawtooth', 0.16, 0);
+  tone(64, 18, 1.05, 'sine', 0.18, 0);
+  [0.02, 0.09, 0.18, 0.29, 0.42].forEach((delay, idx) => {
+    tone(920 - idx * 120, 190, 0.085, 'square', 0.045, delay);
+  });
+}
