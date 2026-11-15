@@ -21,7 +21,7 @@ let renderer = null, bloomComp = null, scene = null, camera = null, controls = n
 let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = null, earthshineLight = null;
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, beamHalo = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
-let gsNodes = [], gsPulseRing = null, orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
+let gsNodes = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
 let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false, sensorCamEnabled = false;
 let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs = 0, fitDist = 7.2, sunElapsed = 0;
@@ -496,6 +496,214 @@ function startOrbitDeployment(isReplay = false) {
   startCameraTween('chase', false, 0.78);
 }
 
+function createGroundStationMesh(gs, active) {
+  const localPos = latLonToVec(gs.lat, gs.lon, EARTH_R * 1.001);
+  const localNorm = localPos.clone().normalize();
+  const group = new THREE.Group();
+  group.position.copy(localPos);
+  group.quaternion.setFromUnitVectors(tmpUpAxis, localNorm);
+
+  const accentHex = active ? 0x34d399 : 0x38bdf8;
+  const slateMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.78, roughness: 0.28 });
+  const turretMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.82, roughness: 0.24 });
+  const dishMat = new THREE.MeshStandardMaterial({
+    color: 0xf1f5f9,
+    metalness: 0.52,
+    roughness: 0.24,
+    emissive: 0x0f172a,
+    emissiveIntensity: 0.15
+  });
+
+  // Base octagon pedestal flush with terrain + turret collar
+  const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.068, 0.022, 8), slateMat);
+  pedestal.position.y = 0.006;
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.036, 0.024, 8), turretMat);
+  turret.position.y = 0.024;
+  group.add(pedestal, turret);
+
+  // Thin glowing cyan/emerald base perimeter ring
+  const baseRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.054, 0.065, 32),
+    new THREE.MeshBasicMaterial({
+      color: accentHex,
+      transparent: true,
+      opacity: active ? 0.92 : 0.62,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  baseRing.rotation.x = -Math.PI / 2;
+  baseRing.position.y = 0.019;
+  group.add(baseRing);
+
+  // Steerable azimuth yoke + ~30 deg skyward-tilted parabolic dish complex
+  const yawGroup = new THREE.Group();
+  yawGroup.position.y = 0.036;
+  yawGroup.rotation.y = gs.id === 'inuvik' ? 0.35 : (gs.id === 'nsn' ? -0.55 : 0.95);
+  const yokeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.026, 0.012), slateMat);
+  yokeLeft.position.set(-0.018, 0.013, 0);
+  const yokeRight = yokeLeft.clone();
+  yokeRight.position.x = 0.018;
+  const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.042, 8), turretMat);
+  axle.rotation.z = Math.PI / 2;
+  axle.position.y = 0.024;
+  yawGroup.add(yokeLeft, yokeRight, axle);
+
+  const dishPivot = new THREE.Group();
+  dishPivot.position.y = 0.024;
+  dishPivot.rotation.x = 0.52; // ~30 deg tilt off local zenith
+
+  // Procedural closed-profile Lathe parabolic dish reflector
+  const dishPts = [];
+  for (let i = 0; i <= 7; i += 1) {
+    const t = i / 7;
+    const r = 0.003 + t * 0.055;
+    dishPts.push(new THREE.Vector2(r, 0.028 * t * t));
+  }
+  dishPts.push(new THREE.Vector2(0.06, 0.027));
+  for (let i = 7; i >= 1; i -= 1) {
+    const t = i / 7;
+    const r = 0.004 + t * 0.054;
+    dishPts.push(new THREE.Vector2(r, 0.028 * t * t - 0.0045));
+  }
+  dishPts.push(new THREE.Vector2(0.016, -0.012), new THREE.Vector2(0.002, -0.012));
+  const dishBowl = new THREE.Mesh(new THREE.LatheGeometry(dishPts, 28), dishMat);
+  const rearHub = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.014, 14), turretMat);
+  rearHub.position.y = -0.01;
+  dishPivot.add(dishBowl, rearHub);
+
+  // Feed horn spire, 3 hairline tripod struts & tiny pulsing tip
+  const feedSpire = new THREE.Mesh(new THREE.CylinderGeometry(0.002, 0.0036, 0.052, 8), turretMat);
+  feedSpire.position.y = 0.026;
+  const subReflector = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.004, 0.0045, 12), dishMat);
+  subReflector.position.y = 0.051;
+  dishPivot.add(feedSpire, subReflector);
+
+  for (let i = 0; i < 3; i += 1) {
+    const a = (i * Math.PI * 2) / 3;
+    const p0 = new THREE.Vector3(Math.cos(a) * 0.048, 0.021, Math.sin(a) * 0.048);
+    const p1 = new THREE.Vector3(0, 0.05, 0);
+    const dir = p1.clone().sub(p0);
+    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.001, 0.001, dir.length(), 6), turretMat);
+    strut.position.copy(p0).addScaledVector(dir, 0.5);
+    strut.quaternion.setFromUnitVectors(tmpUpAxis, dir.normalize());
+    dishPivot.add(strut);
+  }
+
+  const beaconTip = new THREE.Mesh(
+    new THREE.SphereGeometry(0.0062, 10, 8),
+    new THREE.MeshBasicMaterial({ color: accentHex })
+  );
+  beaconTip.position.y = 0.056;
+  dishPivot.add(beaconTip);
+
+  yawGroup.add(dishPivot);
+  group.add(yawGroup);
+
+  // Subtle additive uplink signal cone + ascending pulse rings for active station
+  let cone = null;
+  let pulseRings = [];
+  if (active) {
+    cone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.46, 0.92, 28, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0x10b981,
+        transparent: true,
+        opacity: 0.14,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    cone.rotation.x = Math.PI;
+    cone.position.y = 0.062 + 0.46;
+    group.add(cone);
+
+    pulseRings = [0, 1].map(() => {
+      const pr = new THREE.Mesh(
+        new THREE.RingGeometry(0.072, 0.088, 32),
+        new THREE.MeshBasicMaterial({
+          color: 0x34d399,
+          transparent: true,
+          opacity: 0.32,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        })
+      );
+      pr.rotation.x = -Math.PI / 2;
+      pr.position.y = 0.065;
+      group.add(pr);
+      return pr;
+    });
+  }
+
+  return { group, localPos, localNorm, beaconTip, baseRing, cone, pulseRings };
+}
+
+function createHoloReticle() {
+  const reticle = new THREE.Group();
+  const innerGroup = new THREE.Group();
+  const outerGroup = new THREE.Group();
+
+  const innerRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.84, 0.864, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.92,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  innerGroup.add(innerRing);
+
+  const tickMat = new THREE.MeshBasicMaterial({
+    color: 0x7dd3fc,
+    transparent: true,
+    opacity: 0.88,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  for (let i = 0; i < 4; i += 1) {
+    const ang = (i * Math.PI) / 2;
+    const tick = new THREE.Mesh(new THREE.PlaneGeometry(0.075, 0.018), tickMat);
+    tick.position.set(Math.cos(ang) * 0.785, Math.sin(ang) * 0.785, 0);
+    tick.rotation.z = ang;
+    innerGroup.add(tick);
+  }
+
+  const bracketMat = new THREE.MeshBasicMaterial({
+    color: 0x67e8f9,
+    transparent: true,
+    opacity: 0.96,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const arcSpan = Math.PI * 0.25;
+  for (let i = 0; i < 4; i += 1) {
+    const startAngle = i * (Math.PI / 2) - arcSpan / 2;
+    const arc = new THREE.Mesh(
+      new THREE.RingGeometry(0.985, 1.024, 20, 1, startAngle, arcSpan),
+      bracketMat
+    );
+    const pip = new THREE.Mesh(
+      new THREE.RingGeometry(1.055, 1.08, 6, 1, i * (Math.PI / 2) + Math.PI / 4 - 0.045, 0.09),
+      tickMat
+    );
+    outerGroup.add(arc, pip);
+  }
+
+  reticle.add(innerGroup, outerGroup);
+  reticle.userData = { innerGroup, outerGroup };
+  reticle.renderOrder = 12;
+  return reticle;
+}
+
 function buildWorld(missionState, evaluation) {
   orbitEl = evaluation.orbitElements;
   const deep = Boolean(orbitEl.deepSpace);
@@ -548,35 +756,35 @@ function buildWorld(missionState, evaluation) {
     gsHoloProxies = [];
     gsNodes = STATIONS.map((gs) => {
       const active = gs.id === missionState.stationId;
-      const localPos = latLonToVec(gs.lat, gs.lon, EARTH_R * 1.02), localNorm = localPos.clone().normalize();
-      const m = new THREE.Mesh(new THREE.SphereGeometry(active ? 0.095 : 0.06, 12, 10), new THREE.MeshBasicMaterial({ color: active ? 0x22c55e : 0xf59e0b }));
-      m.position.copy(localPos); earthGroup.add(m);
+      const stationRig = createGroundStationMesh(gs, active);
+      earthGroup.add(stationRig.group);
+
       const gsProxy = new THREE.Mesh(
-        new THREE.SphereGeometry(0.42, 10, 8),
+        new THREE.SphereGeometry(0.36, 12, 10),
         new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })
       );
       const holoKey = `gs-${gs.id}`;
       gsProxy.userData.holoId = holoKey;
-      gsProxy.position.copy(localPos);
+      gsProxy.position.copy(stationRig.localPos);
       earthGroup.add(gsProxy);
       gsHoloProxies.push(gsProxy);
       holoTargets[holoKey] = {
         id: holoKey,
-        visualRadius: 0.28,
-        getPos: () => m.getWorldPosition(new THREE.Vector3()),
-        getNormal: () => localNorm.clone().applyQuaternion(earthGroup.quaternion).normalize()
+        isGroundStation: true,
+        visualRadius: 0.125,
+        getPos: () => stationRig.group.getWorldPosition(new THREE.Vector3()),
+        getNormal: () => stationRig.localNorm.clone().applyQuaternion(earthGroup.quaternion).normalize()
       };
-      let cone = null;
-      if (active) {
-        cone = new THREE.Mesh(new THREE.ConeGeometry(0.52, 0.95, 22, 1, true), new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false }));
-        cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), localNorm);
-        cone.position.copy(localPos).addScaledVector(localNorm, 0.475);
-        gsPulseRing = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.14, 24), new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
-        gsPulseRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), localNorm);
-        gsPulseRing.position.copy(localPos).addScaledVector(localNorm, 0.02);
-        earthGroup.add(cone, gsPulseRing);
-      }
-      return { ...gs, active, mesh: m, cone, localNorm };
+      return {
+        ...gs,
+        active,
+        mesh: stationRig.beaconTip,
+        group: stationRig.group,
+        cone: stationRig.cone,
+        pulseRings: stationRig.pulseRings,
+        baseRing: stationRig.baseRing,
+        localNorm: stationRig.localNorm
+      };
     });
   }
   scene.add(earthGroup);
@@ -635,18 +843,7 @@ function buildWorld(missionState, evaluation) {
   };
   holoProxies = [...(spaceEnv.holoProxies || [])];
 
-  selectionRing = new THREE.Group();
-  const ringCore = new THREE.Mesh(
-    new THREE.TorusGeometry(1, 0.036, 12, 64),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending, depthWrite: false })
-  );
-  ringCore.rotation.x = Math.PI / 2;
-  const ringHalo = new THREE.Mesh(
-    new THREE.RingGeometry(1.08, 1.24, 64),
-    new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })
-  );
-  ringHalo.rotation.x = Math.PI / 2;
-  selectionRing.add(ringCore, ringHalo);
+  selectionRing = createHoloReticle();
   selectionRing.visible = false;
   scene.add(selectionRing);
 
@@ -790,13 +987,20 @@ function animate() {
     if (selTarget) {
       selectionRing.visible = true;
       selectionRing.position.copy(selTarget.getPos());
-      const pulse = 1 + 0.055 * Math.sin(sunElapsed * 4.2);
-      selectionRing.scale.setScalar(Math.max(0.28, selTarget.visualRadius * 1.42) * pulse);
-      if (selTarget.getNormal) {
-        selectionRing.quaternion.setFromUnitVectors(tmpUpAxis, selTarget.getNormal());
-      } else {
-        selectionRing.rotation.set(0, sunElapsed * 0.85, 0);
+      if (selTarget.isGroundStation && selTarget.getNormal) {
+        selectionRing.position.addScaledVector(selTarget.getNormal(), 0.048);
+        tmpNorm.copy(camera.position).sub(selectionRing.position).normalize();
+        selectionRing.position.addScaledVector(tmpNorm, 0.085);
       }
+      selectionRing.quaternion.copy(camera.quaternion);
+      const pulse = 1 + 0.035 * Math.sin(sunElapsed * 3.8);
+      const baseScale = selTarget.isGroundStation
+        ? selTarget.visualRadius
+        : Math.max(0.28, selTarget.visualRadius * 1.24);
+      selectionRing.scale.setScalar(baseScale * pulse);
+      const { innerGroup, outerGroup } = selectionRing.userData;
+      if (innerGroup) innerGroup.rotation.z = sunElapsed * 0.4;
+      if (outerGroup) outerGroup.rotation.z = -sunElapsed * 0.4;
     } else {
       selectionRing.visible = false;
     }
@@ -927,18 +1131,35 @@ function animate() {
   }
 
   inLineOfSight = false; activeStationName = 'None';
+  gsNodes.forEach((gs, idx) => {
+    const pTip = 0.88 + 0.28 * Math.abs(Math.sin(sunElapsed * 2.6 + idx * 1.7));
+    if (gs.mesh) gs.mesh.scale.setScalar(pTip);
+  });
   const activeGs = gsNodes.find((g) => g.active) || gsNodes[0];
   if (activeGs && beamLine) {
     activeGs.mesh.getWorldPosition(tmpGs);
     tmpNorm.copy(activeGs.localNorm).applyQuaternion(earthGroup.quaternion);
     const losDot = tmpSat.clone().sub(tmpGs).normalize().dot(tmpNorm);
     const rangeOk = orbitEl.deepSpace ? true : tmpSat.distanceTo(tmpGs) < 5.6;
-    if (activeGs.cone) activeGs.cone.material.opacity = 0.16 + 0.15 * Math.abs(Math.sin(now * 0.004));
-    if (gsPulseRing) {
-      const p = 1 + 0.8 * ((now * 0.0012) % 1);
-      gsPulseRing.scale.setScalar(p); gsPulseRing.material.opacity = Math.max(0.05, 0.85 * (2 - p));
+    const losOk = losDot > 0.08 && rangeOk && !stormActive && !gimbalJammed;
+
+    if (activeGs.cone) {
+      activeGs.cone.material.opacity = losOk
+        ? 0.34 + 0.08 * Math.abs(Math.sin(now * 0.008))
+        : 0.12 + 0.04 * Math.abs(Math.sin(now * 0.0035));
+      activeGs.cone.material.color.setHex(losOk ? 0x22d3ee : 0x10b981);
     }
-    if (losDot > 0.08 && rangeOk && !stormActive && !gimbalJammed) {
+    if (activeGs.pulseRings?.length) {
+      const speed = losOk ? 0.0014 : 0.00055;
+      activeGs.pulseRings.forEach((pr, idx) => {
+        const phase = ((now * speed) + idx * 0.5) % 1;
+        pr.position.y = 0.065 + phase * 0.72;
+        pr.scale.setScalar(0.85 + phase * 3.8);
+        pr.material.color.setHex(losOk ? 0x22d3ee : 0x34d399);
+        pr.material.opacity = (losOk ? 0.62 : 0.24) * (1 - phase);
+      });
+    }
+    if (losOk) {
       inLineOfSight = true; activeStationName = activeGs.name;
       beamLine.visible = true; beamHalo.visible = true;
       beamLine.material.color.setHex(now < beamBoostUntil ? 0x34d399 : 0x22d3ee);
@@ -1305,7 +1526,7 @@ export function focusCelestialBody(holoId = selectedHoloId) {
     const side = new THREE.Vector3(0, 1, 0).cross(n);
     if (side.lengthSq() < 1e-4) side.set(1, 0, 0);
     side.normalize();
-    camPos = center.clone().addScaledVector(n, 2.35).addScaledVector(side, 0.95).add(new THREE.Vector3(0, 0.55, 0));
+    camPos = center.clone().addScaledVector(n, 0.92).addScaledVector(side, 0.42).add(new THREE.Vector3(0, 0.22, 0));
   } else {
     camPos = center.clone().add(target.camOffset || new THREE.Vector3(4, 2, 5));
   }
@@ -1584,7 +1805,7 @@ export function unmountOrbit() {
   }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
   earthGroup = earthMat = cloudMesh = atmoMat = earthshineLight = satMesh = targetReticle = thrusterGlow = beamLine = beamHalo = scanLine = null;
-  orbitLine = ribbonMesh = velArrow = lineColorAttr = ribbonColorAttr = gsPulseRing = hazardFx = null;
+  orbitLine = ribbonMesh = velArrow = lineColorAttr = ribbonColorAttr = hazardFx = null;
   hazardEventCb = null;
   resetOrbitHazards();
   gsNodes = []; gsHoloProxies = []; holoProxies = []; holoTargets = {};
