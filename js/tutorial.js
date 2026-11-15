@@ -556,7 +556,7 @@ function handleAssist() {
   if (step === 7) {
     if (!ctx.orbitTelemetry?.inLineOfSight) {
       cb.seekPass();
-      cb.setOrbitWarp(120);
+      cb.setOrbitWarp(6);
     } else {
       cb.transmitNow();
     }
@@ -609,7 +609,7 @@ export function notifyTutorialState() {
     if (!passSought) {
       passSought = true;
       cb.seekPass();
-      cb.setOrbitWarp(90);
+      cb.setOrbitWarp(4);
     }
     if (ctx.orbitTelemetry?.inLineOfSight && !warpDroppedForLos) {
       warpDroppedForLos = true;

@@ -361,8 +361,8 @@ export function renderStageHud(stage, state, ev, opts) {
       </div>
       <div class="btn-row">
         <button class="btn-sci ${opts.orbitWarp === 1 ? 'is-on' : ''}" data-warp="1" type="button">1x</button>
-        <button class="btn-sci ${opts.orbitWarp === 25 ? 'is-on' : ''}" data-warp="25" type="button">25x</button>
-        <button class="btn-sci ${opts.orbitWarp === 100 ? 'is-on' : ''}" data-warp="100" type="button">100x</button>
+        <button class="btn-sci ${opts.orbitWarp === 2 ? 'is-on' : ''}" data-warp="2" type="button">2x</button>
+        <button class="btn-sci ${opts.orbitWarp === 5 ? 'is-on' : ''}" data-warp="5" type="button">5x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
         ${testHazBtn}
         <button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Replay Zero-G Satellite Unfolding [U]">🛰️ Replay Unfold [U]</button>
@@ -686,11 +686,14 @@ export function updateOrbitOverlay(t, objStatus = null) {
     scanBtn.disabled = destroyed;
     scanBtn.classList.remove('is-swath-ready', 'is-cooldown', 'is-standby');
     if (t?.swathReady) {
-      scanBtn.textContent = `🔬 TARGET IN SWATH — PRESS [E] TO CAPTURE (+${t.swathZonePoints || 60})`;
+      scanBtn.textContent = `🔬 IN SCAN ZONE — PRESS [E] TO CAPTURE SCIENCE (+${t.swathZonePoints || 60})`;
       scanBtn.classList.add('is-swath-ready');
     } else if ((t?.swathCooldownSec || 0) > 0) {
       scanBtn.textContent = `⏳ ${(t.swathZoneName || 'ZONE').toUpperCase()} COOLDOWN (${t.swathCooldownSec}s)`;
       scanBtn.classList.add('is-cooldown');
+    } else if (t?.nextZoneName) {
+      scanBtn.textContent = `🔍 NEXT SCAN: ${t.nextZoneName} · ${t.nextZoneEtaSec}s (~${t.nextZoneDistKm} km)`;
+      scanBtn.classList.add('is-standby');
     } else {
       scanBtn.textContent = '🔍 [E] SCAN SCIENCE ZONE (FLY INTO RING)';
       scanBtn.classList.add('is-standby');
@@ -775,7 +778,7 @@ export function renderMissionBriefing(ev, stage, open) {
     <div class="brief-keybinds" aria-label="Orbital Controls">
       <span><kbd>[SPACE]</kbd> Downlink Buffer at Ground Dish</span>
       <span><kbd>[E]</kbd> Scan Science Zone</span>
-      <span><kbd>[1x–100x]</kbd> Time Warp</span>
+      <span><kbd>[1x–5x]</kbd> Time Warp</span>
       <span><kbd>[Click / Hotkey]</kbd> Fix Hazards</span>
     </div>
 

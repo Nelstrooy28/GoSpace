@@ -36,7 +36,7 @@ let stage = 'hangar', titleOpen = true, activeSegment = 'user', activeSub = 'obj
 let missionState = (() => { const s = readJson(STORAGE_ACTIVE, null); return s?.scenarioId ? s : createInitialState('wildfiresat-l1', false); })();
 let runSession = createFreshRunSession(missionState.scenarioId);
 let activeScene = null, hudHidden = false, codexOpen = false, briefingOpen = false, sensorCamOpen = false, objectivesCollapsed = false, selectedHoloId = null, focusedHoloId = null;
-let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 25, orbitCam = 'full';
+let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 1, orbitCam = 'full';
 let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0, orbitSessionDirty = true;
 let lossModalTimer = 0, lossModalOpen = false, lossReason = '';
 
@@ -62,7 +62,7 @@ function resetRunSession(missionId) {
   briefingOpen = false;
   sensorCamOpen = false;
   objectivesCollapsed = false;
-  orbitWarp = 25;
+  orbitWarp = 1;
   orbitCam = 'full';
 }
 
@@ -199,6 +199,10 @@ function closeMissionBriefing(confirm = false) {
   if (!briefingOpen) return;
   briefingOpen = false;
   if (confirm) playRepairSuccess(); else playHover();
+  if (orbitWarp <= 0) {
+    orbitWarp = 1;
+    setOrbitTimeWarp(1);
+  }
   if (activeScene === 'orbit') setOrbitBriefingPaused(false);
   if (orbitTelemetry?.deployActive || (!briefingOpen && stage === 'orbit')) {
     orbitCam = 'chase';
@@ -513,7 +517,8 @@ const handleScanAsteroid = () => {
     spawnPopup(`⏳ ${r.zoneName} on ${r.cooldownSec}s cooldown — fly to next zone!`);
   } else if (r.reason === 'out-of-swath') {
     playWarning();
-    spawnPopup('🔍 No Science Zone in Swath — fly over a cyan/amber target ring!');
+    const etaHint = r.nextZoneName ? ` — next: ${r.nextZoneName} (~${r.nextZoneEtaSec}s)!` : ' — fly into a cyan waypoint ring!';
+    spawnPopup(`🔍 No Scan Zone in Swath${etaHint}`);
   } else if (r.reason === 'brownout') {
     playWarning();
     spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to scan.');

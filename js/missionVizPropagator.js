@@ -86,6 +86,30 @@ export function propagateOrbit(elements, timeSec = 0) {
   };
 }
 
+export function propagateOrbitVisual(elements, timeSec = 0) {
+  const a = Math.max(elements.aKm || 7000, R_EARTH + 160);
+  const e = Math.min(Math.max(elements.e ?? 0.001, 0), 0.985);
+  const periodSec = 2 * Math.PI * Math.sqrt((a ** 3) / MU_EARTH);
+  const meanMotion = (Math.PI * 2) / periodSec;
+  const m0 = (elements.meanAnomaly0Deg ?? 0) * DEG2RAD;
+  // Clamp pacing eccentricity so high-eccentricity HEO/Lunar apogees never stall visually
+  const ePace = Math.min(e, 0.35);
+  const rawPhase = meanMotion * timeSec;
+  const E = solveEccentricAnomaly(m0 + rawPhase, ePace);
+  const trueAnomalyRad = 2 * Math.atan2(
+    Math.sqrt(1 + ePace) * Math.sin(E / 2),
+    Math.sqrt(1 - ePace) * Math.cos(E / 2)
+  );
+  const state = keplerStateAtAnomaly(elements, trueAnomalyRad);
+  const cycleFrac = (((rawPhase / (Math.PI * 2)) % 1) + 1) % 1;
+  return {
+    ...state,
+    periodSec,
+    cycleFrac,
+    trueAnomalyDeg: ((trueAnomalyRad / DEG2RAD) + 360) % 360
+  };
+}
+
 export function generateOrbitTrack(elements, steps = 120) {
   const a = Math.max(elements.aKm || 7000, R_EARTH + 160);
   const e = Math.min(Math.max(elements.e ?? 0.001, 0), 0.985);
