@@ -67,43 +67,37 @@ const cardHtml = ({ field, id, name, pills, selected, ok = true, soft = false, t
 
 const CONTRACT_ART = {
   'wildfiresat-l1': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
-    <path d="M-10 74 Q55 38 120 74 L120 105 L-10 105 Z" fill="#141821" stroke="#f59e0b" stroke-width="1.2"/>
-    <circle cx="42" cy="70" r="8" fill="#f59e0b" fill-opacity="0.25"/><circle cx="42" cy="70" r="3" fill="#fbbf24"/>
+    <path d="M-10 74 Q55 38 120 74 L120 105 L-10 105 Z" fill="#14204a" stroke="#5ee7ff" stroke-width="1.2"/>
+    <circle cx="42" cy="70" r="8" fill="#fbbf24" fill-opacity="0.25"/><circle cx="42" cy="70" r="3" fill="#fbbf24"/>
     <circle cx="71" cy="76" r="6" fill="#ef4444" fill-opacity="0.3"/><circle cx="71" cy="76" r="2.5" fill="#fbbf24"/>
     <path d="M10 34 Q56 14 100 38" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="4 3"/>
     <rect x="52" y="19" width="10" height="6" rx="1" fill="#fbbf24"/>
   </svg>`,
   'aurora-l1': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
     <path d="M10 34 Q36 16 58 32 T100 26" fill="none" stroke="#10b981" stroke-width="3" stroke-opacity="0.65" stroke-linecap="round"/>
-    <circle cx="55" cy="76" r="32" fill="#141821" stroke="#f59e0b" stroke-width="1.1"/>
+    <circle cx="55" cy="76" r="32" fill="#14204a" stroke="#5ee7ff" stroke-width="1.1"/>
     <path d="M26 52 Q55 24 84 52" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="3 3"/>
     <rect x="50" y="21" width="10" height="6" rx="1" fill="#10b981"/>
   </svg>`,
   'ocean-l2': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
     <circle cx="55" cy="52" r="28" fill="#111827" stroke="#38bdf8" stroke-width="1.2"/>
     <ellipse cx="55" cy="52" rx="15" ry="39" transform="rotate(14 55 52)" fill="none" stroke="#9ca3af" stroke-width="1.2" stroke-dasharray="4 3"/>
-    <rect x="54" y="10" width="10" height="6" rx="1" fill="#f3f4f6" stroke="#f59e0b" stroke-width="0.8"/>
+    <rect x="54" y="10" width="10" height="6" rx="1" fill="#f3f4f6" stroke="#5ee7ff" stroke-width="0.8"/>
   </svg>`,
   'monsoon-l2': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
-    <circle cx="55" cy="58" r="27" fill="#141821" stroke="#f59e0b" stroke-width="1.2"/>
+    <circle cx="55" cy="58" r="27" fill="#14204a" stroke="#5ee7ff" stroke-width="1.2"/>
     <path d="M40 58 Q55 42 70 58 Q55 72 40 58 Z" fill="none" stroke="#d1d5db" stroke-width="1.8"/>
-    <rect x="47" y="12" width="18" height="5" rx="1" fill="#f59e0b"/>
+    <rect x="47" y="12" width="18" height="5" rx="1" fill="#fbbf24"/>
   </svg>`,
   'lunar-l3': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
     <circle cx="55" cy="50" r="27" fill="#272d38" stroke="#9ca3af" stroke-width="1"/>
     <ellipse cx="55" cy="73" rx="11" ry="4.5" fill="#111827" stroke="#38bdf8" stroke-width="1.2"/>
     <path d="M14 78 Q38 14 96 34" fill="none" stroke="#fbbf24" stroke-width="1.3" stroke-dasharray="4 3"/>
     <circle cx="84" cy="27" r="3" fill="#fbbf24"/>
   </svg>`,
   'asteroid-l3': `<svg viewBox="0 0 110 100" aria-hidden="true">
-    <rect width="110" height="100" fill="#090b0f"/>
     <polygon points="40,36 62,28 80,44 74,66 50,74 30,58" fill="#374151" stroke="#d1d5db" stroke-width="1.1"/>
-    <path d="M14 76 Q46 18 96 30" fill="none" stroke="#f59e0b" stroke-width="1.3" stroke-dasharray="4 3"/>
+    <path d="M14 76 Q46 18 96 30" fill="none" stroke="#5ee7ff" stroke-width="1.3" stroke-dasharray="4 3"/>
     <rect x="26" y="33" width="9" height="6" rx="1" fill="#fbbf24"/>
   </svg>`
 };
@@ -139,14 +133,18 @@ export function renderTitleOverlay(sandboxMode, activeScenarioId, progressMap = 
     const budBadge = sandboxMode
       ? '<span class="spill ok">INF</span>'
       : `<span class="spill ok">$${s.budgetLimitM}M</span>`;
+    // Mission-patch card: art sits in a glowing porthole whose ring colour
+    // tracks difficulty (tier 1 plasma, 2 nebula, 3 solar).
     return `
-    <div class="contract-card ${selected ? 'selected' : ''}" data-start-scenario="${s.id}" role="button" tabindex="0">
-      <div class="contract-art">${CONTRACT_ART[s.id] || ''}</div>
-      <div class="contract-body">
-        <div class="contract-top">
+    <div class="contract-card tier-${diffStars} ${selected ? 'selected' : ''}" data-start-scenario="${s.id}" role="button" tabindex="0" aria-label="${esc(`${m.title}: ${m.obj}`)}">
+      <div class="contract-head">
+        <div class="contract-porthole"><div class="contract-art">${CONTRACT_ART[s.id] || ''}</div></div>
+        <div class="contract-head-meta">
           <span class="contract-stars" aria-label="Difficulty ${diffStars} of 3">${svgStars(diffStars, 3)}</span>
           ${statusBadge}
         </div>
+      </div>
+      <div class="contract-body">
         <h3 class="contract-title">${esc(m.title)}</h3>
         <p class="contract-obj">${esc(m.obj)}</p>
         <div class="contract-footer">
@@ -155,7 +153,7 @@ export function renderTitleOverlay(sandboxMode, activeScenarioId, progressMap = 
             ${budBadge}
             <span class="spill">${s.minLifetimeYr}YR</span>
           </div>
-          <span class="btn-sci contract-cta ${selected ? 'active' : ''}">DEPLOY</span>
+          <span class="btn-sci contract-cta ${selected ? 'is-primary' : ''}">${svgIcon('rocket')}Launch</span>
         </div>
       </div>
     </div>`;

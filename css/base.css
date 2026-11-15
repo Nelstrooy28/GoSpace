@@ -1,4 +1,6 @@
-/* GoSpace — Tactical Aerospace Game UI Design System
+/* GoSpace — "Deep Space Holo" UI Design System
+   Cockpit-glass panels with nebula tint and gradient hairline rings,
+   plasma capsule buttons, porthole icon switches and orbital ornaments.
    Fluid game-engine viewport scale: every HUD dimension is authored in rem,
    and the root rem tracks the viewport so the HUD shrinks on 720p laptops
    and grows on 1440p / 4K monitors like a native PC game HUD. */
@@ -8,53 +10,70 @@ html {
 }
 
 :root {
-  /* Deep Matte Carbon & Obsidian Surfaces */
-  --bg: #07080b;
-  --bg-dark: #07080b;
-  --bg-hud: rgba(10, 12, 16, 0.88);
-  --bg-hud-elevated: rgba(20, 23, 30, 0.92);
-  --bg-card: #12151c;
-  --bg-card-hover: #181c25;
-  --bg-card-active: rgba(245, 158, 11, 0.14);
-  --panel: rgba(10, 12, 16, 0.88);
-  --panel-strong: rgba(12, 14, 19, 0.97);
-  --graphite: #12151c;
-  --ink: #090b0f;
+  /* Deep-space surfaces */
+  --space-0: #02040b;
+  --space-1: #060a18;
+  --space-2: #0b1228;
+  --bg: var(--space-0);
+  --bg-dark: var(--space-0);
+  --bg-hud: rgba(8, 13, 30, 0.74);
+  --bg-hud-elevated: rgba(14, 21, 46, 0.9);
+  --bg-card: rgba(13, 20, 44, 0.86);
+  --bg-card-hover: rgba(22, 32, 66, 0.92);
+  --bg-card-active: rgba(94, 231, 255, 0.14);
+  --panel: rgba(8, 13, 30, 0.78);
+  --panel-strong: rgba(6, 10, 24, 0.96);
+  --graphite: rgba(15, 23, 50, 0.9);
+  --ink: #040714;
 
   /* Hairlines */
-  --border-subtle: rgba(255, 255, 255, 0.10);
-  --border-mid: rgba(255, 255, 255, 0.18);
-  --border-focus: rgba(245, 158, 11, 0.55);
-  --border-bright: rgba(245, 158, 11, 0.72);
-  --line: rgba(255, 255, 255, 0.10);
-  --line-bright: rgba(245, 158, 11, 0.65);
-  --radius-sm: 0;
-  --radius: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
+  --border-subtle: rgba(148, 197, 255, 0.12);
+  --border-mid: rgba(148, 197, 255, 0.22);
+  --border-focus: rgba(94, 231, 255, 0.55);
+  --border-bright: rgba(94, 231, 255, 0.75);
+  --line: rgba(148, 197, 255, 0.12);
+  --line-bright: rgba(94, 231, 255, 0.65);
 
-  /* Kapton Amber + Bone White */
-  --accent: #f59e0b;
-  --accent-bright: #fbbf24;
-  --accent-deep: #d97706;
-  --amber: #f59e0b;
-  --amber-soft: #fbbf24;
-  --cyan: #f59e0b;
-  --cyan-soft: #fbbf24;
+  /* Rounded cockpit-glass geometry */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-pill: 999px;
+  --radius-sm: var(--r-sm);
+  --radius: var(--r-md);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+
+  /* Plasma cyan + nebula violet + star gold */
+  --plasma: #5ee7ff;
+  --plasma-bright: #b9f6ff;
+  --plasma-deep: #0ea5c6;
+  --nebula: #a78bfa;
+  --nebula-deep: #7c3aed;
+  --nebula-pink: #f472b6;
+  --star: #fcd34d;
+  --accent: var(--plasma);
+  --accent-bright: var(--plasma-bright);
+  --accent-deep: var(--plasma-deep);
+  --amber: var(--plasma);
+  --amber-soft: var(--plasma-bright);
+  --cyan: var(--plasma);
+  --cyan-soft: var(--plasma-bright);
   --scan-teal: #38bdf8;
-  --steel: rgba(156, 163, 175, 0.78);
-  --text: #f3f4f6;
-  --text-main: #f3f4f6;
-  --text-dim: #9ca3af;
-  --muted: #9ca3af;
-  --text-muted: #6b7280;
+  --steel: rgba(165, 180, 252, 0.7);
+  --text: #eef4ff;
+  --text-main: #eef4ff;
+  --text-dim: #a5b4d4;
+  --muted: #a5b4d4;
+  --text-muted: #7180a6;
 
   /* Semantic */
-  --green: #10b981;
-  --status-good: #10b981;
-  --status-warn: #f59e0b;
-  --red: #ef4444;
-  --status-bad: #ef4444;
+  --green: #34d399;
+  --status-good: #34d399;
+  --status-warn: #fbbf24;
+  --red: #fb7185;
+  --status-bad: #f43f5e;
 
   /* Fluid rem type scale — every HUD/modal text token floors at 14px
      so small laptop windows stay readable while 1440p/4K still scale up. */
@@ -63,6 +82,7 @@ html {
   --fs-md: max(15.5px, 1.04rem);
   --fs-lg: max(17px, 1.24rem);
   --fs-hero: clamp(1.8rem, 3.2vmin, 2.8rem);
+  --fs-logo: clamp(2.4rem, 4.6vmin, 3.5rem);
   --fs-title: var(--fs-hero);
 
   /* Spatial tokens */
@@ -73,23 +93,39 @@ html {
   --sp-5: 0.86rem;
   --cut: 0.48rem;
   --pcut: 0.42rem;
-  --gi-size: 1.05rem;
+  --gi-size: 1.1rem;
 
   /* Typography: geometric sci-fi UI + tactical mono telemetry */
   --font-hud: 'Orbitron', 'Chakra Petch', sans-serif;
   --font-ui: 'Chakra Petch', 'Orbitron', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
 
-  /* Instrument segment mask */
-  --seg-mask: repeating-linear-gradient(90deg, transparent 0 0.38rem, rgba(10, 12, 16, 0.85) 0.38rem 0.48rem);
+  /* Instrument energy-cell mask */
+  --seg-mask: repeating-linear-gradient(90deg, transparent 0 0.42rem, rgba(4, 7, 20, 0.7) 0.42rem 0.5rem);
 
-  /* Metal rims */
-  --rim-steel: linear-gradient(155deg, rgba(255, 255, 255, 0.36) 0%, rgba(148, 163, 184, 0.10) 42%, rgba(255, 255, 255, 0.22) 100%);
-  --rim-amber: linear-gradient(155deg, #fde68a 0%, rgba(245, 158, 11, 0.40) 48%, #f59e0b 100%);
-  --rim-crimson: linear-gradient(155deg, #fca5a5 0%, rgba(239, 68, 68, 0.38) 48%, #ef4444 100%);
-  --rim-emerald: linear-gradient(155deg, #a7f3d0 0%, rgba(16, 185, 129, 0.38) 48%, #10b981 100%);
-  --plate-amber: repeating-linear-gradient(-45deg, rgba(9, 11, 15, 0.55) 0 2px, transparent 2px 0.32rem) right top / 1.7rem 0.34rem no-repeat, linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
-  --plate-amber-hot: repeating-linear-gradient(-45deg, rgba(9, 11, 15, 0.55) 0 2px, transparent 2px 0.32rem) right top / 1.7rem 0.34rem no-repeat, linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+  /* Gradient hairline rings (drawn by a masked ::before) */
+  --ring-glass: linear-gradient(135deg, rgba(94, 231, 255, 0.55) 0%, rgba(148, 197, 255, 0.10) 38%, rgba(167, 139, 250, 0.08) 62%, rgba(167, 139, 250, 0.5) 100%);
+  --rim-steel: linear-gradient(135deg, rgba(185, 246, 255, 0.5) 0%, rgba(148, 163, 184, 0.12) 45%, rgba(167, 139, 250, 0.42) 100%);
+  --rim-amber: linear-gradient(135deg, #b9f6ff 0%, rgba(94, 231, 255, 0.55) 40%, rgba(167, 139, 250, 0.9) 100%);
+  --rim-plasma: var(--rim-amber);
+  --rim-crimson: linear-gradient(135deg, #fecdd3 0%, rgba(244, 63, 94, 0.5) 48%, #f43f5e 100%);
+  --rim-emerald: linear-gradient(135deg, #a7f3d0 0%, rgba(52, 211, 153, 0.45) 48%, #22d3ee 100%);
+
+  /* Ion-drive plasma fills */
+  --ion-fill: linear-gradient(115deg, #22d3ee 0%, #3b82f6 38%, #7c3aed 72%, #c026d3 100%);
+  --plate-amber: var(--ion-fill);
+  --plate-amber-hot: linear-gradient(115deg, #67e8f9 0%, #60a5fa 38%, #8b5cf6 72%, #d946ef 100%);
+
+  /* Faint orbit-arc + satellite ornament used on panel corners */
+  --orbit-ornament: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Cellipse cx='40' cy='40' rx='36' ry='15' fill='none' stroke='%235ee7ff' stroke-opacity='.55' stroke-width='1' stroke-dasharray='2 4' transform='rotate(-28 40 40)'/%3E%3Ccircle cx='40' cy='40' r='5' fill='none' stroke='%23a78bfa' stroke-opacity='.6'/%3E%3Ccircle cx='70' cy='22' r='2' fill='%23b9f6ff'/%3E%3C/svg%3E");
+  /* Star dust sprinkled inside panels */
+  --star-dust:
+    radial-gradient(1px 1px at 8% 22%, rgba(255, 255, 255, 0.55), transparent 70%),
+    radial-gradient(1px 1px at 27% 78%, rgba(185, 246, 255, 0.45), transparent 70%),
+    radial-gradient(1.4px 1.4px at 46% 12%, rgba(255, 255, 255, 0.5), transparent 70%),
+    radial-gradient(1px 1px at 63% 64%, rgba(196, 181, 253, 0.5), transparent 70%),
+    radial-gradient(1px 1px at 82% 36%, rgba(255, 255, 255, 0.45), transparent 70%),
+    radial-gradient(1.2px 1.2px at 93% 86%, rgba(185, 246, 255, 0.4), transparent 70%);
 }
 
 *, *::before, *::after {
@@ -123,6 +159,20 @@ button, input, select, textarea {
   font-family: inherit;
 }
 
+input[type="text"] {
+  color: var(--text-main);
+  background: rgba(4, 8, 22, 0.8);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-pill);
+  padding: 0.45rem 0.95rem;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(94, 231, 255, 0.16);
+}
+
 /* Tabular numerals on all telemetry & counters */
 .tabular,
 .gm-top b,
@@ -144,26 +194,41 @@ button, input, select, textarea {
 }
 
 /* ------------------------------------------------------------------
-   VECTOR GLYPHS
+   VECTOR GLYPHS (duotone: stroke + soft .d fill)
    ------------------------------------------------------------------ */
 .gi {
   width: var(--gi-size);
   height: var(--gi-size);
   flex-shrink: 0;
   display: inline-block;
-  vertical-align: -0.2em;
+  vertical-align: -0.22em;
   overflow: visible;
 }
 
+.gi .d {
+  fill: currentColor;
+  fill-opacity: 0.22;
+  stroke: none;
+}
+
+.gi .f {
+  fill: currentColor;
+  stroke: none;
+}
+
 .gi-rate {
-  width: 0.95rem;
-  height: 0.95rem;
+  width: 1rem;
+  height: 1rem;
   color: var(--text-muted);
 }
 
 .gi-rate.is-lit {
-  color: var(--accent-bright);
-  fill: currentColor;
+  color: var(--star);
+  filter: drop-shadow(0 0 0.3rem rgba(252, 211, 77, 0.55));
+}
+
+.gi-rate.is-lit .d {
+  fill-opacity: 1;
 }
 
 .gi.when-off { display: none; }
@@ -175,7 +240,10 @@ button, input, select, textarea {
   position: fixed;
   inset: 0;
   z-index: 1;
-  background: radial-gradient(circle at 60% 45%, #11151d 0%, #050609 78%);
+  background:
+    radial-gradient(ellipse 60% 50% at 72% 28%, rgba(124, 58, 237, 0.20), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 18% 82%, rgba(14, 165, 233, 0.16), transparent 70%),
+    radial-gradient(circle at 60% 45%, #0b1228 0%, #02040b 78%);
 }
 
 #viewport-container canvas {
@@ -191,7 +259,7 @@ button, input, select, textarea {
   z-index: 95;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85) 0%, rgba(245, 158, 11, 0.35) 38%, rgba(7, 8, 11, 0) 76%);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9) 0%, rgba(94, 231, 255, 0.4) 30%, rgba(124, 58, 237, 0.25) 52%, rgba(2, 4, 11, 0) 76%);
 }
 
 #warp-flash.active, .warp-flash.active {
@@ -205,65 +273,58 @@ button, input, select, textarea {
 }
 
 /* ------------------------------------------------------------------
-   TACTICAL HUD PLATES — chamfered obsidian + corner L-reticles
-   ::before = amber reticles (top-right / bottom-left)
-   ::after  = steel reticles (top-left / bottom-right, inside chamfer)
+   COCKPIT-GLASS PANELS
+   background = nebula-tinted glass
+   ::before    = gradient hairline ring (masked border)
+   ::after     = star dust + orbit-arc ornament (behind content)
    ------------------------------------------------------------------ */
 .plate,
 .hud-panel {
   --plate-bg: var(--bg-hud);
-  --plate-rim: rgba(255, 255, 255, 0.12);
-  --tick: var(--accent);
-  --tick-2: var(--steel);
+  --plate-ring: var(--ring-glass);
   position: relative;
+  isolation: isolate;
   background:
-    linear-gradient(to bottom right, transparent calc(50% - 0.8px), var(--plate-rim) calc(50% - 0.8px) calc(50% + 0.8px), transparent calc(50% + 0.8px)) left top / var(--pcut) var(--pcut) no-repeat border-box,
-    linear-gradient(to bottom right, transparent calc(50% - 0.8px), var(--plate-rim) calc(50% - 0.8px) calc(50% + 0.8px), transparent calc(50% + 0.8px)) right bottom / var(--pcut) var(--pcut) no-repeat border-box,
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, transparent 2.4rem) border-box,
+    radial-gradient(130% 90% at 0% 0%, rgba(94, 231, 255, 0.10), transparent 55%),
+    radial-gradient(110% 80% at 100% 100%, rgba(124, 58, 237, 0.14), transparent 60%),
     var(--plate-bg);
-  border: 1px solid var(--plate-rim);
-  border-radius: 0;
-  clip-path: polygon(var(--pcut) 0, 100% 0, 100% calc(100% - var(--pcut)), calc(100% - var(--pcut)) 100%, 0 100%, 0 var(--pcut));
-  backdrop-filter: blur(10px);
-}
-
-.plate::before,
-.plate::after,
-.hud-panel::before,
-.hud-panel::after {
-  content: '';
-  position: absolute;
-  inset: 0.26rem;
-  pointer-events: none;
-  background-repeat: no-repeat;
-  z-index: 3;
+  border: 0;
+  border-radius: var(--r-md);
+  box-shadow:
+    0 1rem 2.6rem rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(185, 246, 255, 0.08);
+  backdrop-filter: blur(14px) saturate(1.25);
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
 }
 
 .plate::before,
 .hud-panel::before {
-  background-image:
-    linear-gradient(var(--tick), var(--tick)),
-    linear-gradient(var(--tick), var(--tick)),
-    linear-gradient(var(--tick), var(--tick)),
-    linear-gradient(var(--tick), var(--tick));
-  background-size: 0.5rem 2px, 2px 0.5rem, 0.5rem 2px, 2px 0.5rem;
-  background-position: right top, right top, left bottom, left bottom;
-  filter: drop-shadow(0 0 0.18rem rgba(245, 158, 11, 0.55));
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--plate-ring);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
 }
 
 .plate::after,
 .hud-panel::after {
-  inset: 0.38rem;
-  background-image:
-    linear-gradient(var(--tick-2), var(--tick-2)),
-    linear-gradient(var(--tick-2), var(--tick-2)),
-    linear-gradient(var(--tick-2), var(--tick-2)),
-    linear-gradient(var(--tick-2), var(--tick-2));
-  background-size: 0.5rem 1px, 1px 0.5rem, 0.5rem 1px, 1px 0.5rem;
-  background-position: left top, left top, right bottom, right bottom;
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--orbit-ornament) right -1.1rem top -1.3rem / 4.6rem 4.6rem no-repeat, var(--star-dust);
+  opacity: 0.55;
 }
 
-/* Uppercase header strips with slash accents */
+/* Section headings get a glowing beacon dot instead of slashes */
 .loadout-title::before,
 .orb-obj-kicker::before,
 .card-head > span:first-child::before,
@@ -279,25 +340,30 @@ button, input, select, textarea {
 .sensor-pip-title::before,
 .orb-debuffs-head::before,
 .modal-head h2::before {
-  content: '//';
-  margin-right: 0.36rem;
-  color: var(--text-muted);
-  font-weight: 700;
-  letter-spacing: 0;
+  content: '';
+  display: inline-block;
+  width: 0.46rem;
+  height: 0.46rem;
+  margin-right: 0.5rem;
+  vertical-align: 0.08em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, var(--plasma) 45%, rgba(94, 231, 255, 0) 75%);
+  box-shadow: 0 0 0.45rem var(--plasma), 0 0 0.9rem rgba(167, 139, 250, 0.6);
 }
 
 /* ------------------------------------------------------------------
-   CHAMFERED SCI-FI GAME BUTTONS
-   Outer metallic rim = ::before evenodd ring, inner graphite fill =
-   element background, 2px amber accent bar = inset box-shadow,
-   hover sheen sweep = ::after.
+   PLASMA CAPSULE BUTTONS
+   --fill  = capsule body
+   --rim   = gradient hairline ring (masked ::before)
+   --bar   = outer glow colour (transparent = no glow)
+   ::after = light sweep on hover
    :where() keeps base specificity at zero so state rules always win.
    ------------------------------------------------------------------ */
 :where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild) {
-  --cut: 0.48rem;
-  --fill: var(--graphite);
+  --fill: linear-gradient(180deg, rgba(30, 44, 86, 0.82) 0%, rgba(10, 16, 38, 0.92) 100%);
   --rim: var(--rim-steel);
-  --bar: rgba(245, 158, 11, 0.72);
+  --bar: transparent;
+  --btn-radius: var(--r-pill);
   position: relative;
   isolation: isolate;
   font-family: var(--font-ui);
@@ -307,8 +373,8 @@ button, input, select, textarea {
   color: var(--text-main);
   background: var(--fill);
   border: 0;
-  border-radius: 0;
-  padding: 0.36rem 0.72rem 0.36rem 0.82rem;
+  border-radius: var(--btn-radius);
+  padding: 0.36rem 0.95rem;
   min-height: 1.9rem;
   cursor: pointer;
   display: inline-flex;
@@ -320,9 +386,11 @@ button, input, select, textarea {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
-  box-shadow: inset 2px 0 0 var(--bar);
-  transition: color 0.14s ease, filter 0.14s ease, transform 0.08s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(185, 246, 255, 0.14),
+    inset 0 -0.35rem 0.7rem rgba(2, 4, 11, 0.35),
+    0 0 0.9rem -0.1rem var(--bar);
+  transition: color 0.16s ease, box-shadow 0.2s ease, filter 0.16s ease, transform 0.08s ease;
 }
 
 :where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild)::before {
@@ -330,57 +398,76 @@ button, input, select, textarea {
   position: absolute;
   inset: 0;
   z-index: 2;
+  padding: 1px;
+  border-radius: inherit;
   pointer-events: none;
   background: var(--rim);
-  clip-path: polygon(evenodd,
-    var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut), var(--cut) 0,
-    calc(var(--cut) + 0.42px) 1px, 1px calc(var(--cut) + 0.42px), 1px calc(100% - 1px), calc(100% - var(--cut) - 0.42px) calc(100% - 1px), calc(100% - 1px) calc(100% - var(--cut) - 0.42px), calc(100% - 1px) 1px, calc(var(--cut) + 0.42px) 1px);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
 
 :where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild)::after {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: -1;
+  border-radius: inherit;
   pointer-events: none;
-  background: linear-gradient(105deg, transparent 34%, rgba(255, 255, 255, 0.16) 47%, rgba(255, 255, 255, 0.04) 53%, transparent 62%);
-  transform: translateX(-115%);
-  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  background: radial-gradient(60% 120% at var(--sweep-x, -30%) 0%, rgba(185, 246, 255, 0.28), transparent 70%);
+  transition: --sweep-x 0.5s ease, background-position 0.5s ease, opacity 0.3s ease;
+  opacity: 0;
 }
 
 :where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):not(:disabled):hover {
-  --fill: var(--bg-card-hover);
-  --rim: linear-gradient(155deg, rgba(253, 230, 138, 0.85) 0%, rgba(245, 158, 11, 0.28) 48%, rgba(255, 255, 255, 0.4) 100%);
+  --fill: linear-gradient(180deg, rgba(40, 62, 120, 0.9) 0%, rgba(14, 22, 52, 0.95) 100%);
+  --rim: linear-gradient(135deg, #e0fbff 0%, rgba(94, 231, 255, 0.7) 40%, rgba(196, 181, 253, 0.85) 100%);
+  --bar: rgba(94, 231, 255, 0.45);
   color: #ffffff;
 }
 
 :where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):not(:disabled):hover::after {
-  transform: translateX(115%);
+  --sweep-x: 50%;
+  opacity: 1;
 }
 
 :where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):not(:disabled):active {
-  transform: translateY(1px);
-  filter: brightness(0.92);
+  transform: translateY(1px) scale(0.985);
+  filter: brightness(0.94);
 }
 
 :where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):focus-visible {
   outline: none;
   --rim: linear-gradient(#ffffff, #ffffff) !important;
-  --bar: #ffffff !important;
+  --bar: rgba(185, 246, 255, 0.85) !important;
 }
 
 :where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):disabled {
   cursor: not-allowed;
-  opacity: 0.45;
-  --bar: rgba(156, 163, 175, 0.4);
+  opacity: 0.42;
+  filter: saturate(0.4);
+  --bar: transparent;
 }
 
-/* Square icon-only switches (close / collapse) */
+/* Buttons holding a keycap never shrink below their content */
+.debrief-close-btn,
+.tut-skip-btn,
+.brief-start-btn {
+  flex-shrink: 0;
+  padding-right: 0.5rem;
+}
+
+/* Card-shaped buttons keep soft rounded-glass corners instead of capsules */
+:where(.equip-card, .part-card, .menu-btn, .hazard-choice-btn) {
+  --btn-radius: var(--r-md);
+}
+
+/* Round porthole switches (close / collapse) */
 :where(.orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .brief-close-btn) {
-  --cut: 0.3rem;
+  --btn-radius: 50%;
   --bar: transparent;
-  width: 1.55rem;
-  height: 1.55rem;
+  width: 1.75rem;
+  height: 1.75rem;
   min-height: 0;
   padding: 0;
   flex-shrink: 0;
@@ -388,11 +475,11 @@ button, input, select, textarea {
 }
 
 :where(.orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .brief-close-btn) .gi {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
-/* Selected / engaged state */
+/* Selected / engaged state: lit plasma capsule */
 .btn-sci.active,
 .btn-sci.is-on,
 .stage-btn.active,
@@ -401,13 +488,15 @@ button, input, select, textarea {
 .sub-chip.active,
 .equip-card.selected,
 .part-card.selected {
-  --fill: linear-gradient(180deg, rgba(245, 158, 11, 0.24) 0%, rgba(245, 158, 11, 0.08) 100%), var(--graphite);
-  --rim: var(--rim-amber);
-  --bar: var(--accent-bright);
-  color: var(--accent-bright);
+  --fill:
+    radial-gradient(120% 140% at 50% 120%, rgba(94, 231, 255, 0.32) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(34, 64, 120, 0.92) 0%, rgba(14, 26, 62, 0.95) 100%);
+  --rim: var(--rim-plasma);
+  --bar: rgba(94, 231, 255, 0.5);
+  color: var(--plasma-bright);
 }
 
-/* Primary action: Kapton Amber tactical plate with hazard-stripe corner */
+/* Primary action: ion-drive plasma capsule */
 .cta-btn,
 .btn-rollout.is-ready,
 .orb-obj-footer-btn.is-unlocked,
@@ -416,15 +505,28 @@ button, input, select, textarea {
 .debrief-cta.is-primary,
 .loss-btn.is-retry,
 .brief-start-btn {
-  --fill: var(--plate-amber);
-  --rim: linear-gradient(155deg, #fef3c7 0%, #b45309 55%, #fbbf24 100%);
-  --bar: var(--ink);
-  color: var(--ink);
+  --fill: var(--ion-fill);
+  --rim: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.18) 45%, rgba(255, 255, 255, 0.7) 100%);
+  --bar: rgba(94, 231, 255, 0.6);
+  color: #ffffff;
+  background-size: 180% 100%;
+  background-position: 0% 50%;
   font-family: var(--font-ui);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-shadow: 0 1px 2px rgba(4, 7, 20, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -0.4rem 0.8rem rgba(46, 16, 101, 0.35),
+    0 0 1.1rem -0.1rem rgba(94, 231, 255, 0.55),
+    0 0 2.2rem -0.4rem rgba(168, 85, 247, 0.5);
+  animation: ionFlow 7s ease-in-out infinite alternate;
+}
+
+@keyframes ionFlow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
 }
 
 .cta-btn:not(:disabled):hover,
@@ -436,8 +538,9 @@ button, input, select, textarea {
 .loss-btn.is-retry:hover,
 .brief-start-btn:hover {
   --fill: var(--plate-amber-hot);
-  --rim: linear-gradient(155deg, #ffffff 0%, #d97706 55%, #fde68a 100%);
-  color: var(--ink);
+  --rim: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.4) 45%, #ffffff 100%);
+  color: #ffffff;
+  filter: brightness(1.08) saturate(1.1);
 }
 
 .cta-btn .keycap,
@@ -446,28 +549,30 @@ button, input, select, textarea {
 #orb-transmit-btn.is-cyan .keycap,
 .brief-start-btn .keycap,
 .debrief-cta.is-primary .keycap {
-  color: var(--accent-bright);
-  background: linear-gradient(180deg, #1a1d24 0%, #090b0f 100%);
-  border-color: rgba(9, 11, 15, 0.8);
-  border-bottom-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  background: rgba(4, 7, 20, 0.42);
+  border-color: rgba(255, 255, 255, 0.35);
+  border-bottom-color: rgba(255, 255, 255, 0.5);
   text-shadow: none;
 }
 
-/* Emerald "complete" plate variant */
+/* Aurora "complete" variant */
 .cta-btn.is-complete {
-  --fill: repeating-linear-gradient(-45deg, rgba(4, 19, 12, 0.5) 0 2px, transparent 2px 0.32rem) right top / 1.7rem 0.34rem no-repeat, linear-gradient(180deg, #10b981 0%, #059669 100%);
+  --fill: linear-gradient(115deg, #34d399 0%, #10b981 40%, #0ea5c6 100%);
   --rim: var(--rim-emerald);
-  color: #04130c;
+  --bar: rgba(52, 211, 153, 0.6);
+  color: #022c22;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-/* Crimson-edged tactical abort switch */
+/* Solar-flare red abort switch */
 .btn-quit-mission,
 .btn-sci.danger,
 .quit-btn.is-danger {
-  --fill: linear-gradient(180deg, rgba(127, 29, 29, 0.55) 0%, rgba(40, 10, 12, 0.9) 100%);
+  --fill: linear-gradient(180deg, rgba(190, 18, 60, 0.55) 0%, rgba(60, 8, 24, 0.9) 100%);
   --rim: var(--rim-crimson);
-  --bar: #ef4444;
-  color: #fecaca;
+  --bar: rgba(244, 63, 94, 0.35);
+  color: #ffe4e6;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -475,8 +580,9 @@ button, input, select, textarea {
 .btn-quit-mission:not(:disabled):hover,
 .btn-sci.danger:not(:disabled):hover,
 .quit-btn.is-danger:not(:disabled):hover {
-  --fill: linear-gradient(180deg, rgba(185, 28, 28, 0.78) 0%, rgba(80, 14, 16, 0.95) 100%);
-  --rim: linear-gradient(155deg, #ffffff 0%, #ef4444 55%, #fca5a5 100%);
+  --fill: linear-gradient(180deg, rgba(225, 29, 72, 0.8) 0%, rgba(110, 14, 40, 0.95) 100%);
+  --rim: linear-gradient(135deg, #ffffff 0%, #fb7185 55%, #fecdd3 100%);
+  --bar: rgba(244, 63, 94, 0.6);
   color: #ffffff;
 }
 
@@ -487,7 +593,7 @@ button, input, select, textarea {
 }
 
 /* ------------------------------------------------------------------
-   3D PHYSICAL KEYCAPS
+   GLASS KEYCAPS
    ------------------------------------------------------------------ */
 .keycap,
 .hazard-keycap,
@@ -495,39 +601,40 @@ button, input, select, textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.4rem;
-  height: 1.3rem;
-  padding: 0 0.34rem;
+  min-width: 1.45rem;
+  height: 1.35rem;
+  padding: 0 0.38rem;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #e5e7eb;
-  background: linear-gradient(180deg, #2b313c 0%, #171b22 100%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.28);
-  border-radius: 3px;
-  box-shadow: 0 0.12rem 0 rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  color: var(--plasma-bright);
+  background: linear-gradient(180deg, rgba(40, 58, 110, 0.9) 0%, rgba(10, 16, 38, 0.95) 100%);
+  border: 1px solid rgba(148, 197, 255, 0.28);
+  border-bottom: 2px solid rgba(94, 231, 255, 0.45);
+  border-radius: var(--r-xs);
+  box-shadow: 0 0.12rem 0 rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
 }
 
+/* Signal badge: pill with live beacon */
 .badge-tag {
   display: inline-flex;
   align-items: center;
-  gap: 0.28rem;
+  gap: 0.36rem;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.05em;
-  color: var(--accent-bright);
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.38);
-  border-radius: 0;
-  padding: 0.14rem 0.43rem;
+  color: var(--plasma-bright);
+  background: linear-gradient(90deg, rgba(94, 231, 255, 0.16), rgba(124, 58, 237, 0.14));
+  border: 1px solid rgba(94, 231, 255, 0.36);
+  border-radius: var(--r-pill);
+  padding: 0.14rem 0.62rem;
   white-space: nowrap;
-  clip-path: polygon(0.24rem 0, 100% 0, 100% calc(100% - 0.24rem), calc(100% - 0.24rem) 100%, 0 100%, 0 0.24rem);
+  box-shadow: 0 0 0.7rem -0.2rem rgba(94, 231, 255, 0.45);
 }
 
 .stat-pills {
@@ -544,33 +651,33 @@ button, input, select, textarea {
   font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--text-dim);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(148, 197, 255, 0.06);
   border: 1px solid var(--border-subtle);
-  border-radius: 0;
-  padding: 0.07rem 0.36rem;
+  border-radius: var(--r-pill);
+  padding: 0.07rem 0.5rem;
   white-space: nowrap;
 }
 
 .spill.ok {
   color: #6ee7b7;
-  background: rgba(16, 185, 129, 0.14);
-  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(52, 211, 153, 0.13);
+  border-color: rgba(52, 211, 153, 0.45);
 }
 
 .spill.warn {
-  color: var(--accent-bright);
-  background: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.45);
+  color: #fde68a;
+  background: rgba(251, 191, 36, 0.13);
+  border-color: rgba(251, 191, 36, 0.45);
 }
 
 .spill.bad {
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.5);
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.15);
+  border-color: rgba(244, 63, 94, 0.5);
 }
 
 /* ------------------------------------------------------------------
-   SEGMENTED COCKPIT INSTRUMENT BARS
+   ENERGY-CELL INSTRUMENT BARS
    ------------------------------------------------------------------ */
 .seg-bar,
 .gm-bar,
@@ -580,10 +687,10 @@ button, input, select, textarea {
 .hazard-bar-track {
   position: relative;
   height: 0.5rem;
-  border-radius: 0;
+  border-radius: var(--r-pill);
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: rgba(148, 197, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(148, 197, 255, 0.10), inset 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .seg-bar::after,
@@ -605,31 +712,35 @@ button, input, select, textarea {
 .orb-obj-fill,
 .hazard-bar-fill {
   height: 100%;
-  border-radius: 0;
-  box-shadow: 0 0 0.4rem rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-pill);
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.28) 100%);
+  box-shadow: 0 0 0.5rem rgba(94, 231, 255, 0.4);
 }
 
 /* Custom Subtle Scrollbars */
 ::-webkit-scrollbar {
-  width: 0.36rem;
-  height: 0.36rem;
+  width: 0.4rem;
+  height: 0.4rem;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(7, 8, 11, 0.6);
+  background: rgba(4, 7, 20, 0.5);
+  border-radius: var(--r-pill);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(94, 231, 255, 0.35), rgba(167, 139, 250, 0.35));
+  border-radius: var(--r-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(245, 158, 11, 0.55);
+  background: linear-gradient(180deg, rgba(94, 231, 255, 0.75), rgba(167, 139, 250, 0.75));
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }

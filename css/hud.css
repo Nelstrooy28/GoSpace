@@ -37,11 +37,11 @@ body.hud-collapsed #mel-drawer,
 /* ------------------------------------------------------------------
    TOP BAR (2.75rem tactical header)
    ------------------------------------------------------------------ */
+/* Floating cockpit capsule bar */
 .hud-top {
-  --pcut: 0.5rem;
   height: 2.75rem;
   min-height: 2.75rem;
-  padding: 0 0.86rem;
+  padding: 0 0.5rem 0 1.05rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -49,11 +49,12 @@ body.hud-collapsed #mel-drawer,
   pointer-events: auto;
   min-width: 0;
   z-index: 30;
+  border-radius: var(--r-pill);
+  --plate-ring: linear-gradient(90deg, rgba(94, 231, 255, 0.6) 0%, rgba(148, 197, 255, 0.1) 25%, rgba(148, 197, 255, 0.06) 75%, rgba(167, 139, 250, 0.6) 100%);
 }
 
-.hud-top::before,
 .hud-top::after {
-  inset: 0.2rem;
+  background: var(--star-dust);
 }
 
 .brand-cluster {
@@ -75,17 +76,22 @@ body.hud-collapsed #mel-drawer,
 }
 
 .brand-glyph {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--plasma);
+  filter: drop-shadow(0 0 0.35rem rgba(94, 231, 255, 0.7));
 }
 
 .brand-name {
   font-family: var(--font-hud);
   font-size: var(--fs-md);
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  color: var(--text-main);
+  font-weight: 900;
+  letter-spacing: 0.18em;
   white-space: nowrap;
+  background: linear-gradient(90deg, #ffffff 0%, var(--plasma-bright) 45%, var(--nebula) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .mission-chip {
@@ -107,18 +113,32 @@ body.hud-collapsed #mel-drawer,
   min-width: 0;
 }
 
+/* Mission stages sit on a dashed flight path, like waypoints on a trajectory */
 .stage-bar {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
-  gap: 0.29rem;
+  gap: 0.75rem;
   min-width: 0;
 }
 
+.stage-bar::before {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  top: 50%;
+  z-index: -1;
+  height: 0;
+  border-top: 1.5px dashed rgba(94, 231, 255, 0.4);
+  filter: drop-shadow(0 0 0.25rem rgba(94, 231, 255, 0.5));
+}
+
 #stage-switcher .stage-btn {
-  --cut: 0.42rem;
   height: 1.9rem;
   min-height: 0;
-  padding: 0 0.7rem 0 0.75rem;
+  padding: 0 0.85rem 0 0.75rem;
   font-family: var(--font-ui);
   font-size: var(--fs-xs);
   font-weight: 700;
@@ -135,10 +155,17 @@ body.hud-collapsed #mel-drawer,
   color: var(--accent-bright);
 }
 
-#stage-switcher .stage-btn.is-locked {
-  opacity: 0.38;
+/* Locked waypoints stay opaque (so the flight path doesn't show through) and just dim */
+#stage-switcher .stage-btn.is-locked,
+#stage-switcher .stage-btn.is-locked:disabled,
+#stage-switcher .stage-btn.is-breadcrumb.is-locked:disabled {
+  opacity: 1;
+  filter: none;
   cursor: not-allowed;
+  --fill: linear-gradient(180deg, rgba(12, 18, 40, 0.98) 0%, rgba(6, 10, 24, 0.98) 100%);
+  --rim: linear-gradient(135deg, rgba(148, 197, 255, 0.22), rgba(148, 197, 255, 0.08));
   --bar: transparent;
+  color: var(--text-muted);
 }
 
 #stage-switcher .stage-btn.is-breadcrumb:not(.is-locked) {
@@ -153,53 +180,74 @@ body.hud-collapsed #mel-drawer,
   opacity: 1;
 }
 
-#stage-switcher .stage-btn.is-breadcrumb.is-locked:disabled {
-  opacity: 0.38;
+/* Narrower windows: tighten the flight path so every waypoint label fits */
+@media (max-width: 1400px) {
+  .stage-bar {
+    gap: 0.4rem;
+  }
+
+  #stage-switcher .stage-btn {
+    padding: 0 0.6rem 0 0.55rem;
+    letter-spacing: 0.06em;
+  }
 }
 
+/* Concept maturity as a row of little planets linked by an orbit line */
 .cml-nodes {
   display: inline-flex;
   align-items: center;
-  gap: 0.43rem;
+  gap: 0.55rem;
   height: 1.9rem;
-  padding: 0 0.57rem;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0 0.75rem 0 0.5rem;
+  background: rgba(148, 197, 255, 0.05);
   border: 1px solid var(--border-subtle);
-  clip-path: polygon(0.34rem 0, 100% 0, 100% calc(100% - 0.34rem), calc(100% - 0.34rem) 100%, 0 100%, 0 0.34rem);
+  border-radius: var(--r-pill);
   flex-shrink: 0;
 }
 
 .node-dots {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
-  gap: 0.21rem;
+  gap: 0.3rem;
+}
+
+.node-dots::before {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  top: 50%;
+  z-index: -1;
+  border-top: 1px solid rgba(148, 197, 255, 0.3);
 }
 
 .cnode {
-  width: 1.05rem;
-  height: 1.05rem;
+  width: 1.15rem;
+  height: 1.15rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
-  font-size: var(--fs-xs);
+  font-size: 0;
   font-weight: 700;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-subtle);
-  transform: skewX(-12deg);
+  background: radial-gradient(circle at 35% 30%, #2a3a66 0%, #0b1228 75%);
+  border: 1px solid rgba(148, 197, 255, 0.25);
+  border-radius: 50%;
 }
 
 .cnode.lit {
-  color: var(--ink);
-  background: var(--accent);
-  border-color: var(--accent-bright);
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, var(--plasma) 38%, #1d4ed8 100%);
+  border-color: var(--plasma-bright);
+  box-shadow: 0 0 0.5rem rgba(94, 231, 255, 0.75);
 }
 
 .cnode.lit-max {
-  color: var(--ink);
-  background: var(--status-good);
-  border-color: #6ee7b7;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #6ee7b7 38%, #047857 100%);
+  border-color: #a7f3d0;
+  box-shadow: 0 0 0.55rem rgba(52, 211, 153, 0.8);
 }
 
 .cml-text {
@@ -218,21 +266,28 @@ body.hud-collapsed #mel-drawer,
   flex-shrink: 0;
 }
 
+/* Round porthole switch (labelled variants stretch into capsules) */
 .icon-toggle {
-  --cut: 0.36rem;
-  width: 2.15rem;
-  height: 1.9rem;
+  width: 2rem;
+  height: 2rem;
   min-height: 0;
   padding: 0 !important;
   flex-shrink: 0;
   --bar: transparent;
+  --btn-radius: 50%;
+}
+
+.icon-toggle .gi {
+  filter: drop-shadow(0 0 0.25rem rgba(94, 231, 255, 0.45));
 }
 
 /* Icon buttons carry a short word so players don't have to guess */
 .icon-toggle.has-lbl {
+  --btn-radius: var(--r-pill);
   width: auto;
+  height: 1.9rem;
   gap: 0.36rem;
-  padding: 0 0.6rem 0 0.66rem !important;
+  padding: 0 0.78rem 0 0.62rem !important;
 }
 
 .util-lbl {
@@ -248,10 +303,12 @@ body.hud-collapsed #mel-drawer,
   text-decoration: line-through;
 }
 
-/* Very narrow windows fall back to icon + tooltip only */
-@media (max-width: 1100px) {
+/* Smaller windows fall back to round porthole icons + tooltip */
+@media (max-width: 1360px) {
   .icon-toggle.has-lbl {
-    width: 2.15rem;
+    --btn-radius: 50%;
+    width: 2rem;
+    height: 2rem;
     padding: 0 !important;
   }
 
@@ -270,7 +327,6 @@ body.hud-collapsed #mel-drawer,
 }
 
 .btn-quit-mission {
-  --cut: 0.42rem;
   height: 1.9rem;
   min-height: 0;
   padding: 0 0.72rem 0 0.8rem;
@@ -291,12 +347,13 @@ body.hud-collapsed #mel-drawer,
   top: 3.7rem;
   right: 0.71rem;
   z-index: 55;
-  width: 14.5rem;
-  padding: 0.64rem;
+  width: max(16rem, 240px);
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.36rem;
+  gap: 0.4rem;
   pointer-events: auto;
+  border-radius: var(--r-lg);
 }
 
 .codex-row {
@@ -306,16 +363,60 @@ body.hud-collapsed #mel-drawer,
   padding: 0.36rem 0.57rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
 }
 
+/* Sandbox checkbox drawn as a glowing power toggle */
+.codex-row {
+  border-radius: var(--r-pill);
+}
+
 .codex-row input {
-  accent-color: var(--accent);
-  width: 0.9rem;
-  height: 0.9rem;
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 2.3rem;
+  height: 1.25rem;
+  margin: 0;
+  border-radius: var(--r-pill);
+  background: rgba(4, 7, 20, 0.9);
+  border: 1px solid var(--border-mid);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.codex-row input::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0.18rem;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff, #7180a6);
+  transform: translateY(-50%);
+  transition: left 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.codex-row input:checked {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.6), rgba(94, 231, 255, 0.6));
+  border-color: rgba(52, 211, 153, 0.7);
+}
+
+.codex-row input:checked::after {
+  left: calc(100% - 1.03rem);
+  background: radial-gradient(circle at 35% 35%, #ffffff, #6ee7b7);
+  box-shadow: 0 0 0.6rem rgba(52, 211, 153, 0.9);
+}
+
+.codex-row input:focus-visible {
+  outline: 2px solid var(--plasma-bright);
+  outline-offset: 2px;
 }
 
 .codex-menu .btn-sci {
@@ -465,8 +566,8 @@ body[data-stage="4"] #hud-bottom {
   align-items: center;
   justify-content: space-between;
   gap: 0.71rem;
-  padding: 0.5rem 0.71rem;
-  clip-path: none;
+  padding: 0.5rem 0.6rem 0.5rem 0.71rem;
+  border-radius: var(--r-lg);
 }
 
 .gauges-mini {
@@ -477,38 +578,42 @@ body[data-stage="4"] #hud-bottom {
   gap: 0.45rem;
 }
 
+/* Each gauge is a small instrument pod */
 .gm-item {
   position: relative;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.3rem 0.43rem 0.36rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
+  gap: 0.32rem;
+  padding: 0.32rem 0.6rem 0.4rem;
+  border: 1px solid rgba(148, 197, 255, 0.1);
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, rgba(148, 197, 255, 0.06), rgba(148, 197, 255, 0.01));
   cursor: help;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.2s ease;
 }
 
 .gm-item:hover,
 .gm-item:focus-within {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--border-mid);
+  background: linear-gradient(180deg, rgba(94, 231, 255, 0.12), rgba(94, 231, 255, 0.03));
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0.9rem -0.2rem rgba(94, 231, 255, 0.45);
 }
 
 .gm-item:focus-visible {
-  outline: 1px solid var(--accent-bright);
-  outline-offset: 1px;
+  outline: 2px solid var(--plasma-bright);
+  outline-offset: 2px;
 }
 
 .gm-item.is-violation {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.48);
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.18), rgba(244, 63, 94, 0.05));
+  border-color: rgba(244, 63, 94, 0.5);
+  box-shadow: 0 0 0.9rem -0.3rem rgba(244, 63, 94, 0.6);
 }
 
 .gm-item.is-near-cap {
-  background: rgba(245, 158, 11, 0.10);
-  border-color: rgba(245, 158, 11, 0.40);
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.14), rgba(251, 191, 36, 0.03));
+  border-color: rgba(251, 191, 36, 0.42);
 }
 
 .gm-top {
@@ -570,15 +675,18 @@ body[data-stage="4"] #hud-bottom {
 }
 
 .gm-fill.ok {
-  background: var(--status-good);
+  background: linear-gradient(90deg, #10b981 0%, #34d399 60%, #5ee7ff 100%);
+  box-shadow: 0 0 0.5rem rgba(52, 211, 153, 0.55);
 }
 
 .gm-fill.warn {
-  background: var(--accent);
+  background: linear-gradient(90deg, #f59e0b 0%, var(--status-warn) 100%);
+  box-shadow: 0 0 0.5rem rgba(251, 191, 36, 0.55);
 }
 
 .gm-fill.bad {
-  background: var(--status-bad);
+  background: linear-gradient(90deg, #be123c 0%, var(--status-bad) 70%, #fb7185 100%);
+  box-shadow: 0 0 0.5rem rgba(244, 63, 94, 0.6);
 }
 
 .gm-tooltip {
@@ -588,10 +696,12 @@ body[data-stage="4"] #hud-bottom {
   transform: translateX(-50%);
   width: max(19rem, 260px);
   padding: 0.57rem 0.71rem;
-  background: var(--panel-strong);
-  border: 1px solid var(--border-mid);
-  border-left: 2px solid var(--accent);
-  box-shadow: 0 0.7rem 1.9rem rgba(0, 0, 0, 0.78);
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(94, 231, 255, 0.12), transparent 60%),
+    var(--panel-strong);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--r-md);
+  box-shadow: 0 0.7rem 1.9rem rgba(0, 0, 0, 0.78), 0 0 1.2rem -0.3rem rgba(94, 231, 255, 0.45);
   z-index: 70;
   pointer-events: none;
   opacity: 0;
@@ -700,11 +810,10 @@ body[data-stage="4"] #hud-bottom {
 
 /* Primary Roll Out / Bottom Stage CTA */
 .btn-rollout {
-  --cut: 0.55rem;
   flex-shrink: 0;
   min-height: 2.45rem;
   height: auto;
-  padding: 0.28rem 1.15rem 0.28rem 1.25rem;
+  padding: 0.28rem 1.35rem 0.28rem 1.2rem;
   color: var(--text-dim);
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
@@ -713,17 +822,25 @@ body[data-stage="4"] #hud-bottom {
   text-transform: uppercase;
 }
 
+.btn-rollout .gi {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+/* Launch-with-issues: solar-warning capsule */
 .btn-rollout.is-risk {
-  --fill: linear-gradient(180deg, rgba(245, 158, 11, 0.22) 0%, rgba(245, 158, 11, 0.06) 100%), var(--graphite);
-  --rim: var(--rim-amber);
-  color: var(--accent-bright);
+  --fill:
+    radial-gradient(120% 140% at 50% 120%, rgba(251, 191, 36, 0.28) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(70, 44, 10, 0.85) 0%, rgba(24, 16, 8, 0.92) 100%);
+  --rim: linear-gradient(135deg, #fde68a 0%, rgba(251, 191, 36, 0.4) 50%, #f59e0b 100%);
+  --bar: rgba(251, 191, 36, 0.45);
+  color: #fde68a;
 }
 
 /* ------------------------------------------------------------------
    SHARED FLOATING TOOLTIPS, TOAST POPUPS & RESTORE BUTTON
    ------------------------------------------------------------------ */
 .game-tooltip {
-  --pcut: 0.3rem;
   position: fixed;
   z-index: 120;
   max-width: 18.5rem;
@@ -767,7 +884,7 @@ body[data-stage="4"] #hud-bottom {
   background: var(--panel-strong);
   border: 1px solid var(--border-focus);
   box-shadow: inset 2px 0 0 var(--accent);
-  clip-path: polygon(0.36rem 0, 100% 0, 100% calc(100% - 0.36rem), calc(100% - 0.36rem) 100%, 0 100%, 0 0.36rem);
+  border-radius: var(--r-sm);
   animation: popFloat 1.5s ease forwards;
 }
 

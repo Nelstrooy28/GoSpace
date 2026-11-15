@@ -81,6 +81,7 @@
   padding: 0.72rem 0.86rem;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
 }
 
 .debrief-stars-wrap {
@@ -107,9 +108,13 @@
 }
 
 .debrief-star.lit {
-  fill: var(--accent-bright);
+  fill: var(--star);
   stroke: #fef3c7;
-  filter: drop-shadow(0 0 0.57rem rgba(245, 158, 11, 0.45));
+  filter: drop-shadow(0 0 0.6rem rgba(252, 211, 77, 0.65)) drop-shadow(0 0 1.4rem rgba(167, 139, 250, 0.35));
+}
+
+.debrief-star.lit .d {
+  fill-opacity: 1;
 }
 
 .debrief-star.is-slammed {
@@ -129,7 +134,7 @@
   top: 50%;
   width: 0.36rem;
   height: 0.36rem;
-  background: var(--col, #fbbf24);
+  background: var(--col, #b9f6ff);
   opacity: 0;
 }
 
@@ -149,9 +154,9 @@
   letter-spacing: 0.06em;
   color: var(--accent-bright);
   padding: 0.32rem 0.78rem;
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  background: rgba(245, 158, 11, 0.12);
-  clip-path: polygon(0.36rem 0, 100% 0, 100% calc(100% - 0.36rem), calc(100% - 0.36rem) 100%, 0 100%, 0 0.36rem);
+  border: 1px solid rgba(94, 231, 255, 0.45);
+  background: rgba(94, 231, 255, 0.12);
+  border-radius: var(--r-sm);
 }
 
 .rank-crest.rank-b {
@@ -182,6 +187,7 @@
   padding: 0.29rem 0.72rem;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
 }
 
 .debrief-total-lbl {
@@ -203,6 +209,7 @@
   color: #fecaca;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: var(--r-sm);
   padding: 0.43rem 0.72rem;
 }
 
@@ -218,6 +225,7 @@
   padding: 0.72rem 0.86rem;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -225,7 +233,7 @@
 }
 
 .holo-card {
-  border-color: rgba(245, 158, 11, 0.32);
+  border-color: rgba(94, 231, 255, 0.32);
 }
 
 .debrief-sec-head,
@@ -276,6 +284,7 @@
   padding: 0.14rem 0.5rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
   color: var(--text-main);
 }
 
@@ -381,6 +390,7 @@
   padding: 0.5rem 0.64rem;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
 }
 
 .brief-step-num {
@@ -410,6 +420,7 @@
   padding: 0.36rem 0.57rem;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--text-dim);
@@ -475,6 +486,7 @@
   padding: 0.5rem 0.64rem;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: var(--r-sm);
   display: flex;
   flex-direction: column;
   gap: 0.14rem;
@@ -580,6 +592,7 @@ dialog.modal:not([open]) {
   padding: 0.43rem 0.57rem;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
   font-size: var(--fs-sm);
 }
 
@@ -602,6 +615,7 @@ dialog.modal:not([open]) {
   min-width: 0;
   padding: 0.36rem 0.57rem;
   border: 1px solid var(--border-mid);
+  border-radius: var(--r-sm);
   background: rgba(0, 0, 0, 0.45);
   color: var(--text-main);
   font-family: var(--font-ui);
@@ -613,6 +627,7 @@ dialog.modal:not([open]) {
   padding: 0.5rem 0.64rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--text-dim);
