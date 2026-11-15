@@ -175,14 +175,17 @@ export function renderLoadoutDock(segment, subGroup, state, evaluation) {
 }
 
 function getGaugeRows(ev) {
-  const { metrics, scenario, sandboxMode } = ev;
+  const { metrics, scenario, sandboxMode, designRisks } = ev;
+  const powerOk = (metrics.powerPct ?? (100 + metrics.powerMargin)) >= 100 && metrics.powerMargin >= 0;
+  const dataOk = (metrics.dataPct ?? (100 + metrics.dataMargin)) >= 100 && metrics.dataMargin >= 0 && !designRisks?.weakCommsMargin;
+  const sciOk = !designRisks?.scienceMismatch && !designRisks?.wavelengthMismatch && metrics.scienceScore >= scenario.minScience;
   return [
     { key: 'BUD', label: 'Budget', val: sandboxMode ? '∞' : `$${metrics.budget.usedM}/${metrics.budget.limitM}M`, isInf: sandboxMode, tip: sandboxMode ? 'Unlimited Sandbox Budget' : '', pct: sandboxMode ? 100 : Math.min(100, metrics.budget.pct), ok: sandboxMode || metrics.budget.usedM <= metrics.budget.limitM },
-    { key: 'MASS', label: 'Mass', val: sandboxMode ? `${metrics.mass.totalKg}kg / ∞` : `${metrics.mass.totalKg}/${metrics.mass.launchLimitKg}kg`, isInf: false, tip: sandboxMode ? 'Unlimited Rocket Payload Mass' : '', pct: sandboxMode ? 100 : Math.min(100, (metrics.mass.totalKg / Math.max(metrics.mass.launchLimitKg, 1)) * 100), ok: sandboxMode || metrics.mass.totalKg <= metrics.mass.launchLimitKg },
-    { key: 'PWR', label: 'Power', val: `${metrics.powerMargin}%`, pct: Math.max(0, Math.min(100, metrics.powerMargin + 30)), ok: metrics.powerMargin >= 5 },
-    { key: 'DATA', label: 'Data', val: `${metrics.dataMargin}%`, pct: Math.max(0, Math.min(100, metrics.dataMargin + 25)), ok: metrics.dataMargin >= 5 },
+    { key: 'MASS', label: 'Mass', val: sandboxMode ? `${metrics.mass.totalKg}kg / ∞` : `${metrics.mass.totalKg}/${metrics.mass.launchLimitKg}kg`, isInf: false, tip: sandboxMode ? 'Unlimited Rocket Payload Mass' : '', pct: sandboxMode ? 100 : Math.min(100, (metrics.mass.totalKg / Math.max(metrics.mass.launchLimitKg, 1)) * 100), ok: !designRisks?.massOverrun },
+    { key: 'PWR', label: 'Power', val: `${metrics.powerMargin}%`, tip: `Supply ratio: ${metrics.powerPct ?? Math.round(100 + metrics.powerMargin)}% of demand`, pct: Math.max(0, Math.min(100, metrics.powerMargin + 30)), ok: powerOk },
+    { key: 'DATA', label: 'Data', val: `${metrics.dataMargin}%`, tip: `Downlink capacity: ${metrics.dataPct ?? Math.round(100 + metrics.dataMargin)}% of generated rate`, pct: Math.max(0, Math.min(100, metrics.dataMargin + 25)), ok: dataOk },
     { key: 'LIFE', label: 'Life', val: `${metrics.lifetimeYears}/${scenario.minLifetimeYr}yr`, pct: Math.min(100, (metrics.lifetimeYears / scenario.minLifetimeYr) * 100), ok: metrics.lifetimeYears >= scenario.minLifetimeYr },
-    { key: 'SCI', label: 'Science', val: `${metrics.scienceScore}%`, pct: metrics.scienceScore, ok: metrics.scienceScore >= scenario.minScience }
+    { key: 'SCI', label: 'Science', val: `${metrics.scienceScore}%`, pct: metrics.scienceScore, ok: sciOk }
   ];
 }
 
@@ -344,12 +347,6 @@ export function renderStageHud(stage, state, ev, opts) {
     return;
   }
   if (stage === 'orbit') {
-    const risks = ev.designRisks || {};
-    const riskMsgs = [];
-    if (risks.massOverrun) riskMsgs.push('Drag Decay (-0.5%/s Hull)');
-    if (risks.lowPowerMargin) riskMsgs.push('Eclipse Brownout Risk (2.5x drain)');
-    if (risks.weakCommsMargin) riskMsgs.push('Packet Bottleneck (-50% downlink pts)');
-    if (risks.wavelengthMismatch) riskMsgs.push('Wavelength Mismatch (-40% science)');
     const testHazBtn = state.sandboxMode === true
       ? '<button id="orb-test-hazard-btn" class="btn-sci" type="button">⚡ Trigger Hazard</button>'
       : '';
@@ -358,6 +355,7 @@ export function renderStageHud(stage, state, ev, opts) {
       : '';
     const debOk = Boolean(opts.orbitObjectivesMet);
     const bufPkts = opts.onboardBuffer || 0;
+    const battInit = opts.batterySoc ?? 84;
     hud.innerHTML = `<div class="stage-card plate">
       <div class="card-head"><span>ORBITAL OPS</span><div class="orb-head-pills"><span id="orb-buffer-pill" class="badge-tag orb-buffer-pill ${bufPkts > 0 ? 'is-loaded' : 'is-empty'}" title="Buffered Science Packets ready for Ground Station downlink">💾 BUFFER: ${bufPkts} Packet${bufPkts === 1 ? '' : 's'}</span><span id="orb-score-pill" class="badge-tag">SCORE ${opts.orbitScore || 0}</span></div></div>
       <div class="orbit-clock-row">
@@ -365,7 +363,6 @@ export function renderStageHud(stage, state, ev, opts) {
         <div class="orbit-clock-cell"><span class="orbit-clock-lbl">UTC</span><span id="orb-utc-val" class="orbit-clock-val">2026-11-15 14:00:00</span></div>
       </div>
       <div id="orb-eclipse-badge" class="eclipse-badge" hidden>🌑 ECLIPSE SHADOW · SOLAR ARRAY OUTPUT DROPPED</div>
-      ${riskMsgs.length ? `<div class="design-risk-banner">⚠️ ACTIVE RISKS: ${esc(riskMsgs.join(' · '))}</div>` : ''}
       <div class="btn-row">
         <button class="btn-sci ${opts.orbitCam === 'chase' ? 'is-on' : ''}" data-cam="chase" type="button">🛰️ Chase Sat</button>
         <button class="btn-sci ${opts.orbitCam === 'full' ? 'is-on' : ''}" data-cam="full" type="button">🌍 Full Orbit</button>
@@ -386,6 +383,8 @@ export function renderStageHud(stage, state, ev, opts) {
       <div class="hull-meter-row">
         <div class="hull-meter-head"><span>HULL INTEGRITY</span><span id="orb-hull-pct">${opts.hullIntegrity ?? 100}%</span></div>
         <div class="hull-meter-track"><div id="orb-hull-fill" class="hull-meter-fill" style="width:${opts.hullIntegrity ?? 100}%"></div></div>
+        <div class="hull-meter-head"><span>BATTERY SOC</span><span id="orb-batt-pct">${battInit}%</span></div>
+        <div class="hull-meter-track"><div id="orb-batt-fill" class="hull-meter-fill" style="width:${battInit}%"></div></div>
       </div>
       <div id="orbit-telem" class="telem-mono">Propagating Keplerian track...</div></div>`;
     actions.innerHTML = `<button id="orb-transmit-btn" class="action-prompt is-cyan" type="button" hidden>📡 [SPACE] TRANSMIT SCIENCE (+50)</button>
@@ -407,7 +406,9 @@ export function renderStageHud(stage, state, ev, opts) {
   const budgetEfficiency = !sandboxMode && metrics.budget.usedM <= metrics.budget.limitM
     ? Math.round((metrics.budget.limitM - metrics.budget.usedM) * 4)
     : 0;
-  const budgetPenalty = budgetOverrun ? 200 : 0;
+  const budgetPenalty = budgetOverrun
+    ? Math.min(250, Math.round(opts.budgetOverrunPenalty != null && opts.budgetOverrunPenalty > 0 ? opts.budgetOverrunPenalty : 200))
+    : 0;
   const engPts = metrics.scienceScore * 10 + (cmlLevel === 4 ? 250 : 0) + budgetEfficiency - budgetPenalty;
   const totalScore = Math.max(0, downlinkPts + anomalyPts + scanPts + decisionPts + engPts);
 
@@ -578,21 +579,35 @@ export function updateOrbitOverlay(t, objStatus = null) {
       d.textContent = '💥 HULL BREACHED (0%) — VEHICLE LOST';
     } else {
       const flags = [];
-      if ((t.solarPausedSec || 0) > 0) flags.push(`SOLAR PAUSED ${t.solarPausedSec}s`);
+      const warpNum = t.timeWarp ?? 1;
+      if ((t.solarPausedSec || 0) > 0) {
+        flags.push(warpNum > 1 ? `SOLAR PAUSED ${t.solarPausedRealSec}s (${t.solarPausedSec}s @ ${warpNum}x)` : `SOLAR PAUSED ${t.solarPausedSec}s`);
+      }
       if ((t.commsPausedSec || 0) > 0) flags.push(`DL PAUSED ${t.commsPausedSec}s`);
+      if (t.sensorCalibrating) flags.push(`SENSOR RE-CAL ${t.sensorCalibratingSec}s`);
+      if (t.brownoutLocked) flags.push('BROWNOUT');
       if ((t.omniReducedDownlinks || 0) > 0) flags.push('OMNI 70%');
       const flagStr = flags.length ? ` · ${flags.join(' · ')}` : '';
       d.textContent = `ALT ${t.altitudeKm}km · ${t.speedKms}km/s · ${t.stormActive ? 'SOLAR FLARE!' : (t.inEclipse ? 'ECLIPSE' : 'SUNLIT')} | BATT ${t.batterySoc}%${flagStr} · ${t.nearestNeaId || 'NEA'}`;
     }
   }
-  document.getElementById('orb-score-pill')?.replaceChildren(document.createTextNode(`SCORE ${t.missionScore}`));
+  document.getElementById('orb-score-pill')?.replaceChildren(document.createTextNode(`SCORE ${t?.missionScore ?? 0}`));
   document.querySelectorAll('#stage-hud [data-warp]').forEach((b) => b.classList.toggle('is-on', Number(b.dataset.warp) === Number(t?.timeWarp)));
   const hull = destroyed ? 0 : Math.max(0, Math.min(100, t?.hullIntegrity ?? 100));
+  const hullBarW = destroyed ? 0 : Math.max(0, Math.min(100, t?.hullExact ?? hull));
   const hullPct = document.getElementById('orb-hull-pct'); if (hullPct) hullPct.textContent = `${hull}%`;
   const hullFill = document.getElementById('orb-hull-fill');
   if (hullFill) {
-    hullFill.style.width = `${hull}%`;
+    hullFill.style.width = `${hullBarW.toFixed(2)}%`;
     hullFill.style.background = hull >= 70 ? '#10b981' : (hull >= 40 ? '#f59e0b' : '#ef4444');
+  }
+  const batt = destroyed ? 0 : Math.max(0, Math.min(100, t?.batterySoc ?? 84));
+  const battBarW = destroyed ? 0 : Math.max(0, Math.min(100, t?.batterySocExact ?? batt));
+  const battPct = document.getElementById('orb-batt-pct'); if (battPct) battPct.textContent = `${batt}%`;
+  const battFill = document.getElementById('orb-batt-fill');
+  if (battFill) {
+    battFill.style.width = `${battBarW.toFixed(2)}%`;
+    battFill.style.background = t?.brownoutLocked || batt < 15 ? '#ef4444' : (batt < 40 ? '#f59e0b' : '#38bdf8');
   }
   const hazBox = document.getElementById('hazard-alert-hud');
   const hs = t?.hazardState;
@@ -687,8 +702,8 @@ export function updateOrbitOverlay(t, objStatus = null) {
       tx.classList.add('is-status-pill');
     } else if (readyToTx) {
       let pts = 50;
-      if (t?.designRisks?.weakCommsMargin) pts = Math.round(pts * 0.5);
-      if (t?.designRisks?.wavelengthMismatch) pts = Math.round(pts * 0.6);
+      const weakComms = Boolean(t?.activeDebuffs?.dataBottleneck?.active || t?.designRisks?.weakCommsMargin);
+      if (weakComms) pts = Math.round(pts * 0.5);
       if ((t?.omniReducedDownlinks || 0) > 0) pts = Math.round(pts * 0.7);
       const omniTag = (t?.omniReducedDownlinks || 0) > 0 ? ' · OMNI 70%' : '';
       const stLabel = t?.linkedStation || 'Ground Station';
@@ -698,13 +713,20 @@ export function updateOrbitOverlay(t, objStatus = null) {
   }
   const scanBtn = document.getElementById('orb-scan-btn');
   if (scanBtn) {
-    scanBtn.disabled = destroyed;
+    scanBtn.disabled = destroyed || Boolean(t?.brownoutLocked) || Boolean(t?.sensorCalibrating);
     scanBtn.classList.remove('is-swath-ready', 'is-cooldown', 'is-standby', 'is-cyan', 'is-status-pill');
     if (destroyed) {
       scanBtn.hidden = true;
+    } else if (t?.sensorCalibrating) {
+      scanBtn.hidden = false;
+      scanBtn.textContent = `🔬 Sensor Re-calibrating... (${t.sensorCalibratingSec || 1}s)`;
+      scanBtn.classList.add('is-status-pill');
     } else if (t?.swathReady) {
       scanBtn.hidden = false;
-      scanBtn.textContent = `🔬 IN SCAN GATE — PRESS [E] TO CAPTURE SCIENCE (+${t.swathZonePoints || 60})`;
+      const basePts = t.swathZonePoints || 60;
+      const sciBad = Boolean(t?.activeDebuffs?.scienceMismatch?.active || t?.designRisks?.wavelengthMismatch);
+      const scanPts = sciBad ? Math.round(basePts * 0.6) : basePts;
+      scanBtn.textContent = `🔬 IN SCAN GATE — PRESS [E] TO CAPTURE SCIENCE (+${scanPts})`;
       scanBtn.classList.add('is-swath-ready');
     } else if ((t?.swathCooldownSec || 0) > 0) {
       scanBtn.hidden = false;
@@ -871,7 +893,9 @@ export function computeMissionDebriefSummary(ev, opts = {}) {
   const budgetEfficiency = !sandboxMode && metrics.budget.usedM <= metrics.budget.limitM
     ? Math.round((metrics.budget.limitM - metrics.budget.usedM) * 4)
     : 0;
-  const budgetPenalty = budgetOverrun ? 200 : 0;
+  const budgetPenalty = budgetOverrun
+    ? Math.min(250, Math.round(opts.budgetOverrunPenalty != null && opts.budgetOverrunPenalty > 0 ? opts.budgetOverrunPenalty : 200))
+    : 0;
   const engPts = metrics.scienceScore * 10 + (cmlLevel === 4 ? 250 : 0) + budgetEfficiency - budgetPenalty;
   const totalScore = Math.max(0, downlinkPts + anomalyPts + scanPts + decisionPts + engPts);
   let starCount = (cmlLevel === 4 || sandboxMode) && metrics.scienceScore >= 85 && (oScore >= 50 || resolvedCount > 0)
@@ -925,12 +949,46 @@ export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run
   box.hidden = false;
   box.classList.toggle('is-collapsed', Boolean(collapsed));
   const status = getOrbitObjectivesStatus(state, telemetry, run);
-  const debuffs = evaluation ? getOrbitActiveDebuffs(evaluation, telemetry) : [];
-  const debuffSig = debuffs.map((d) => `${d.id}:${d.firing ? 1 : 0}`).join(',');
-  const sig = `${status.scenarioId}|${status.isSandbox ? 1 : 0}|${collapsed ? 1 : 0}|${status.isDestroyed ? 1 : 0}|${status.completedCount}|${status.canDebrief ? 1 : 0}|${status.tasks.map((t) => `${t.progressText}:${t.badgeText}`).join('|')}|${debuffSig}`;
-  if (box.dataset.renderKey === sig) return status;
-  box.dataset.renderKey = sig;
+  const debuffs = evaluation ? [...getOrbitActiveDebuffs(evaluation, telemetry, state)] : [];
+  const warpNum = telemetry?.timeWarp ?? 1;
+  if ((telemetry?.solarPausedSec || 0) > 0) {
+    debuffs.push({
+      id: 'temp-solar',
+      icon: '☀️',
+      title: `SOLAR PAUSED (${telemetry.solarPausedRealSec ?? telemetry.solarPausedSec}s)`,
+      effect: warpNum > 1 ? `${telemetry.solarPausedSec}s sim @ ${warpNum}x · Wings Feathered` : 'Wings Feathered · Charging Halted',
+      firing: true
+    });
+  }
+  if ((telemetry?.commsPausedSec || 0) > 0) {
+    debuffs.push({
+      id: 'temp-comms',
+      icon: '📡',
+      title: `COMMS PAUSED (${telemetry.commsPausedSec}s)`,
+      effect: `Downlink Locked @ ${warpNum}x`,
+      firing: true
+    });
+  }
+  if (telemetry?.sensorCalibrating) {
+    debuffs.push({
+      id: 'temp-recal',
+      icon: '🔬',
+      title: `SENSOR RE-CALIBRATING (${telemetry.sensorCalibratingSec}s)`,
+      effect: `Spectral Drift Recovery @ ${warpNum}x`,
+      firing: true
+    });
+  }
+  if (telemetry?.brownoutLocked) {
+    debuffs.push({
+      id: 'temp-brownout',
+      icon: '🔋',
+      title: `POWER BROWNOUT (${telemetry.batterySoc ?? 0}%/15%)`,
+      effect: 'Payloads Shed · Emergency Sun Trickle Active',
+      firing: true
+    });
+  }
 
+  const debuffSig = debuffs.map((d) => `${d.id}:${d.firing ? 1 : 0}:${d.title}:${d.effect}`).join('|');
   const debuffsHtml = debuffs.length
     ? `<div class="orb-debuffs-list">${debuffs.map((d) => `
         <div class="orb-debuff-pill ${d.firing ? 'is-firing' : ''}">
@@ -938,6 +996,17 @@ export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run
           <div class="orb-debuff-eff">${esc(d.effect)}</div>
         </div>`).join('')}</div>`
     : '<div class="orb-debuff-nominal">✅ ZERO DESIGN DEBUFFS — NOMINAL</div>';
+
+  const sig = `${status.scenarioId}|${status.isSandbox ? 1 : 0}|${collapsed ? 1 : 0}|${status.isDestroyed ? 1 : 0}|${status.completedCount}|${status.canDebrief ? 1 : 0}|${status.tasks.map((t) => `${t.progressText}:${t.badgeText}`).join('|')}`;
+  if (box.dataset.renderKey === sig) {
+    const debBox = document.getElementById('orb-debuffs-sec');
+    if (debBox && debBox.dataset.debuffKey !== debuffSig) {
+      debBox.dataset.debuffKey = debuffSig;
+      debBox.innerHTML = `<div class="orb-debuffs-head">⚠️ ACTIVE DESIGN DEBUFFS</div>${debuffsHtml}`;
+    }
+    return status;
+  }
+  box.dataset.renderKey = sig;
 
   const destroyedBanner = status.isDestroyed && status.isSandbox
     ? '<div class="orb-obj-destroyed-tag">💥 0% DESTROYED — VEHICLE LOST</div>'
@@ -966,7 +1035,7 @@ export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run
           </li>`).join('')}
       </ul>
       ${destroyedBanner}
-      <div class="orb-debuffs-sec">
+      <div id="orb-debuffs-sec" class="orb-debuffs-sec" data-debuff-key="${esc(debuffSig)}">
         <div class="orb-debuffs-head">⚠️ ACTIVE DESIGN DEBUFFS</div>
         ${debuffsHtml}
       </div>

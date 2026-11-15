@@ -147,6 +147,36 @@ export function createHazardFxController(scene) {
   );
   debrisActiveGroup.add(debrisRadarRing);
 
+  // Over-Mass continuous atmospheric drag friction sparks trailing along -velocityDir (-Z in velGroup)
+  const DRAG_SPARK_COUNT = 32;
+  const dragPos = new Float32Array(DRAG_SPARK_COUNT * 6);
+  const dragCol = new Float32Array(DRAG_SPARK_COUNT * 6);
+  const dragSeeds = [];
+  for (let i = 0; i < DRAG_SPARK_COUNT; i += 1) {
+    const a = (i / DRAG_SPARK_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
+    const rad = 0.28 + Math.random() * 0.72;
+    const x = Math.cos(a) * rad;
+    const y = Math.sin(a) * rad;
+    const z = 0.3 - Math.random() * 4.2;
+    const len = 0.24 + Math.random() * 0.42;
+    dragSeeds.push({ x, y, z, len, speed: 4.5 + Math.random() * 4.5 });
+    const base = i * 6;
+    dragPos[base] = x; dragPos[base + 1] = y; dragPos[base + 2] = z;
+    dragPos[base + 3] = x; dragPos[base + 4] = y; dragPos[base + 5] = z - len;
+    dragCol[base] = 1.0; dragCol[base + 1] = i % 2 === 0 ? 0.42 : 0.62; dragCol[base + 2] = 0.12;
+    dragCol[base + 3] = 0.95; dragCol[base + 4] = 0.18; dragCol[base + 5] = 0.05;
+  }
+  const dragGeo = trackGeo(new THREE.BufferGeometry());
+  const dragPosAttr = new THREE.BufferAttribute(dragPos, 3);
+  dragGeo.setAttribute('position', dragPosAttr);
+  dragGeo.setAttribute('color', new THREE.BufferAttribute(dragCol, 3));
+  const dragMat = trackMat(new THREE.LineBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false, blending: THREE.AdditiveBlending
+  }));
+  const dragFrictionSparks = new THREE.LineSegments(dragGeo, dragMat);
+  dragFrictionSparks.visible = false;
+  velGroup.add(dragFrictionSparks);
+
   // ===================================================================
   // 2. SOLAR STORM / CME ACTIVE RIG (90 plasma + 2 bow shock + 5 arcs + light)
   // ===================================================================
@@ -697,13 +727,32 @@ export function createHazardFxController(scene) {
     const realDt = Math.min(0.05, Math.max(0.0001, dt || 0.016));
     if (context.satModel) lastCraftModel = context.satModel;
     const satModel = context.satModel || lastCraftModel;
+    const dragActive = Boolean(context.dragActive);
 
-    if (!activeType && !resolveState) {
+    if (!activeType && !resolveState && !dragActive) {
+      dragFrictionSparks.visible = false;
       if (fxRoot.visible) clear(satModel);
       return;
     }
 
+    fxRoot.visible = true;
     syncSpatial(context);
+
+    dragFrictionSparks.visible = dragActive;
+    if (dragActive) {
+      const warpScale = Math.max(0.5, Math.min(18, 1 + (context.timeWarp ?? 1) * 0.45));
+      dragMat.opacity = Math.min(0.95, 0.48 + (context.dragSeverity || 0.25) * 0.25);
+      for (let i = 0; i < DRAG_SPARK_COUNT; i += 1) {
+        const s = dragSeeds[i];
+        s.z -= s.speed * warpScale * realDt;
+        if (s.z < -4.2) s.z = 0.35 - Math.random() * 0.4;
+        const streakLen = s.len * (0.85 + warpScale * 0.14);
+        const base = i * 6;
+        dragPos[base + 2] = s.z;
+        dragPos[base + 5] = s.z - streakLen;
+      }
+      dragPosAttr.needsUpdate = true;
+    }
 
     // Outer halo telemetry fade (0 in Chase Sat < 3.6, visible in Full Orbit >= 6.5)
     let haloAlpha = 0;
@@ -947,6 +996,7 @@ export function createHazardFxController(scene) {
   function clear(satModel) {
     activeType = null;
     resolveState = null;
+    dragFrictionSparks.visible = false;
     hideAllActiveRigs();
     hideAllResolveRigs();
     haloRing.material.opacity = 0;

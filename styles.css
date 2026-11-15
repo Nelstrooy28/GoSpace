@@ -1145,7 +1145,7 @@ dialog button:hover {
   display: flex;
   justify-content: space-between;
   font-family: var(--font-hud);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   color: #e2e8f0;
 }
@@ -1162,7 +1162,7 @@ dialog button:hover {
   height: 100%;
   width: 100%;
   background: #10b981;
-  transition: width 0.2s ease, background-color 0.2s ease;
+  transition: width 0.04s linear, background-color 0.15s ease;
 }
 
 .score-popups {

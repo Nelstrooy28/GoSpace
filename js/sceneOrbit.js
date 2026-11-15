@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { generateOrbitTrack, propagateOrbit, propagateOrbitAtTrueAnomaly } from './missionVizPropagator.js';
-import { getMissionScienceZones, getOrbitObjectivesStatus, ORBIT_MISSION_TARGETS } from './catalog.js';
+import { getActiveDebuffs, getMissionScienceZones, getOrbitObjectivesStatus, ORBIT_MISSION_TARGETS } from './catalog.js';
 import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpaceTexture } from './solarSystem.js';
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
 import { applyHullDelta, clearActiveHazard, getHazardSnapshot, initOrbitHazards, recordOrbitPlayerAction, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=18';
@@ -38,8 +38,11 @@ let onboardBuffer = 0, scienceScansCount = 0, eclipsesSurvived = 0, wasInEclipse
 let activeZoneReady = null, activeZoneCooldown = null, zoneScanFxUntil = 0, zoneScanLabel = '', zoneScanPos = new THREE.Vector3();
 let nextZoneName = '', nextZoneEtaSec = 0, nextZoneDeg = 0, nextZoneDistKm = 0;
 let downlinkPts = 0, anomalyPts = 0, scanPts = 0, decisionPts = 0;
-let downlinkCooldownUntilReal = 0, downlinkCooldownUntilRev = 0, downlinkCooldownSec = 0;
-let brownoutLocked = false, sensorOfflineUntil = 0, solarChargePauseUntil = 0, commsPauseUntil = 0, omniReducedDownlinks = 0, dragLossKm = 0, dragHullAccum = 0;
+let downlinkCooldownSec = 0, stationCooldownSimSec = 0;
+let brownoutLocked = false, sensorOfflineSimSec = 0, solarPausedSimSec = 0, commsPausedSimSec = 0, stormSimSec = 0;
+let omniReducedDownlinks = 0, dragLossKm = 0, bufferOverflowTimer = 0, sensorDriftTimer = 0, sensorDriftPauseSimSec = 0;
+let budgetOverrunPenalty = 0, cachedDebuffs = null, lastSpaceTxRealMs = 0, lastScanKeyRealMs = 0, lastPacketWarnMs = 0;
+let lastDragRate = 0, lastRadRate = 0, lastBattRate = 0, lastOpsBleedRate = 0, lastOverflowPeriodSec = 0;
 let isDestroyed = false, destructionReason = '', explosionRig = null, explosionElapsed = 0, shakeRemaining = 0;
 const tmpShake = new THREE.Vector3(), tmpZoneWorld = new THREE.Vector3(), tmpVelDir = new THREE.Vector3(), sunWorldPos = SUN_DIR.clone().multiplyScalar(120);
 let inLineOfSight = false, activeStationName = 'None', activeStationId = '', activeLosGs = null, stationPassCooldownActive = false, hazardNow = false;
@@ -337,7 +340,11 @@ function triggerSpacecraftExplosion(reason = 'Unmitigated Orbital Hazard') {
   isDestroyed = true;
   destructionReason = reason;
   clearActiveHazard();
-  stormUntil = 0;
+  stormSimSec = 0;
+  solarPausedSimSec = 0;
+  commsPausedSimSec = 0;
+  sensorOfflineSimSec = 0;
+  sensorDriftPauseSimSec = 0;
   deployActive = false;
 
   if (satMesh) satMesh.visible = false;
@@ -1118,9 +1125,11 @@ function buildWorld(missionState, evaluation) {
 
 function animate() {
   rafId = requestAnimationFrame(animate);
-  const now = performance.now(), realDt = Math.min(clock.getDelta(), 0.05);
+  const now = performance.now(), clampedDt = Math.min(clock.getDelta(), 0.05), realDt = clampedDt;
   const periodRef = Math.max(600, orbitPeriodSec || 5800);
   const activePaused = briefingPaused || isDestroyed;
+  const warpPaused = activePaused || showcaseMode || victoryMode || isTutorialActive() || timeWarp <= 0;
+  const warpDt = warpPaused ? 0 : clampedDt * timeWarp;
   const basePhaseRate = activePaused ? 0 : (1 / TARGET_ORBIT_DURATION_1X) * timeWarp;
   const eEff = Math.min(orbitEl?.e || 0, 0.28);
   const modFactor = Math.max(0.65, 1 + eEff * Math.cos(orbitPhase * Math.PI * 2));
@@ -1383,6 +1392,18 @@ function animate() {
     else satModel.group.rotation.y = 0;
   }
 
+  const debuffs = cachedDebuffs || getActiveDebuffs(stateRef, evalRef, evalRef?.scenario);
+  const canDegrade = !showcaseMode && !victoryMode && !briefingPaused && !isTutorialActive() && !isDestroyed;
+
+  if (warpDt > 0) {
+    solarPausedSimSec = Math.max(0, solarPausedSimSec - warpDt);
+    commsPausedSimSec = Math.max(0, commsPausedSimSec - warpDt);
+    sensorOfflineSimSec = Math.max(0, sensorOfflineSimSec - warpDt);
+    stationCooldownSimSec = Math.max(0, stationCooldownSimSec - warpDt);
+    if (sensorDriftPauseSimSec > 0) sensorDriftPauseSimSec = Math.max(0, sensorDriftPauseSimSec - warpDt);
+    if (stormSimSec > 0) stormSimSec = Math.max(0, stormSimSec - warpDt);
+  }
+
   if (hazardFx && satMesh && !isDestroyed) {
     tmpVelDir.copy(tmpNext).sub(tmpSat);
     if (tmpVelDir.lengthSq() > 1e-8) tmpVelDir.normalize();
@@ -1395,40 +1416,103 @@ function animate() {
       velocityDir: tmpVelDir,
       sunWorldPos,
       cameraPos: camera?.position,
-      spacecraftScale: satFitR
+      spacecraftScale: satFitR,
+      dragActive: canDegrade && warpDt > 0 && debuffs.overMass.active,
+      dragSeverity: debuffs.overMass.severity,
+      timeWarp: warpPaused ? 0 : timeWarp
     });
   }
 
-  const stormActive = now < stormUntil || activeKind === 'cme';
+  const stormActive = stormSimSec > 0 || activeKind === 'cme';
   const gimbalJammed = activeKind === 'gimbal';
-  const solarPaused = now < solarChargePauseUntil;
-  const commsPaused = now < commsPauseUntil || now < sensorOfflineUntil;
+  const solarPaused = solarPausedSimSec > 0;
+  const commsPaused = commsPausedSimSec > 0 || sensorOfflineSimSec > 0;
   const risks = evalRef?.designRisks || {};
-  const canDegrade = !showcaseMode && !victoryMode && !briefingPaused && !isTutorialActive() && !isDestroyed;
-  if (canDegrade && risks.massOverrun) {
-    dragHullAccum += realDt * 0.5;
-    dragLossKm += realDt * 0.85;
-    if (dragHullAccum >= 0.5) {
-      const nextHull = applyHullDelta(-dragHullAccum, 0);
-      dragHullAccum = 0;
+
+  // Compute live continuous debuff rates (exact per-1x simulated-second rates)
+  const isNearPeriapsis = Math.cos((prop.trueAnomalyDeg * Math.PI) / 180) > 0.35;
+  lastDragRate = debuffs.overMass.active
+    ? (0.60 + Math.min(1.60, debuffs.overMass.severity * 0.65)) * (isNearPeriapsis ? 1.3 : 1.0)
+    : 0;
+  lastRadRate = debuffs.lowLifetime.active
+    ? (0.38 + Math.min(0.90, debuffs.lowLifetime.severity * 0.55)) * (prop.inEclipse ? 0.7 : 1.2)
+    : 0;
+  lastOverflowPeriodSec = debuffs.dataBottleneck.active
+    ? Math.max(4.0, 9.0 - debuffs.dataBottleneck.severity * 3.0)
+    : 0;
+  lastOpsBleedRate = debuffs.overBudget.active
+    ? (2.0 + debuffs.overBudget.severity * 2.0)
+    : 0;
+
+  let battRate = 0;
+  if (prop.inEclipse) {
+    battRate = -(debuffs.powerDeficit.active ? 3.2 * (1 + debuffs.powerDeficit.severity) : 0.95);
+  } else if (!solarPaused) {
+    if (brownoutLocked) {
+      battRate = 1.8;
+    } else if (debuffs.powerDeficit.active) {
+      battRate = -(0.65 + debuffs.powerDeficit.severity * 1.25);
+    } else {
+      const surplusBonus = Math.min(3.5, Math.max(0, (evalRef?.metrics?.powerMargin || 0) * 0.035));
+      battRate = 2.5 + surplusBonus;
+    }
+  } else {
+    battRate = debuffs.powerDeficit.active ? -(0.65 + debuffs.powerDeficit.severity * 1.25) : -0.65;
+  }
+  if (activeKind === 'cryo') battRate = Math.min(battRate, -0.65 * (activeHaz?.drainMult ?? 1) - 0.6);
+  lastBattRate = battRate;
+
+  hazardNow = prop.inEclipse || stormActive || Boolean(activeHaz);
+  const inSun = !prop.inEclipse && !solarPaused;
+  if (canDegrade && warpDt > 0) {
+    const hullLossRate = lastDragRate + lastRadRate;
+    if (debuffs.overMass.active) dragLossKm += warpDt * 0.85;
+    if (hullLossRate > 0) {
+      const nextHull = applyHullDelta(-(hullLossRate * warpDt), 0);
       if (nextHull <= 0) {
-        triggerSpacecraftExplosion('Severe Atmospheric Drag Decay');
+        const reason = debuffs.overMass.active && debuffs.lowLifetime.active
+          ? 'Atmospheric Drag & Radiation Frame Failure'
+          : (debuffs.overMass.active ? 'Severe Atmospheric Drag Decay' : 'Structural Radiation & Thermal Fatigue');
+        triggerSpacecraftExplosion(reason);
       }
     }
-  }
-  hazardNow = prop.inEclipse || stormActive || Boolean(activeHaz);
-  const cryoDrain = activeKind === 'cryo' ? -0.65 * (activeHaz?.drainMult ?? 1) : 0;
-  let pwrRate = cryoDrain || (hazardNow ? -0.45 : Math.max(0.15, (evalRef.metrics.powerMargin + 25) * 0.012));
-  if (solarPaused && pwrRate > 0) pwrRate = 0;
-  if (prop.inEclipse && risks.lowPowerMargin) pwrRate = Math.min(pwrRate * 2.5, -1.65);
-  if (sysSimDt > 0 && !briefingPaused) {
-    const minSoc = risks.lowPowerMargin ? 0 : 5;
-    const stepSoc = (prop.inEclipse && risks.lowPowerMargin) ? pwrRate * realDt * 3.5 : pwrRate * (sysSimDt / 60);
-    batterySoc = Math.max(minSoc, Math.min(100, batterySoc + stepSoc));
+
+    batterySoc = THREE.MathUtils.clamp(batterySoc + battRate * warpDt, 0, 100);
+    if (batterySoc <= 0.01) { batterySoc = 0; brownoutLocked = true; }
+    if (brownoutLocked && inSun && batterySoc >= 15) brownoutLocked = false;
     bufferGb = Math.min(32, bufferGb + (sysSimDt / 86400) * 1.6);
+
+    if (debuffs.dataBottleneck.active && onboardBuffer > 0 && lastOverflowPeriodSec > 0) {
+      bufferOverflowTimer += warpDt;
+      while (bufferOverflowTimer >= lastOverflowPeriodSec && onboardBuffer > 0) {
+        bufferOverflowTimer -= lastOverflowPeriodSec;
+        onboardBuffer = Math.max(0, onboardBuffer - 1);
+        if (now - lastPacketWarnMs > 850) {
+          lastPacketWarnMs = now;
+          playWarning();
+          hazardEventCb?.({ type: 'packet-lost', onboardBuffer });
+        }
+        lastHudMs = 0;
+      }
+    } else {
+      bufferOverflowTimer = 0;
+    }
+
+    if (debuffs.scienceMismatch.active && sensorDriftPauseSimSec <= 0) {
+      sensorDriftTimer += warpDt;
+      if (sensorDriftTimer >= 14.0) {
+        sensorDriftTimer -= 14.0;
+        sensorDriftPauseSimSec = 2.5;
+        hazardEventCb?.({ type: 'sensor-recal' });
+        lastHudMs = 0;
+      }
+    }
+
+    if (debuffs.overBudget.active && budgetOverrunPenalty < 250) {
+      budgetOverrunPenalty = Math.min(250, budgetOverrunPenalty + lastOpsBleedRate * warpDt);
+      missionScore = Math.max(-250, downlinkPts + anomalyPts + scanPts + decisionPts - Math.round(budgetOverrunPenalty));
+    }
   }
-  if (batterySoc <= 0.1 && (risks.lowPowerMargin || brownoutLocked)) brownoutLocked = true;
-  if (brownoutLocked && !prop.inEclipse && !solarPaused && batterySoc >= 15) brownoutLocked = false;
   if (earthshineLight) earthshineLight.intensity = prop.inEclipse ? 0.24 : 0.95;
 
   if (!showcaseMode && !victoryMode && !briefingPaused && !isDestroyed) {
@@ -1528,14 +1612,11 @@ function animate() {
   });
 
   inLineOfSight = false; activeStationName = 'None'; activeStationId = ''; activeLosGs = null;
-  const dlReady = now >= downlinkCooldownUntilReal || totalRevs >= downlinkCooldownUntilRev;
+  const dlReady = stationCooldownSimSec <= 0;
   stationPassCooldownActive = !dlReady;
   downlinkCooldownSec = dlReady
     ? 0
-    : Math.max(1, Math.min(
-        Math.ceil((downlinkCooldownUntilReal - now) / 1000),
-        Math.ceil(((downlinkCooldownUntilRev - totalRevs) * TARGET_ORBIT_DURATION_1X) / Math.max(0.25, timeWarp || 1))
-      ));
+    : Math.max(0.1, Number((stationCooldownSimSec / Math.max(0.25, timeWarp || 1)).toFixed(1)));
   let bestLosGs = null, bestLosScore = -1;
   const orbitRadiusScene = tmpSat.length();
   const losThreshold = orbitRadiusScene < EARTH_R * 1.6 ? 0.32 : 0.08;
@@ -1650,19 +1731,28 @@ function animate() {
 
   const pipEl = document.getElementById('sensor-cam-pip');
   const overlayEl = document.getElementById('sensor-pip-overlay-msg');
-  const offlineRem = Math.max(0, (sensorOfflineUntil - now) / 1000);
+  const offlineRem = Math.max(0, sensorOfflineSimSec);
+  const driftRem = Math.max(0, sensorDriftPauseSimSec);
   if (pipEl) {
     pipEl.classList.toggle('is-brownout', brownoutLocked);
-    pipEl.classList.toggle('is-offline', offlineRem > 0 && !brownoutLocked);
+    pipEl.classList.toggle('is-offline', (offlineRem > 0 || driftRem > 0) && !brownoutLocked);
   }
   if (overlayEl) {
     if (brownoutLocked) {
-      overlayEl.textContent = `🔋 POWER BROWNOUT (${Math.round(batterySoc)}%) — RECHARGING TO 15% IN SUNLIGHT`;
+      const flickerOn = Math.sin(now * 0.025) > -0.35;
+      overlayEl.textContent = `⚡ BROWNOUT — RECHARGING (${Math.round(batterySoc)}% -> 15%)`;
+      overlayEl.style.opacity = flickerOn ? '1' : '0.45';
       overlayEl.hidden = false;
     } else if (offlineRem > 0) {
+      overlayEl.style.opacity = '1';
       overlayEl.textContent = `🛡️ SENSORS SHIELDED — OFFLINE (${offlineRem.toFixed(1)}s)`;
       overlayEl.hidden = false;
+    } else if (driftRem > 0) {
+      overlayEl.style.opacity = '1';
+      overlayEl.textContent = `🔬 Sensor Re-calibrating... (${driftRem.toFixed(1)}s)`;
+      overlayEl.hidden = false;
     } else {
+      overlayEl.style.opacity = '1';
       overlayEl.hidden = true;
     }
   }
@@ -1672,19 +1762,30 @@ function animate() {
     drawSensorCamFeed(latDeg, lonDeg, prop.inEclipse, stormActive, sunElapsed, simTime);
   }
 
-  if (telemetryCb && now - lastHudMs > 120) {
+  if (telemetryCb && now - lastHudMs >= 33) {
     lastHudMs = now;
     const nearest = spaceEnv?.findNearestTarget(tmpSat);
+    const curWarpDiv = Math.max(0.25, timeWarp || 1);
+    const solarRemReal = timeWarp > 0 ? solarPausedSimSec / timeWarp : solarPausedSimSec;
+    const commsRemSim = Math.max(commsPausedSimSec, sensorOfflineSimSec);
+    const commsRemReal = timeWarp > 0 ? commsRemSim / timeWarp : commsRemSim;
     telemetryCb({
       altitudeKm: Math.max(120, Math.round(prop.altitudeKm - dragLossKm)), speedKms: Number(prop.speedKms.toFixed(2)),
       dragLossKm: Number(dragLossKm.toFixed(1)),
       latDeg: Number(latDeg.toFixed(1)), lonDeg: Number(lonDeg.toFixed(1)),
       inEclipse: prop.inEclipse, stormActive, inLineOfSight,
-      brownoutLocked, sensorOfflineSec: Number(offlineRem.toFixed(1)),
-      solarPausedSec: Number(Math.max(0, (solarChargePauseUntil - now) / 1000).toFixed(1)),
-      commsPausedSec: Number(Math.max(0, (commsPauseUntil - now) / 1000).toFixed(1)),
+      brownoutLocked,
+      sensorOfflineSec: Number((timeWarp > 0 ? offlineRem / timeWarp : offlineRem).toFixed(1)),
+      sensorCalibrating: driftRem > 0,
+      sensorCalibratingSec: Number((timeWarp > 0 ? driftRem / timeWarp : driftRem).toFixed(1)),
+      solarPausedSec: Number(solarPausedSimSec.toFixed(1)),
+      solarPausedRealSec: Number(solarRemReal.toFixed(1)),
+      commsPausedSec: Number(commsRemReal.toFixed(1)),
+      commsPausedSimSec: Number(commsRemSim.toFixed(1)),
       omniReducedDownlinks,
-      batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
+      batterySoc: Math.round(batterySoc),
+      batterySocExact: Number(batterySoc.toFixed(2)),
+      bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
       linkedStation: activeStationName, activeStationId, stationPassCooldownActive, downlinkCooldownSec,
       missionScore, downlinkCount, flareMitigated, asteroidsScanned,
       onboardBuffer, scienceScansCount, eclipsesSurvived, orbitHasShadow, orbitPhase: Number(orbitPhase.toFixed(3)),
@@ -1694,7 +1795,7 @@ function animate() {
       swathZonePoints: activeZoneReady?.points || 0,
       swathReady: Boolean(activeZoneReady),
       swathCooldownSec: activeZoneCooldown
-        ? Math.max(1, Math.ceil(((activeZoneCooldown.cooldownUntilRev - totalRevs) * TARGET_ORBIT_DURATION_1X) / Math.max(0.25, timeWarp || 1)))
+        ? Math.max(1, Math.ceil(((activeZoneCooldown.cooldownUntilRev - totalRevs) * TARGET_ORBIT_DURATION_1X) / curWarpDiv))
         : 0,
       nextZoneName,
       nextZoneDeg,
@@ -1703,12 +1804,20 @@ function animate() {
       zoneScanActive: now < zoneScanFxUntil,
       downlinkPts, anomalyPts, scanPts, decisionPts,
       hullIntegrity: isDestroyed ? 0 : hazardSnap.hullIntegrity,
+      hullExact: isDestroyed ? 0 : (hazardSnap.hullExact ?? hazardSnap.hullIntegrity),
+      dragRate: Number(lastDragRate.toFixed(2)),
+      radRate: Number(lastRadRate.toFixed(2)),
+      battRate: Number(lastBattRate.toFixed(2)),
+      overflowPeriodSec: Number(lastOverflowPeriodSec.toFixed(2)),
+      opsBleedRate: Number(lastOpsBleedRate.toFixed(2)),
+      budgetOverrunPenalty: Number(budgetOverrunPenalty.toFixed(1)),
       isDestroyed,
       destructionReason,
       anomaliesResolved: hazardSnap.anomaliesResolved,
       anomaliesMissed: hazardSnap.anomaliesMissed,
       hazardState: isDestroyed ? { ...hazardSnap, hullIntegrity: 0, activeHazard: null, resolvedBanner: '' } : hazardSnap,
       designRisks: risks,
+      activeDebuffs: debuffs,
       metText: formatMetClock(simTime),
       utcText: formatUtcClock(simTime),
       nearestNeaId: nearest?.target.id || '', nearestNeaDist: nearest ? Number(nearest.dist.toFixed(1)) : 99,
@@ -2011,27 +2120,27 @@ function drawSensorCamFeed(latDeg, lonDeg, inEclipse, stormActive, tReal, tSim) 
     ctx.fillText(`SCANNING +1 PKT · ${zoneScanLabel.slice(0, 18)}`, 14, 48);
   }
 
-  const risks = evalRef?.designRisks || {};
-  if (stormActive || risks.weakCommsMargin || risks.wavelengthMismatch) {
-    ctx.fillStyle = risks.wavelengthMismatch ? 'rgba(239, 68, 68, 0.22)' : 'rgba(245, 158, 11, 0.16)';
-    const bars = risks.wavelengthMismatch ? 28 : 16;
+  const debuffs = cachedDebuffs || getActiveDebuffs(stateRef, evalRef, evalRef?.scenario);
+  if (stormActive || debuffs.dataBottleneck.active || debuffs.scienceMismatch.active) {
+    ctx.fillStyle = debuffs.scienceMismatch.active ? 'rgba(239, 68, 68, 0.24)' : 'rgba(245, 158, 11, 0.16)';
+    const bars = debuffs.scienceMismatch.active ? 32 : 16;
     for (let i = 0; i < bars; i += 1) {
-      ctx.fillRect((Math.sin(tReal * 41 + i * 7) * 0.5 + 0.5) * w, (i * 9) % h, risks.wavelengthMismatch ? 44 : 18, 2);
+      ctx.fillRect((Math.sin(tReal * 41 + i * 7) * 0.5 + 0.5) * w, (i * 9) % h, debuffs.scienceMismatch.active ? 48 : 18, 2);
     }
   }
-  if (risks.wavelengthMismatch) {
+  if (debuffs.scienceMismatch.active) {
     ctx.fillStyle = 'rgba(127, 29, 29, 0.85)';
     ctx.fillRect(8, h - 26, w - 16, 20);
     ctx.fillStyle = '#fecaca';
     ctx.font = '700 11px Orbitron, sans-serif';
-    ctx.fillText('⚠ WAVELENGTH MISMATCH · -40% SCI', 14, h - 12);
+    ctx.fillText('⚠ SPECTRAL MISMATCH · -40% SCI', 14, h - 12);
   }
 
   const telemEl = document.getElementById('sensor-pip-telem');
-  if (telemEl) telemEl.textContent = risks.weakCommsMargin ? `${telemText} · RF STATIC` : telemText;
+  if (telemEl) telemEl.textContent = debuffs.dataBottleneck.active ? `${telemText} · RF STATIC` : telemText;
 }
 
-export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); };
+export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); lastHudMs = 0; };
 export function setOrbitBriefingPaused(paused) {
   const next = Boolean(paused);
   const wasPaused = briefingPaused;
@@ -2175,18 +2284,17 @@ export function seekOrbitToPass(leadSeconds = null) {
       totalRevs += targetFrac;
       simTime += targetFrac * periodRef;
       earthGroup.rotation.y += targetFrac * TARGET_ORBIT_DURATION_1X * 0.09;
-      downlinkCooldownUntilReal = 0;
-      downlinkCooldownUntilRev = 0;
+      stationCooldownSimSec = 0;
       downlinkCooldownSec = 0;
       stationPassCooldownActive = false;
-      stormUntil = 0;
+      stormSimSec = 0;
       lastAutoFlare = simTime + 999999;
       return true;
     }
   }
   return false;
 }
-export const triggerOrbitStorm = () => { if (!isDestroyed) { stormUntil = performance.now() + 6000; playWarning(); } };
+export const triggerOrbitStorm = () => { if (!isDestroyed) { stormSimSec = 6.0; playWarning(); } };
 export function triggerTestHazard(forcedKind = null) {
   if (isDestroyed) return null;
   return triggerRandomHazard(forcedKind);
@@ -2206,21 +2314,24 @@ export function transmitScience() {
   recordOrbitPlayerAction();
   if (isDestroyed) return { ok: false, reason: 'destroyed', points: 0, station: 'None' };
   const now = performance.now();
+  if (now - lastSpaceTxRealMs < 350) return { ok: false, reason: 'debounce', points: 0, station: activeStationName };
   if (brownoutLocked) return { ok: false, reason: 'brownout', points: 0, station: activeStationName };
-  if (now < commsPauseUntil || now < sensorOfflineUntil) {
-    const rem = Math.max(commsPauseUntil - now, sensorOfflineUntil - now) / 1000;
-    return { ok: false, reason: 'paused', pausedSec: Number(rem.toFixed(1)), points: 0, station: activeStationName };
+  const commsRemSim = Math.max(commsPausedSimSec, sensorOfflineSimSec);
+  if (commsRemSim > 0) {
+    const remReal = timeWarp > 0 ? commsRemSim / timeWarp : commsRemSim;
+    return { ok: false, reason: 'paused', pausedSec: Number(remReal.toFixed(1)), points: 0, station: activeStationName };
   }
   if (!inLineOfSight) return { ok: false, points: 0, station: 'None' };
   const tut = isTutorialActive();
-  const dlReady = now >= downlinkCooldownUntilReal || totalRevs >= downlinkCooldownUntilRev;
+  const dlReady = stationCooldownSimSec <= 0;
   if (!tut && !dlReady) {
-    return { ok: false, reason: 'downlink-cooldown', cooldownSec: Math.max(1, downlinkCooldownSec || 1), points: 0, station: activeStationName };
+    return { ok: false, reason: 'downlink-cooldown', cooldownSec: Math.max(0.1, downlinkCooldownSec || 1), points: 0, station: activeStationName };
   }
   if (!tut && onboardBuffer < 1) {
     return { ok: false, reason: 'empty-buffer', points: 0, station: activeStationName };
   }
-  const risks = evalRef?.designRisks || {};
+  lastSpaceTxRealMs = now;
+  const debuffs = cachedDebuffs || getActiveDebuffs(stateRef, evalRef, evalRef?.scenario);
   let pts = 50;
   let omniReduced = false;
   if (omniReducedDownlinks > 0) {
@@ -2228,18 +2339,18 @@ export function transmitScience() {
     omniReducedDownlinks -= 1;
     omniReduced = true;
   }
-  if (risks.weakCommsMargin) pts = Math.round(pts * 0.5);
-  if (risks.wavelengthMismatch) pts = Math.round(pts * 0.6);
+  if (debuffs.dataBottleneck.active) pts = Math.round(pts * 0.5);
   const xfer = Math.max(0.15, Math.min(bufferGb, 1.4));
   bufferGb = Math.max(0, bufferGb - xfer); downlinkedGb += xfer;
   if (onboardBuffer > 0) onboardBuffer -= 1;
   if (!tut) {
-    downlinkCooldownUntilReal = now + 10000;
-    downlinkCooldownUntilRev = totalRevs + 0.18;
-    downlinkCooldownSec = Math.min(10, Math.ceil((0.18 * TARGET_ORBIT_DURATION_1X) / Math.max(0.25, timeWarp || 1)));
+    stationCooldownSimSec = 10.0;
+    downlinkCooldownSec = Math.max(0.1, Number((stationCooldownSimSec / Math.max(0.25, timeWarp || 1)).toFixed(1)));
     stationPassCooldownActive = true;
   }
-  downlinkCount += 1; downlinkPts += pts; missionScore += pts; beamBoostUntil = performance.now() + 900;
+  downlinkCount += 1; downlinkPts += pts;
+  missionScore = Math.max(-250, downlinkPts + anomalyPts + scanPts + decisionPts - Math.round(budgetOverrunPenalty));
+  beamBoostUntil = performance.now() + 900;
   lastHudMs = 0;
   playDownlinkPing();
   return {
@@ -2248,32 +2359,36 @@ export function transmitScience() {
     station: activeStationName,
     onboardBuffer,
     omniReduced,
-    weakComms: Boolean(risks.weakCommsMargin),
-    wavelengthMismatch: Boolean(risks.wavelengthMismatch)
+    weakComms: Boolean(debuffs.dataBottleneck.active),
+    wavelengthMismatch: false
   };
 }
 export function scanAsteroid() {
   recordOrbitPlayerAction();
   if (isDestroyed) return { ok: false, reason: 'destroyed', points: 0 };
   const now = performance.now();
+  if (now - lastScanKeyRealMs < 350) return { ok: false, reason: 'debounce', points: 0 };
   if (brownoutLocked) return { ok: false, reason: 'brownout', points: 0 };
-  if (now < sensorOfflineUntil) {
-    return { ok: false, reason: 'offline', pausedSec: Number(((sensorOfflineUntil - now) / 1000).toFixed(1)), points: 0 };
+  const offlineSimRem = Math.max(sensorOfflineSimSec, sensorDriftPauseSimSec);
+  if (offlineSimRem > 0) {
+    const remReal = timeWarp > 0 ? offlineSimRem / timeWarp : offlineSimRem;
+    return { ok: false, reason: 'offline', recalibrating: sensorDriftPauseSimSec > 0, pausedSec: Number(remReal.toFixed(1)), points: 0 };
   }
-  const risks = evalRef?.designRisks || {};
+  const debuffs = cachedDebuffs || getActiveDebuffs(stateRef, evalRef, evalRef?.scenario);
   if (activeZoneReady) {
+    lastScanKeyRealMs = now;
     const z = activeZoneReady;
     z.scannedThisPass = true;
     z.cooldownUntilRev = totalRevs + 0.45;
     zoneScanPos.copy(z.nadirEnd || z.wpPos);
     zoneScanFxUntil = now + 1500;
     zoneScanLabel = z.name;
-    const pts = risks.wavelengthMismatch ? Math.round(z.points * 0.6) : z.points;
+    const pts = debuffs.scienceMismatch.active ? Math.round(z.points * 0.6) : z.points;
     onboardBuffer += 1;
     scienceScansCount += 1;
     asteroidsScanned += 1;
     scanPts += pts;
-    missionScore += pts;
+    missionScore = Math.max(-250, downlinkPts + anomalyPts + scanPts + decisionPts - Math.round(budgetOverrunPenalty));
     lastHudMs = 0;
     playDownlinkPing();
     return {
@@ -2300,7 +2415,7 @@ export function scanAsteroid() {
 export function applyOrbitDecisionEffect({ scoreDelta = 0, hullDelta = 0, batteryDelta = 0, sensorOfflineSec = 0 } = {}) {
   if (scoreDelta) {
     decisionPts += scoreDelta;
-    missionScore += scoreDelta;
+    missionScore = Math.max(-250, downlinkPts + anomalyPts + scanPts + decisionPts - Math.round(budgetOverrunPenalty));
   }
   if (hullDelta) {
     const h = applyHullDelta(hullDelta, 0);
@@ -2308,9 +2423,9 @@ export function applyOrbitDecisionEffect({ scoreDelta = 0, hullDelta = 0, batter
   }
   if (batteryDelta) {
     batterySoc = Math.max(0, Math.min(100, batterySoc + batteryDelta));
-    if (batterySoc <= 0.1 && evalRef?.designRisks?.lowPowerMargin) brownoutLocked = true;
+    if (batterySoc <= 0.01) { brownoutLocked = true; batterySoc = 0; }
   }
-  if (sensorOfflineSec > 0) sensorOfflineUntil = performance.now() + sensorOfflineSec * 1000;
+  if (sensorOfflineSec > 0) sensorOfflineSimSec = Math.max(sensorOfflineSimSec, sensorOfflineSec);
   lastHudMs = 0;
   return { missionScore, batterySoc: Math.round(batterySoc), hullIntegrity: getHazardSnapshot().hullIntegrity };
 }
@@ -2322,20 +2437,24 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   briefingPaused = Boolean(options.paused);
   if (timeWarp <= 0) timeWarp = 1;
   stateRef = missionState; evalRef = evaluation; telemetryCb = onTelemetry; hazardEventCb = options.onHazardEvent || null;
+  cachedDebuffs = getActiveDebuffs(missionState, evaluation, evaluation?.scenario);
   holoSelectCb = options.onSelectHolo || null;
   requiredEventsCount = missionState?.sandboxMode ? 1 : (ORBIT_MISSION_TARGETS[missionState?.scenarioId]?.eventTarget ?? 1);
   const elA = Math.max(evaluation?.orbitElements?.aKm || 7000, 6531);
   orbitPeriodSec = 2 * Math.PI * Math.sqrt((elA ** 3) / 398600.4418);
   simTime = 0; orbitPhase = 0; totalRevs = 0; orbitHasShadow = true; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
-  stormUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
+  stormSimSec = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
   onboardBuffer = 0; scienceScansCount = 0; eclipsesSurvived = 0; wasInEclipse = false;
   activeZoneReady = null; activeZoneCooldown = null; zoneScanFxUntil = 0; zoneScanLabel = '';
   nextZoneName = ''; nextZoneEtaSec = 0; nextZoneDeg = 0; nextZoneDistKm = 0;
   activeStationId = ''; activeLosGs = null; stationPassCooldownActive = false;
-  downlinkCooldownUntilReal = 0; downlinkCooldownUntilRev = 0; downlinkCooldownSec = 0;
+  stationCooldownSimSec = 0; downlinkCooldownSec = 0;
   downlinkPts = 0; anomalyPts = 0; scanPts = 0; decisionPts = 0; lastAutoFlare = 14; lastHudMs = 0; lastCamMs = 0;
-  brownoutLocked = false; sensorOfflineUntil = 0; solarChargePauseUntil = 0; commsPauseUntil = 0; omniReducedDownlinks = 0; dragLossKm = 0; dragHullAccum = 0;
+  brownoutLocked = false; sensorOfflineSimSec = 0; solarPausedSimSec = 0; commsPausedSimSec = 0; omniReducedDownlinks = 0; dragLossKm = 0;
+  bufferOverflowTimer = 0; sensorDriftTimer = 0; sensorDriftPauseSimSec = 0; budgetOverrunPenalty = 0;
+  lastSpaceTxRealMs = 0; lastScanKeyRealMs = 0; lastPacketWarnMs = 0;
+  lastDragRate = 0; lastRadRate = 0; lastBattRate = 0; lastOpsBleedRate = 0; lastOverflowPeriodSec = 0;
   isDestroyed = false; destructionReason = ''; explosionRig = null; explosionElapsed = 0; shakeRemaining = 0;
   sensorCamEnabled = Boolean(options.sensorCam);
   holoTargets = {}; holoProxies = []; gsHoloProxies = []; earthSolidMesh = null; earthOuterProxy = null;
@@ -2371,27 +2490,26 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
     initOrbitHazards(missionState, evaluation, {
       getBatterySoc: () => batterySoc,
       onTrigger: (hazard) => {
-        if (hazard.kind === 'cme') stormUntil = performance.now() + hazard.durationSec * 1000;
+        if (hazard.kind === 'cme') stormSimSec = Math.max(stormSimSec, hazard.durationSec);
         hazardFx?.startHazardFx(hazard.kind, buildHazardCtx());
         playHazardStartCue(hazard.kind);
         lastHudMs = 0;
         hazardEventCb?.({ type: 'trigger', timeWarp, ...hazard });
       },
       onResolve: (res) => {
-        const nowMs = performance.now();
         const deltaScore = res.scoreDelta ?? res.bonus ?? 0;
         anomalyPts += deltaScore;
-        missionScore += deltaScore;
+        missionScore = Math.max(-250, downlinkPts + anomalyPts + scanPts + decisionPts - Math.round(budgetOverrunPenalty));
         flareMitigated += 1;
         if (res.batteryDelta) {
           batterySoc = Math.max(0, Math.min(100, batterySoc + res.batteryDelta));
-          if (batterySoc <= 0.1) { brownoutLocked = true; batterySoc = 0; }
+          if (batterySoc <= 0.01) { brownoutLocked = true; batterySoc = 0; }
         }
-        if (res.solarPauseSec > 0) solarChargePauseUntil = nowMs + res.solarPauseSec * 1000;
-        if (res.sensorOfflineSec > 0) sensorOfflineUntil = nowMs + res.sensorOfflineSec * 1000;
-        if (res.commsPauseSec > 0) commsPauseUntil = nowMs + res.commsPauseSec * 1000;
+        if (res.solarPauseSec > 0) solarPausedSimSec = Math.max(solarPausedSimSec, res.solarPauseSec);
+        if (res.sensorOfflineSec > 0) sensorOfflineSimSec = Math.max(sensorOfflineSimSec, res.sensorOfflineSec);
+        if (res.commsPauseSec > 0) commsPausedSimSec = Math.max(commsPausedSimSec, res.commsPauseSec);
         if (res.omniReducedCount > 0) omniReducedDownlinks += res.omniReducedCount;
-        if (res.kind === 'cme') stormUntil = 0;
+        if (res.kind === 'cme') stormSimSec = 0;
         hazardFx?.resolveHazardFx(res.choiceIndex ?? 0, res, buildHazardCtx());
         playHazardResolveCue(res.kind, res.choiceIndex ?? 0, res);
         if ((res.hullDelta || 0) < 0 && res.hullIntegrity > 0) {
@@ -2405,9 +2523,9 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
       },
       onExpire: (exp) => {
         batterySoc = Math.max(0, batterySoc - (exp.batteryLoss || 18));
-        if (batterySoc <= 0.1) { brownoutLocked = true; batterySoc = 0; }
+        if (batterySoc <= 0.01) { brownoutLocked = true; batterySoc = 0; }
         if (exp.dataLossRatio > 0) bufferGb = Math.max(0, bufferGb * (1 - exp.dataLossRatio));
-        if (exp.kind === 'cme') stormUntil = 0;
+        if (exp.kind === 'cme') stormSimSec = 0;
         const hullDelta = -(exp.hullLoss || 15);
         hazardFx?.resolveHazardFx('timeout', { ...exp, hullDelta }, buildHazardCtx());
         playHazardResolveCue(exp.kind, 'timeout', { hullDelta });
@@ -2553,7 +2671,10 @@ export function unmountOrbit() {
   activeZoneReady = null; activeZoneCooldown = null; zoneScanFxUntil = 0; zoneScanLabel = '';
   activeStationId = ''; activeLosGs = null; stationPassCooldownActive = false;
   orbitPhase = 0; totalRevs = 0; orbitHasShadow = true; nextZoneDeg = 0;
-  downlinkCooldownUntilReal = 0; downlinkCooldownUntilRev = 0; downlinkCooldownSec = 0;
+  stationCooldownSimSec = 0; downlinkCooldownSec = 0;
+  solarPausedSimSec = 0; commsPausedSimSec = 0; sensorOfflineSimSec = 0; stormSimSec = 0;
+  bufferOverflowTimer = 0; sensorDriftTimer = 0; sensorDriftPauseSimSec = 0; budgetOverrunPenalty = 0;
+  cachedDebuffs = null;
   earthSolidMesh = null; earthOuterProxy = null; selectionRing = null;
   orbitPts = []; hasPrevSat = false;
 }

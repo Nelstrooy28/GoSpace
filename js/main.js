@@ -236,6 +236,7 @@ function getStageHudOpts() {
     anomalyPts: orbitTelemetry?.anomalyPts,
     scanPts: orbitTelemetry?.scanPts,
     decisionPts: orbitTelemetry?.decisionPts ?? 0,
+    budgetOverrunPenalty: orbitTelemetry?.budgetOverrunPenalty ?? 0,
     batterySoc: orbitTelemetry?.batterySoc,
     launchInserted: runSession.launchInserted,
     deployCompleted: Boolean(runSession.deployCompleted || (!orbitTelemetry?.deployActive && (orbitTelemetry?.deployProgress || 0) >= 0.99)),
@@ -303,6 +304,12 @@ function mountLiveOrbit(vp, isVictory = false) {
         if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
         syncOrbitObjectives(orbitTelemetry);
         spawnPopup(ev.toast || `+${ev.scoreDelta ?? 0} PTS · ANOMALY MITIGATED!`);
+      } else if (ev.type === 'packet-lost') {
+        syncOrbitObjectives(orbitTelemetry);
+        spawnPopup('📡 Buffer Overflow: -1 Packet Lost!');
+      } else if (ev.type === 'sensor-recal') {
+        syncOrbitObjectives(orbitTelemetry);
+        spawnPopup('🔬 Sensor Re-calibrating...');
       } else if (ev.type === 'expire') {
         if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
         syncOrbitObjectives(orbitTelemetry);
@@ -524,7 +531,7 @@ const handleScanAsteroid = () => {
     spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to scan.');
   } else if (r.reason === 'offline') {
     playWarning();
-    spawnPopup(`🛡️ Sensors shielded offline (${r.pausedSec}s)`);
+    spawnPopup(r.recalibrating ? `🔬 Sensor Re-calibrating... (${r.pausedSec}s)` : `🛡️ Sensors shielded offline (${r.pausedSec}s)`);
   }
 };
 const handleHazardChoice = (choiceIdx = 0) => {
@@ -706,7 +713,14 @@ function init() {
       renderStageHud(stage, missionState, lastEval, getStageHudOpts());
       renderHoloScannerCard(selectedHoloId, focusedHoloId);
     }
-    else if (e.target.closest('[data-warp]')) { orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp); setOrbitTimeWarp(orbitWarp); renderStageHud(stage, missionState, lastEval, getStageHudOpts()); }
+    else if (e.target.closest('[data-warp]')) {
+      orbitWarp = Number(e.target.closest('[data-warp]').dataset.warp);
+      setOrbitTimeWarp(orbitWarp);
+      if (orbitTelemetry) orbitTelemetry.timeWarp = orbitWarp;
+      renderStageHud(stage, missionState, lastEval, getStageHudOpts());
+      const objStatus = syncOrbitObjectives(orbitTelemetry);
+      if (orbitTelemetry) updateOrbitOverlay(orbitTelemetry, objStatus);
+    }
     else if (e.target.closest('#orb-test-hazard-btn')) { if (missionState.sandboxMode && !orbitTelemetry?.isDestroyed) triggerTestHazard(); }
     else if (e.target.closest('#orb-replay-unfold-btn')) handleReplayUnfold();
     else if (e.target.closest('#orb-sensorcam-btn')) toggleSensorCam();

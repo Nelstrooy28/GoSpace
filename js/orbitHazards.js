@@ -182,7 +182,8 @@ export function clearActiveHazard() {
 
 export function applyHullDelta(delta, minHull = 0) {
   hullIntegrity = Math.max(minHull, Math.min(100, hullIntegrity + Number(delta || 0)));
-  return Math.round(hullIntegrity);
+  if (hullIntegrity <= 0.001) hullIntegrity = 0;
+  return hullIntegrity <= 0 ? 0 : Number(hullIntegrity.toFixed(2));
 }
 
 /**
@@ -275,7 +276,8 @@ export function getHazardSnapshot() {
     ? Number((Math.max(0, POST_ACTION_GRACE_MS - (now - lastPlayerActionMs)) / 1000).toFixed(1))
     : 0;
   return {
-    hullIntegrity: Math.round(hullIntegrity),
+    hullIntegrity: hullIntegrity <= 0 ? 0 : Math.max(1, Math.round(hullIntegrity)),
+    hullExact: Number(hullIntegrity.toFixed(2)),
     anomaliesResolved,
     anomaliesMissed,
     lowBattery: batt < 15,

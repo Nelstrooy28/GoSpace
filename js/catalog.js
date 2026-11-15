@@ -310,10 +310,12 @@ export function evaluateMissionDesign(state) {
   const avgLoadW = (bus?.basePowerW || 0) + insts.reduce((s, i) => s + i.powerW, 0) + (therm?.powerW || 0) + (tx?.powerW || 0) * 0.35;
   const eclipseMult = solar?.zeroEclipseLoss ? 1.0 : Math.max(0.25, 1 - orbitStats.eclipseFraction);
   const avgGenW = (solar?.genW || 0) * eclipseMult;
+  const powerPct = Number(((avgGenW / Math.max(avgLoadW, 1)) * 100).toFixed(1));
   const powerMargin = Number((((avgGenW - avgLoadW) / Math.max(avgLoadW, 1)) * 100).toFixed(1));
 
   const generatedMbDay = insts.reduce((s, i) => s + i.dataMbDay, 0);
   const downlinkMbDay = (tx?.mbps || 0) * (gs?.passMinDay || 0) * 60 * 0.125 * (orbit.deepSpace && !tx?.deepSpace ? 0.05 : 1);
+  const dataPct = Number(((downlinkMbDay / Math.max(generatedMbDay, 1)) * 100).toFixed(1));
   const dataMargin = Number((((downlinkMbDay - generatedMbDay) / Math.max(generatedMbDay, 1)) * 100).toFixed(1));
   const lifetimeYears = Number(Math.max(0.5, (bus?.lifeBonus || 0) + (solar?.lifeBonus || 0) + (therm?.lifeBonus || 0) - orbit.radPenalty).toFixed(1));
 
@@ -349,11 +351,15 @@ export function evaluateMissionDesign(state) {
   if (orbit.deepSpace && (!gs?.deepSpace || !veh?.deepSpaceCapable)) warn('deepspace', 'Launch', `${orbit.name} requires a heavy launcher and Deep-Space Dish Array.`);
   if (lat?.id === 'realtime' && gs && !gs.realtimeCapable) warn('latency', 'Ground', `${gs.name} cannot support <30 min real-time alerts.`);
 
+  const wrongOrbitClass = Boolean(orbit?.id && sc?.targetOrbit && orbit.id !== sc.targetOrbit) || Boolean(orbit.deepSpace && (!gs?.deepSpace || !veh?.deepSpaceCapable));
+  const wavelengthBad = Boolean(band && band.id !== sc.targetBand) || insts.some((i) => (band && !instMatchesBand(i, band.id)) || !instMatchesBand(i, sc.targetBand));
   const designRisks = {
-    massOverrun: !state.sandboxMode && Boolean((veh && totalMassKg > veh.maxPayloadKg) || (bus && payloadMassKg > bus.payloadCapKg)),
-    lowPowerMargin: powerMargin < 5,
-    weakCommsMargin: dataMargin < 5 || Boolean(lat?.id === 'realtime' && gs && !gs.realtimeCapable) || Boolean(orbit.deepSpace && !tx?.deepSpace),
-    wavelengthMismatch: Boolean(band && band.id !== sc.targetBand) || insts.some((i) => (band && !instMatchesBand(i, band.id)) || !instMatchesBand(i, sc.targetBand)),
+    massOverrun: Boolean((!state.sandboxMode && veh && totalMassKg > veh.maxPayloadKg) || (bus && payloadMassKg > bus.payloadCapKg)),
+    lowPowerMargin: powerPct < 100 || powerMargin < 0,
+    weakCommsMargin: dataPct < 100 || dataMargin < 0 || Boolean(lat?.id === 'realtime' && gs && !gs.realtimeCapable) || Boolean(orbit.deepSpace && !tx?.deepSpace),
+    wavelengthMismatch: wavelengthBad,
+    wrongOrbitClass,
+    scienceMismatch: wavelengthBad || wrongOrbitClass || scienceScore < sc.minScience,
     budgetOverrun: !state.sandboxMode && usedM > sc.budgetLimitM,
     lowLifetime: lifetimeYears < sc.minLifetimeYr
   };
@@ -364,7 +370,7 @@ export function evaluateMissionDesign(state) {
     metrics: {
       budget: { usedM, limitM: sc.budgetLimitM, pct: Math.round((usedM / sc.budgetLimitM) * 100) },
       mass: { totalKg: totalMassKg, payloadKg: Number(payloadMassKg.toFixed(1)), busLimitKg: bus?.payloadCapKg || 0, launchLimitKg: veh?.maxPayloadKg || 0 },
-      powerMargin, dataMargin, lifetimeYears, scienceScore
+      powerMargin, powerPct, dataMargin, dataPct, lifetimeYears, scienceScore
     },
     mel, warnings, designRisks, orbitElements: orbit, orbitStats, missionMatch: sc.realMatch, sandboxMode: Boolean(state.sandboxMode)
   };
@@ -1032,66 +1038,175 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
   };
 }
 
-export function getOrbitActiveDebuffs(ev, telemetry = null) {
-  if (!ev) return [];
-  const risks = ev.designRisks || {};
-  const sandbox = Boolean(ev.sandboxMode);
-  const metrics = ev.metrics || {};
-  const debuffs = [];
+const clampNum = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-  if (risks.massOverrun) {
-    debuffs.push({
+export function getActiveDebuffs(missionState, evaluation, scenario = null) {
+  const emptyEntry = (id, icon, title) => ({ id, icon, title, active: false, severity: 0 });
+  if (!evaluation) {
+    const empty = {
+      overMass: emptyEntry('mass', '⚖️', 'Over-Mass'),
+      powerDeficit: emptyEntry('power', '⚡', 'Power Deficit'),
+      lowLifetime: emptyEntry('life', '⏳', 'Low Shielding'),
+      dataBottleneck: emptyEntry('comms', '📡', 'Data Bottleneck'),
+      scienceMismatch: emptyEntry('band', '🔬', 'Spectral Mismatch'),
+      overBudget: emptyEntry('budget', '💰', 'Over-Budget'),
+      list: []
+    };
+    return empty;
+  }
+
+  const sc = scenario || evaluation.scenario || {};
+  const m = evaluation.metrics || {};
+  const risks = evaluation.designRisks || {};
+  const sandbox = Boolean(missionState?.sandboxMode ?? evaluation.sandboxMode);
+
+  // 1. Over-Mass
+  const launchCap = sc.massCap ?? m.mass?.launchLimitKg ?? 0;
+  const totalMass = typeof m.mass === 'number' ? m.mass : (m.mass?.totalKg ?? 0);
+  const busCap = m.mass?.busLimitKg ?? 0;
+  const payloadMass = m.mass?.payloadKg ?? 0;
+  const launchOver = !sandbox && launchCap > 0 && totalMass > launchCap;
+  const busOver = busCap > 0 && payloadMass > busCap;
+  const launchSev = launchOver ? (totalMass - launchCap) / Math.max(1, launchCap) : 0;
+  const busSev = busOver ? (payloadMass - busCap) / Math.max(1, busCap) : 0;
+  const massActive = Boolean(launchOver || busOver || (!sandbox && risks.massOverrun));
+  const massSev = massActive ? clampNum(Math.max(launchSev, busSev, 0.15), 0.1, 2.5) : 0;
+
+  // 2. Power Deficit (check BOTH powerPct < 100 AND powerMargin < 0)
+  const powerMargin = m.powerMargin ?? (m.powerPct != null ? m.powerPct - 100 : 0);
+  const powerPct = m.powerPct ?? (100 + powerMargin);
+  const powerActive = Boolean(powerPct < 100 || powerMargin < 0);
+  const powerSev = powerActive ? clampNum((100 - Math.min(powerPct, 100 + powerMargin)) / 100, 0.1, 1.5) : 0;
+
+  // 3. Low Lifetime
+  const minLife = sc.minLifetime ?? sc.minLifetimeYr ?? 2;
+  const lifeYr = m.lifetimeYears ?? minLife;
+  const lifeActive = Boolean(lifeYr < minLife || risks.lowLifetime);
+  const lifeSev = lifeActive ? clampNum((minLife - lifeYr) / Math.max(0.5, minLife), 0.1, 1.5) : 0;
+
+  // 4. Data Bottleneck (check BOTH dataPct < 100 AND dataMargin < 0)
+  const dataMargin = m.dataMargin ?? (m.dataPct != null ? m.dataPct - 100 : 0);
+  const dataPct = m.dataPct ?? (100 + dataMargin);
+  const dataActive = Boolean(dataPct < 100 || dataMargin < 0 || risks.weakCommsMargin);
+  const dataSev = dataActive ? clampNum(Math.max((100 - Math.min(dataPct, 100 + dataMargin)) / 100, 0.35), 0.1, 1.5) : 0;
+
+  // 5. Science / Wavelength / Orbit Mismatch
+  const minSci = sc.minScience ?? 75;
+  const sciScore = m.scienceScore ?? minSci;
+  const bandId = missionState?.wavelengthBand || null;
+  const instIds = missionState?.instrumentIds || [];
+  const bandObj = bandId ? CATALOG.user.wavelengths.find((b) => b.id === bandId) : null;
+  const orbitId = missionState?.orbitId || evaluation.orbitElements?.id || null;
+  const bandMismatch = Boolean(bandObj && sc.targetBand && bandObj.id !== sc.targetBand)
+    || instIds.some((id) => {
+      const inst = CATALOG.space.instruments.find((i) => i.id === id);
+      if (!inst) return false;
+      const matchesTarget = !sc.targetBand || inst.band === sc.targetBand || (inst.extraBands || []).includes(sc.targetBand);
+      const matchesSelected = !bandId || inst.band === bandId || (inst.extraBands || []).includes(bandId);
+      return !matchesTarget || !matchesSelected;
+    });
+  const orbitMismatch = Boolean(orbitId && sc.targetOrbit && orbitId !== sc.targetOrbit);
+  const sciActive = Boolean(bandMismatch || orbitMismatch || sciScore < minSci || risks.wavelengthMismatch || risks.scienceMismatch);
+  const sciSev = sciActive ? clampNum(Math.max((minSci - sciScore) / 100, 0.25), 0.25, 1.5) : 0;
+
+  // 6. Over-Budget (non-Sandbox only)
+  const budgetCap = sc.budgetCap ?? sc.budgetLimitM ?? m.budget?.limitM ?? 0;
+  const budgetUsed = typeof m.budget === 'number' ? m.budget : (m.budget?.usedM ?? 0);
+  const budgetActive = Boolean(!sandbox && budgetCap > 0 && budgetUsed > budgetCap);
+  const budgetSev = budgetActive ? clampNum((budgetUsed - budgetCap) / Math.max(1, budgetCap), 0.1, 2.5) : 0;
+
+  const overMass = { id: 'mass', icon: '⚖️', title: 'Over-Mass', active: massActive, severity: Number(massSev.toFixed(3)) };
+  const powerDeficit = { id: 'power', icon: '⚡', title: 'Power Deficit', active: powerActive, severity: Number(powerSev.toFixed(3)) };
+  const lowLifetime = { id: 'life', icon: '⏳', title: 'Low Shielding', active: lifeActive, severity: Number(lifeSev.toFixed(3)) };
+  const dataBottleneck = { id: 'comms', icon: '📡', title: 'Data Bottleneck', active: dataActive, severity: Number(dataSev.toFixed(3)) };
+  const scienceMismatch = { id: 'band', icon: '🔬', title: 'Spectral Mismatch', active: sciActive, severity: Number(sciSev.toFixed(3)) };
+  const overBudget = { id: 'budget', icon: '💰', title: 'Over-Budget', active: budgetActive, severity: Number(budgetSev.toFixed(3)) };
+
+  const all = [overMass, powerDeficit, lowLifetime, dataBottleneck, scienceMismatch, overBudget];
+  return {
+    overMass,
+    powerDeficit,
+    lowLifetime,
+    dataBottleneck,
+    scienceMismatch,
+    overBudget,
+    list: all.filter((d) => d.active)
+  };
+}
+
+export function getOrbitActiveDebuffs(ev, telemetry = null, missionState = null) {
+  if (!ev) return [];
+  const d = getActiveDebuffs(missionState, ev, ev.scenario);
+  const warp = telemetry?.timeWarp ?? 1;
+  const activeRun = Boolean(telemetry && !telemetry.briefingPaused && !telemetry.isDestroyed && warp > 0);
+  const inEclipse = Boolean(telemetry?.inEclipse);
+  const out = [];
+
+  if (d.overMass.active) {
+    const rate = telemetry?.dragRate ?? ((0.60 + Math.min(1.60, d.overMass.severity * 0.65)));
+    out.push({
       id: 'mass',
-      icon: '🔥',
+      icon: '⚖️',
       title: 'Over-Mass',
-      effect: 'Atmospheric Drag: -0.5% Hull/s',
-      firing: Boolean(telemetry && !telemetry.briefingPaused && !telemetry.isDestroyed)
+      effect: `-${(rate * warp).toFixed(1)}% Hull/s (${warp}x)`,
+      firing: activeRun
     });
   }
-  if (risks.lowPowerMargin || (metrics.powerMargin ?? 0) < 0) {
-    debuffs.push({
+  if (d.powerDeficit.active) {
+    const bRate = telemetry?.battRate ?? (inEclipse
+      ? -(3.2 * (1 + d.powerDeficit.severity))
+      : -(0.65 + d.powerDeficit.severity * 1.25));
+    const signed = `${bRate >= 0 ? '+' : ''}${(bRate * warp).toFixed(1)}% Batt/s (${warp}x)`;
+    out.push({
       id: 'power',
       icon: '⚡',
       title: 'Power Deficit',
-      effect: 'Eclipse Brownout: 2.5x Batt Drain',
-      firing: Boolean(telemetry?.inEclipse || telemetry?.brownoutLocked)
+      effect: telemetry?.brownoutLocked ? `BROWNOUT · ${signed}` : signed,
+      firing: Boolean(inEclipse || telemetry?.brownoutLocked || bRate < 0)
     });
   }
-  if (risks.weakCommsMargin) {
-    debuffs.push({
+  if (d.lowLifetime.active) {
+    const rRate = telemetry?.radRate ?? ((0.38 + Math.min(0.90, d.lowLifetime.severity * 0.55)) * (inEclipse ? 0.7 : 1.2));
+    out.push({
+      id: 'life',
+      icon: '⏳',
+      title: 'Low Shielding',
+      effect: `-${(rRate * warp).toFixed(1)}% Hull/s (${warp}x) · +35% Haz`,
+      firing: activeRun
+    });
+  }
+  if (d.dataBottleneck.active) {
+    const period = telemetry?.overflowPeriodSec ?? Math.max(4.0, 9.0 - d.dataBottleneck.severity * 3.0);
+    const effPeriod = warp > 0 ? (period / warp).toFixed(1) : '∞';
+    out.push({
       id: 'comms',
       icon: '📡',
-      title: 'Comms Bottleneck',
-      effect: 'Packet Loss: -50% Downlink Pts',
-      firing: Boolean(telemetry?.inLineOfSight)
+      title: 'Data Bottleneck',
+      effect: `-1 Pkt / ${effPeriod}s (${warp}x) & -50% Pts`,
+      firing: Boolean(telemetry?.inLineOfSight || (telemetry?.onboardBuffer || 0) > 0)
     });
   }
-  if (risks.wavelengthMismatch) {
-    debuffs.push({
+  if (d.scienceMismatch.active) {
+    out.push({
       id: 'band',
       icon: '🔬',
-      title: 'Wavelength Mismatch',
-      effect: 'Spectral Noise: -40% Science',
-      firing: Boolean(telemetry?.inLineOfSight)
+      title: 'Spectral Mismatch',
+      effect: telemetry?.sensorCalibrating
+        ? `RE-CALIBRATING (${(telemetry.sensorCalibratingSec || 0).toFixed(1)}s) & -40%`
+        : `-40% Scan Yield & Drift (${warp}x)`,
+      firing: Boolean(telemetry?.sensorCalibrating || telemetry?.swathReady)
     });
   }
-  if (!sandbox && risks.budgetOverrun) {
-    debuffs.push({
+  if (d.overBudget.active) {
+    const bleed = telemetry?.opsBleedRate ?? (2.0 + d.overBudget.severity * 2.0);
+    const accrued = Math.round(telemetry?.budgetOverrunPenalty ?? 0);
+    out.push({
       id: 'budget',
       icon: '💰',
       title: 'Over-Budget',
-      effect: 'Cost Overrun: -200 Pts & -1 ★ Cap',
-      firing: false
+      effect: `-${(bleed * warp).toFixed(0)} Pts/s (${accrued}/250) & -1 ★`,
+      firing: activeRun && accrued < 250
     });
   }
-  if (risks.lowLifetime) {
-    debuffs.push({
-      id: 'life',
-      icon: '🛡️',
-      title: 'Fragile Frame',
-      effect: 'Fragile Frame: +35% Hazard Damage',
-      firing: Boolean(telemetry?.hazardState?.activeHazard)
-    });
-  }
-  return debuffs;
+  return out;
 }
