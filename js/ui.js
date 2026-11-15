@@ -333,7 +333,7 @@ export function renderStageHud(stage, state, ev, opts) {
     if (risks.weakCommsMargin) riskMsgs.push('Packet Bottleneck (-50% downlink pts)');
     if (risks.wavelengthMismatch) riskMsgs.push('Wavelength Mismatch (-40% science)');
     const testHazBtn = state.sandboxMode
-      ? '<button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Test Hazard</button>'
+      ? '<button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Trigger Hazard</button>'
       : '';
     const debOk = Boolean(opts.orbitObjectivesMet);
     hud.innerHTML = `<div class="stage-card plate">
@@ -550,7 +550,14 @@ export function updateLaunchOverlay(t) {
 
 export function updateOrbitOverlay(t) {
   const d = document.getElementById('orbit-telem');
-  if (d && t) d.textContent = `ALT ${t.altitudeKm}km · ${t.speedKms}km/s · ${t.stormActive ? 'SOLAR FLARE!' : (t.inEclipse ? 'ECLIPSE' : 'SUNLIT')} | BATT ${t.batterySoc}% · ${t.nearestNeaId || 'NEA'}`;
+  if (d && t) {
+    const flags = [];
+    if ((t.solarPausedSec || 0) > 0) flags.push(`SOLAR PAUSED ${t.solarPausedSec}s`);
+    if ((t.commsPausedSec || 0) > 0) flags.push(`DL PAUSED ${t.commsPausedSec}s`);
+    if ((t.omniReducedDownlinks || 0) > 0) flags.push('OMNI 70%');
+    const flagStr = flags.length ? ` · ${flags.join(' · ')}` : '';
+    d.textContent = `ALT ${t.altitudeKm}km · ${t.speedKms}km/s · ${t.stormActive ? 'SOLAR FLARE!' : (t.inEclipse ? 'ECLIPSE' : 'SUNLIT')} | BATT ${t.batterySoc}%${flagStr} · ${t.nearestNeaId || 'NEA'}`;
+  }
   document.getElementById('orb-score-pill')?.replaceChildren(document.createTextNode(`SCORE ${t.missionScore}`));
   document.querySelectorAll('#stage-hud [data-warp]').forEach((b) => b.classList.toggle('is-on', Number(b.dataset.warp) === Number(t?.timeWarp)));
   const hull = Math.max(0, Math.min(100, t?.hullIntegrity ?? 100));
@@ -565,15 +572,33 @@ export function updateOrbitOverlay(t) {
   if (hazBox && hs) {
     if (hs.activeHazard) {
       const haz = hs.activeHazard;
+      const renderKey = `${haz.kind}|${hs.lowBattery ? 1 : 0}|${haz.choices?.length || 0}`;
       hazBox.hidden = false;
       hazBox.classList.remove('is-nominal');
-      if (hazBox.dataset.renderKind !== haz.kind) {
-        hazBox.dataset.renderKind = haz.kind;
-        hazBox.innerHTML = `<div class="hazard-head"><span>🚨 EMERGENCY TELEMETRY ALERT · ${haz.icon} ${esc(haz.title)}</span><span id="hazard-timer-pill" class="hazard-timer-pill">${haz.remainingSec.toFixed(1)}s</span></div>
+      if (hazBox.dataset.renderKey !== renderKey) {
+        hazBox.dataset.renderKey = renderKey;
+        hazBox.innerHTML = `<div class="hazard-head">
+            <div class="hazard-title-wrap">
+              <span class="hazard-kicker">MISSION CONTROL ANOMALY PROTOCOL</span>
+              <span class="hazard-title">${haz.icon} ${esc(haz.title)}</span>
+            </div>
+            <span id="hazard-timer-pill" class="hazard-timer-pill">${haz.remainingSec.toFixed(1)}s</span>
+          </div>
           <div class="hazard-desc">${esc(haz.detail)}</div>
-          <div class="hazard-synergy ${haz.hardwareProtected ? 'is-protected' : ''}">${esc(haz.hardwareNote)}</div>
           <div class="hazard-bar-track"><div id="hazard-bar-fill" class="hazard-bar-fill" style="width:${haz.pct}%"></div></div>
-          <button id="hazard-repair-btn" class="hazard-repair-btn" type="button">🔧 EXECUTE REPAIR ${esc(haz.actionLabel)}</button>`;
+          <div class="hazard-choices">
+            ${(haz.choices || []).map((c) => `
+              <button class="hazard-choice-btn tone-${esc(c.tone || 'amber')}${c.lowBattWarn ? ' has-lowbatt' : ''}" data-choice-idx="${c.index}" type="button">
+                <div class="hazard-choice-top">
+                  <span class="hazard-keycap">[${esc(c.key)}]</span>
+                  <span class="hazard-choice-label">${esc(c.label)}</span>
+                </div>
+                <div class="hazard-badges">
+                  ${(c.badges || []).map((b) => `<span class="haz-badge is-${esc(b.cls || 'warn')}">${esc(b.text)}</span>`).join('')}
+                  ${c.lowBattWarn ? `<span class="hazard-lowbatt-tag">⚠️ ${esc(c.lowBattText || 'LOW BATT -> BROWNOUT RISK')}</span>` : ''}
+                </div>
+              </button>`).join('')}
+          </div>`;
       } else {
         const tp = document.getElementById('hazard-timer-pill');
         if (tp) tp.textContent = `${haz.remainingSec.toFixed(1)}s`;
@@ -582,15 +607,24 @@ export function updateOrbitOverlay(t) {
       }
     } else if (hs.resolvedBanner) {
       hazBox.hidden = false;
-      hazBox.classList.add('is-nominal');
-      if (hazBox.dataset.renderKind !== 'nominal') {
-        hazBox.dataset.renderKind = 'nominal';
-        hazBox.innerHTML = `<div class="hazard-head" style="color:#a7f3d0"><span>✅ SYSTEMS NOMINAL — ANOMALY RESOLVED</span><span class="hazard-timer-pill" style="background:rgba(16,185,129,0.28);border-color:#34d399;color:#d1fae5">+75 PTS</span></div>
-          <div class="hazard-desc">Emergency repair telemetry confirmed nominal spacecraft bus health.</div>`;
+      const b = typeof hs.resolvedBanner === 'object' ? hs.resolvedBanner : null;
+      const isTimeout = Boolean(b?.expired || b?.isTimeout || (typeof hs.resolvedBanner === 'string' && /timeout|timed out|impact/i.test(hs.resolvedBanner)));
+      hazBox.classList.toggle('is-nominal', !isTimeout);
+      const bKey = b ? `ban:${b.title}|${b.scoreDelta ?? ''}|${isTimeout ? 1 : 0}` : `ban:${String(hs.resolvedBanner)}`;
+      if (hazBox.dataset.renderKey !== bKey) {
+        hazBox.dataset.renderKey = bKey;
+        const headText = b?.title || (typeof hs.resolvedBanner === 'string' ? hs.resolvedBanner : '✅ SYSTEMS NOMINAL — ANOMALY RESOLVED');
+        const badgeText = b?.badge || (b?.scoreDelta != null ? `${b.scoreDelta >= 0 ? '+' : ''}${b.scoreDelta} PTS` : (isTimeout ? '-26% HULL' : '+40 PTS'));
+        const descText = b?.detail || (isTimeout ? 'Anomaly timer expired before Mission Control executed mitigation.' : 'Telemetry confirmed anomaly protocol execution.');
+        const pillStyle = isTimeout
+          ? 'background:rgba(239,68,68,0.28);border-color:#f87171;color:#fee2e2'
+          : 'background:rgba(16,185,129,0.28);border-color:#34d399;color:#d1fae5';
+        hazBox.innerHTML = `<div class="hazard-head" style="color:${isTimeout ? '#fecaca' : '#a7f3d0'}"><span>${esc(headText)}</span><span class="hazard-timer-pill" style="${pillStyle}">${esc(badgeText)}</span></div>
+          <div class="hazard-desc">${esc(descText)}</div>`;
       }
     } else {
       hazBox.hidden = true;
-      hazBox.dataset.renderKind = '';
+      hazBox.dataset.renderKey = '';
     }
   }
   document.getElementById('orb-met-val')?.replaceChildren(document.createTextNode(t?.metText || 'T+ 00:00:00'));
@@ -600,14 +634,19 @@ export function updateOrbitOverlay(t) {
   const tx = document.getElementById('orb-transmit-btn');
   if (tx) {
     tx.hidden = !t?.inLineOfSight;
-    tx.disabled = Boolean(t?.brownoutLocked);
+    const dlPaused = (t?.commsPausedSec || 0) > 0;
+    tx.disabled = Boolean(t?.brownoutLocked || dlPaused);
     if (t?.brownoutLocked) {
       tx.textContent = '🔋 BROWNOUT: RECHARGE TO 15% IN SUNLIGHT';
+    } else if (dlPaused) {
+      tx.textContent = `⏸️ DOWNLINK PAUSED (${t.commsPausedSec}s)`;
     } else {
       let pts = 50;
       if (t?.designRisks?.weakCommsMargin) pts = Math.round(pts * 0.5);
       if (t?.designRisks?.wavelengthMismatch) pts = Math.round(pts * 0.6);
-      tx.textContent = `📡 [SPACE] TRANSMIT SCIENCE (+${pts})`;
+      if ((t?.omniReducedDownlinks || 0) > 0) pts = Math.round(pts * 0.7);
+      const omniTag = (t?.omniReducedDownlinks || 0) > 0 ? ' · OMNI 70%' : '';
+      tx.textContent = `📡 [SPACE] TRANSMIT SCIENCE (+${pts})${omniTag}`;
     }
   }
   const debBtn = document.getElementById('orb-debrief-btn');

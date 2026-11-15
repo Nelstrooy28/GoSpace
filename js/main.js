@@ -2,33 +2,16 @@ import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign, getOptim
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { activateSafeMode, applyOrbitDecisionEffect, clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, mountOrbit, mountShowcase, repairActiveHazard, replayOrbitDeployment, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
+import { activateSafeMode, clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, mountOrbit, mountShowcase, replayOrbitDeployment, resolveOrbitHazardChoice, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
 import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
 import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
-import { SUB_TABS, computeMissionDebriefSummary, renderDecisionCard, renderHoloScannerCard, renderHud, renderLoadoutDock, renderMissionBriefing, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
+import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderMissionBriefing, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
 const STORAGE_ACTIVE = 'gospace_active_v1', STORAGE_SAVED = 'gospace_saved_v1', STORAGE_PROGRESS = 'gospace_progress_v2';
 const readJson = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fb; } catch { return fb; } };
 const writeJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
 const FOCUS_MAP = { busId: 'bus', instrumentIds: 'payload', solarId: 'solar', thermalId: 'thermal', transceiverId: 'comms', hullSkinId: 'bus' };
-
-const DECISION_TEMPLATES = [
-  {
-    id: 'cme-surge',
-    title: 'CORONAL MASS EJECTION SURGE',
-    prompt: 'Solar proton wave incoming! Overdrive spectrometers to capture high-energy corona telemetry or feather solar arrays?',
-    risky: { label: '⚡ Capture High-Energy Burst', deltaText: '+180 Score, -22% Hull & Battery', scoreDelta: 180, hullDelta: -22, batteryDelta: -22, sensorOfflineSec: 0 },
-    safe: { label: '🛡️ Feather Arrays & Shield Core', deltaText: '100% Safe, -8s Sensor Offline', scoreDelta: 0, hullDelta: 0, batteryDelta: 0, sensorOfflineSec: 8 }
-  },
-  {
-    id: 'target-overclock',
-    title: 'SUPER-CELL / AURORA TARGET PASS',
-    prompt: 'High-value science target sweeping directly under nadir. Overclock payload sweep or hold nominal safe bus pass?',
-    risky: { label: '📡 Overclock Payload Sweep', deltaText: '+150 Score, -30% Battery', scoreDelta: 150, hullDelta: 0, batteryDelta: -30, sensorOfflineSec: 0 },
-    safe: { label: '🔋 Nominal Safe Pass', deltaText: '+40 Score, Preserve Battery', scoreDelta: 40, hullDelta: 0, batteryDelta: 0, sensorOfflineSec: 0 }
-  }
-];
 
 function createFreshRunSession(missionId) {
   return {
@@ -41,11 +24,7 @@ function createFreshRunSession(missionId) {
     orbitObjectivesMet: false,
     launchCompleted: false,
     launchInserted: false,
-    unlockedStage: 'hangar',
-    decisionIdx: 0,
-    decisionWaitSec: 15,
-    activeDecision: null,
-    decisionScoreDelta: 0
+    unlockedStage: 'hangar'
   };
 }
 
@@ -54,7 +33,7 @@ let missionState = (() => { const s = readJson(STORAGE_ACTIVE, null); return s?.
 let runSession = createFreshRunSession(missionState.scenarioId);
 let activeScene = null, hudHidden = false, codexOpen = false, briefingOpen = false, sensorCamOpen = false, selectedHoloId = null, focusedHoloId = null;
 let autoRotate = true, exploded = false, launchCam = 'trench', orbitWarp = 25, orbitCam = 'full';
-let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0, orbitSessionDirty = true, lastDecTickMs = 0;
+let launchTelemetry = null, orbitTelemetry = null, orbitScore = 0, orbitSessionDirty = true;
 
 function resetRunSession(missionId) {
   runSession = createFreshRunSession(missionId);
@@ -68,8 +47,6 @@ function resetRunSession(missionId) {
   sensorCamOpen = false;
   orbitWarp = 25;
   orbitCam = 'full';
-  lastDecTickMs = 0;
-  renderDecisionCard(null);
 }
 
 function getProgressMap() {
@@ -123,64 +100,11 @@ function updateDebug(ev) {
     briefingOpen, briefingPaused: Boolean(orbitTelemetry?.briefingPaused ?? (activeScene === 'orbit' && briefingOpen)),
     sensorCamOpen, sensorCamMode: getSensorCamMode(missionState).mode,
     selectedHoloId, focusedHoloId, getHoloScreenPos: getHoloBodyScreenPos,
-    runSession: { ...runSession, activeDecision: runSession.activeDecision ? { id: runSession.activeDecision.id, remainingSec: Number(runSession.activeDecision.remainingSec.toFixed(1)) } : null },
+    runSession: { ...runSession },
     unlockedStages: getUnlockedStages(ev),
     progressMap: getProgressMap(),
     metrics: ev.metrics, warnings: ev.warnings, designRisks: ev.designRisks
   };
-}
-
-function resolveActiveDecision(choiceKey = 'safe', timedOut = false) {
-  const dec = runSession.activeDecision;
-  if (!dec) return;
-  const opt = choiceKey === 'risky' ? dec.risky : dec.safe;
-  runSession.activeDecision = null;
-  renderDecisionCard(null);
-  const res = applyOrbitDecisionEffect(opt);
-  runSession.decisionScoreDelta += opt.scoreDelta || 0;
-  orbitScore = res.missionScore;
-  runSession.currentScore = orbitScore;
-  runSession.hullIntegrity = res.hullIntegrity;
-  if (choiceKey === 'risky') playWarning(); else playRepairSuccess();
-  const prefix = timedOut ? '⏱ AUTO-SAFE: ' : '';
-  spawnPopup(`${prefix}${opt.label} (${opt.deltaText})`);
-  renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
-  updateDebug(lastEval);
-}
-
-function tickDecisionSystem(t) {
-  if (stage !== 'orbit' || titleOpen || briefingOpen || isTutorialActive()) {
-    lastDecTickMs = performance.now();
-    return;
-  }
-  const now = performance.now();
-  const dt = lastDecTickMs ? Math.min(1.0, (now - lastDecTickMs) / 1000) : 0;
-  lastDecTickMs = now;
-  if (dt <= 0) return;
-
-  if (runSession.activeDecision) {
-    runSession.activeDecision.remainingSec = Math.max(0, runSession.activeDecision.remainingSec - dt);
-    renderDecisionCard(runSession.activeDecision);
-    if (runSession.activeDecision.remainingSec <= 0) {
-      resolveActiveDecision('safe', true);
-    }
-    return;
-  }
-
-  if (runSession.decisionIdx < DECISION_TEMPLATES.length && !t?.hazardState?.activeHazard && !t?.deployActive) {
-    runSession.decisionWaitSec -= dt;
-    if (runSession.decisionWaitSec <= 0) {
-      const tpl = DECISION_TEMPLATES[runSession.decisionIdx];
-      runSession.decisionIdx += 1;
-      runSession.decisionWaitSec = 22;
-      runSession.activeDecision = {
-        ...tpl,
-        remainingSec: 15.0
-      };
-      playWarning();
-      renderDecisionCard(runSession.activeDecision);
-    }
-  }
 }
 
 function spawnPopup(text) {
@@ -214,8 +138,6 @@ function setStage(nextStage, keepOrbit = false, forceUnlock = false) {
     sensorCamOpen = false;
     selectedHoloId = null;
     focusedHoloId = null;
-    runSession.activeDecision = null;
-    renderDecisionCard(null);
     setSensorCamEnabled(false);
     clearHoloSelection();
   }
@@ -273,7 +195,7 @@ function getStageHudOpts() {
     downlinkPts: orbitTelemetry?.downlinkPts,
     anomalyPts: orbitTelemetry?.anomalyPts,
     scanPts: orbitTelemetry?.scanPts,
-    decisionPts: orbitTelemetry?.decisionPts ?? runSession.decisionScoreDelta,
+    decisionPts: orbitTelemetry?.decisionPts ?? 0,
     batterySoc: orbitTelemetry?.batterySoc,
     launchInserted: runSession.launchInserted,
     orbitObjectivesMet: runSession.orbitObjectivesMet
@@ -291,9 +213,6 @@ function toggleSensorCam(forceState = null) {
 
 function mountLiveOrbit(vp, isVictory = false) {
   unmountAll(); orbitTelemetry = null; orbitScore = 0; orbitSessionDirty = false;
-  runSession.activeDecision = null;
-  renderDecisionCard(null);
-  lastDecTickMs = performance.now();
   mountOrbit(vp, missionState, lastEval, (t) => {
     orbitTelemetry = t; orbitScore = t.missionScore || 0; orbitWarp = t.timeWarp ?? orbitWarp;
     runSession.currentScore = orbitScore;
@@ -306,13 +225,12 @@ function mountLiveOrbit(vp, isVictory = false) {
     if (!prevMet && runSession.orbitObjectivesMet) {
       renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
     }
-    tickDecisionSystem(t);
     updateOrbitOverlay(t);
     if (window.__MISSION_DEBUG__) {
       window.__MISSION_DEBUG__.orbitTelemetry = t;
       window.__MISSION_DEBUG__.orbitScore = orbitScore;
       window.__MISSION_DEBUG__.briefingPaused = t.briefingPaused;
-      window.__MISSION_DEBUG__.runSession = { ...runSession, activeDecision: runSession.activeDecision ? { id: runSession.activeDecision.id, remainingSec: Number(runSession.activeDecision.remainingSec.toFixed(1)) } : null };
+      window.__MISSION_DEBUG__.runSession = { ...runSession };
       window.__MISSION_DEBUG__.unlockedStages = getUnlockedStages(lastEval);
     }
     notifyTutorialState();
@@ -329,13 +247,16 @@ function mountLiveOrbit(vp, isVictory = false) {
       setHazardTension(ev.type === 'trigger');
       if (window.__MISSION_DEBUG__) window.__MISSION_DEBUG__.music = getMusicDebugState();
       if (ev.type === 'trigger') {
-        spawnPopup(`🚨 ${ev.icon} ANOMALY DETECTED · MAINTAINING ${orbitWarp}x`);
+        spawnPopup(`🚨 ${ev.icon} ANOMALY DETECTED · CHOOSE RESPONSE [1][2][3]`);
       } else if (ev.type === 'resolve') {
-        orbitScore += ev.bonus || 75;
+        orbitScore += ev.scoreDelta ?? ev.bonus ?? 0;
         runSession.currentScore = orbitScore;
-        spawnPopup('+75 FLIGHT DIRECTOR BONUS · SYSTEMS NOMINAL!');
+        if (typeof ev.anomaliesResolved === 'number') runSession.anomaliesResolved = ev.anomaliesResolved;
+        if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
+        spawnPopup(ev.toast || `+${ev.scoreDelta ?? 0} PTS · ANOMALY MITIGATED!`);
       } else if (ev.type === 'expire') {
-        spawnPopup(`💥 HULL IMPACT -${ev.hullLoss}% · MISSED REPAIR`);
+        if (typeof ev.hullIntegrity === 'number') runSession.hullIntegrity = ev.hullIntegrity;
+        spawnPopup('💥 ANOMALY TIMED OUT — -26% HULL & -18% BATTERY!');
       }
     }
   });
@@ -470,7 +391,8 @@ const handleTransmit = () => {
     runSession.downlinksCompleted += 1;
     if (orbitTelemetry) orbitTelemetry.downlinkCount = Math.max(orbitTelemetry.downlinkCount || 0, runSession.downlinksCompleted);
     runSession.orbitObjectivesMet = runSession.downlinksCompleted >= 1 && (orbitTelemetry?.hullIntegrity ?? runSession.hullIntegrity) > 0;
-    const suffix = r.weakComms ? ' · BOTTLENECK -50%' : (r.wavelengthMismatch ? ' · MISMATCH -40%' : '');
+    let suffix = r.weakComms ? ' · BOTTLENECK -50%' : (r.wavelengthMismatch ? ' · MISMATCH -40%' : '');
+    if (r.omniReduced) suffix += ' · OMNI 70%';
     spawnPopup(`+${r.points} DATA DOWNLINKED (${r.station})${suffix}!`);
     renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
     updateDebug(lastEval);
@@ -478,11 +400,14 @@ const handleTransmit = () => {
   } else if (r.reason === 'brownout') {
     playWarning();
     spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to transmit.');
+  } else if (r.reason === 'paused') {
+    playWarning();
+    spawnPopup(`⏸️ Downlink paused (${r.pausedSec}s)`);
   }
 };
 const handleSafeMode = () => { const r = activateSafeMode(); orbitScore += r.points; spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`); };
 const handleScanAsteroid = () => { const r = scanAsteroid(); if (r.ok) { orbitScore += r.points; spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`); } };
-const handleRepairHazard = (key = null) => { repairActiveHazard(key); };
+const handleHazardChoice = (choiceIdx = 0) => { resolveOrbitHazardChoice(choiceIdx); };
 
 function init() {
   let lastTitleHover = null;
@@ -697,11 +622,8 @@ function init() {
     else if (e.target.closest('#brief-start-btn')) closeMissionBriefing(true);
   });
   document.getElementById('hazard-alert-hud').addEventListener('click', (e) => {
-    if (e.target.closest('#hazard-repair-btn')) handleRepairHazard(null);
-  });
-  document.getElementById('decision-alert-hud')?.addEventListener('click', (e) => {
-    if (e.target.closest('#dec-opt-risky')) resolveActiveDecision('risky', false);
-    else if (e.target.closest('#dec-opt-safe')) resolveActiveDecision('safe', false);
+    const btn = e.target.closest('[data-choice-idx]');
+    if (btn) handleHazardChoice(Number(btn.dataset.choiceIdx));
   });
   document.getElementById('center-action-hud').addEventListener('click', (e) => {
     if (e.target.closest('#lch-ignite-btn')) triggerIgnition();
@@ -755,7 +677,7 @@ function init() {
     else if (k === 'u' && stage === 'orbit' && !titleOpen && !briefingOpen) handleReplayUnfold();
     else if (k === 'c' && stage === 'orbit' && !titleOpen) toggleSensorCam();
     else if (k === 'q' && stage === 'orbit' && !titleOpen) handleSafeMode();
-    else if (['d', 'f', 't', 'r'].includes(k) && stage === 'orbit' && !titleOpen) handleRepairHazard(k);
+    else if (['1', '2', '3'].includes(k) && stage === 'orbit' && !titleOpen && !briefingOpen) handleHazardChoice(Number(k) - 1);
   });
 
   document.getElementById('mel-toggle').addEventListener('click', () => { const d = document.getElementById('mel-drawer'); d.hidden = !d.hidden; codexOpen = false; applyChrome(); });

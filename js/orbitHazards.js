@@ -1,6 +1,8 @@
-import { playAlertKlaxon, playHullSpark, playRepairSuccess } from './sfx.js';
+import { getHazardProtocol } from './catalog.js';
+import { playAlertKlaxon, playHullSpark, playRepairSuccess, playWarning } from './sfx.js';
 
 const KIND_ORDER = ['debris', 'cme', 'cryo', 'gimbal'];
+const MAX_SIMULATION_AUTO_HAZARDS = 2;
 
 let stateRef = null;
 let evalRef = null;
@@ -8,113 +10,31 @@ let callbacks = {};
 let hullIntegrity = 100;
 let anomaliesResolved = 0;
 let anomaliesMissed = 0;
+let autoTriggeredCount = 0;
 let activeHazard = null;
-let nextScheduleSec = 20;
+let nextScheduleSec = 14;
 let cycleIdx = 0;
 let resolvedBannerUntil = 0;
 let resolvedBannerText = '';
 
-const hasPropulsion = (s) => ['cold-gas-rcs', 'green-monoprop', 'xenon-ion'].includes(s?.thermalId);
-const hasCryoProtection = (s) => s?.solarId === 'rtg-nuclear' || s?.thermalId === 'cryocooler-st';
-const hasRadShield = (s) => s?.busId === 'flagship-bus' || s?.solarId === 'rtg-nuclear' || s?.thermalId === 'cryocooler-st';
-
 function buildHazardSpec(kind) {
-  if (kind === 'debris') {
-    const armed = hasPropulsion(stateRef);
-    return {
-      kind: 'debris',
-      icon: '☄️',
-      title: 'ORBITAL DEBRIS / MICROMETEOROID INTERCEPT',
-      detail: armed
-        ? 'High-velocity fragment cloud crossing orbital track — fire lateral thrusters!'
-        : 'Hypervelocity micrometeoroids inbound — no active thruster equipped!',
-      key: armed ? 'd' : 'r',
-      keyLabel: armed ? 'D' : 'R',
-      actionLabel: armed ? '[D] THRUSTER DODGE' : '[R] ISOLATE DAMAGED CELLS',
-      hardwareProtected: armed,
-      hardwareNote: armed
-        ? 'HARDWARE PROTECTED! Active thrusters execute a zero-damage evasive dodge.'
-        : 'PASSIVE WHEELS ONLY: Partial cell isolation reduces hull impact.',
-      damageOnSave: armed ? 0 : 3,
-      hullLossOnMiss: 18,
-      batteryLossOnMiss: 8,
-      dataLossRatio: 0,
-      drainMult: 1,
-      durationSec: 9.0
-    };
-  }
-  if (kind === 'cme') {
-    const shielded = hasRadShield(stateRef);
-    return {
-      kind: 'cme',
-      icon: '☀️',
-      title: 'SOLAR FLARE / CORONAL MASS EJECTION',
-      detail: 'High-energy proton wave approaching — protect imaging optics & flight memory!',
-      key: 'f',
-      keyLabel: 'F',
-      actionLabel: '[F] SHIELD OPTICS & REBOOT',
-      hardwareProtected: shielded,
-      hardwareNote: shielded
-        ? 'HARDWARE PROTECTED! Rad-hard/RTG/Shield structure limits radiation surge.'
-        : 'Shield optics immediately or radiation flips will wipe buffered science.',
-      damageOnSave: 0,
-      hullLossOnMiss: shielded ? 6 : 12,
-      batteryLossOnMiss: 14,
-      dataLossRatio: shielded ? 0.2 : 0.48,
-      drainMult: 1.2,
-      durationSec: 9.0
-    };
-  }
-  if (kind === 'cryo') {
-    const protectedHw = hasCryoProtection(stateRef);
-    return {
-      kind: 'cryo',
-      icon: '❄️',
-      title: 'ECLIPSE CRYO-FREEZE / BUS BROWNOUT',
-      detail: 'External skin plunging below -140°C — stabilize bus voltage and heaters!',
-      key: 't',
-      keyLabel: 'T',
-      actionLabel: '[T] PULSE SURVIVAL HEATERS',
-      hardwareProtected: protectedHw,
-      hardwareNote: protectedHw
-        ? 'HARDWARE PROTECTED! RTG / Cryo Sunshield cuts thermal drain by 70%.'
-        : 'Heavy eclipse heater load — pulse survival heaters before brownout!',
-      damageOnSave: 0,
-      hullLossOnMiss: protectedHw ? 4 : 10,
-      batteryLossOnMiss: protectedHw ? 5 : 18,
-      dataLossRatio: 0,
-      drainMult: protectedHw ? 0.3 : 1.0,
-      durationSec: 9.5
-    };
-  }
-  const hasLaser = stateRef?.transceiverId === 'ka-optical' || stateRef?.transceiverId === 'ka-mesh';
+  const batt = callbacks.getBatterySoc ? callbacks.getBatterySoc() : 84;
+  const proto = getHazardProtocol(kind, stateRef, batt);
   return {
-    kind: 'gimbal',
-    icon: '📡',
-    title: 'COMMS GIMBAL JAM / STAR-TRACKER DRIFT',
-    detail: 'Attitude gyro bias drifted off station lock — downlink throughput throttled!',
-    key: 'r',
-    keyLabel: 'R',
-    actionLabel: '[R] RECALIBRATE GIMBAL',
-    hardwareProtected: hasLaser,
-    hardwareNote: hasLaser
-      ? 'HARDWARE PROTECTED! Precision Ka-Band / Laser gimbal locks rapid recovery.'
-      : 'Recalibrate pointing assembly to restore full station pass bandwidth.',
-    damageOnSave: 0,
-    hullLossOnMiss: 8,
-    batteryLossOnMiss: 6,
-    dataLossRatio: 0.15,
-    drainMult: 0.9,
-    durationSec: 8.5
+    ...proto,
+    hullLossOnMiss: 26,
+    batteryLossOnMiss: 18,
+    dataLossRatio: kind === 'cme' ? 0.3 : 0,
+    drainMult: kind === 'cryo' ? 1.0 : 1.0
   };
 }
 
 function scheduleNext() {
-  nextScheduleSec = 18 + Math.random() * 7;
+  nextScheduleSec = stateRef?.sandboxMode ? (18 + Math.random() * 8) : 26;
 }
 
 /**
- * Initializes the Stage 3 Orbital Hazard & Emergency Repair manager.
+ * Initializes the Stage 3 Orbital Hazard & Emergency Response manager.
  */
 export function initOrbitHazards(missionState, evaluation, cbs = {}) {
   stateRef = missionState;
@@ -130,11 +50,12 @@ export function resetOrbitHazards() {
   hullIntegrity = 100;
   anomaliesResolved = 0;
   anomaliesMissed = 0;
+  autoTriggeredCount = 0;
   activeHazard = null;
   resolvedBannerUntil = 0;
   resolvedBannerText = '';
   cycleIdx = 0;
-  scheduleNext();
+  nextScheduleSec = 14;
 }
 
 /**
@@ -157,34 +78,58 @@ export function triggerRandomHazard(forcedKind = null) {
 }
 
 /**
- * Attempts to resolve the current emergency hazard via UI button click or hotkey.
+ * Resolves the active anomaly using one of the 3 ConOps engineering choices (index 0, 1, 2).
  */
-export function resolveActiveHazard(key = null) {
+export function resolveActiveHazardChoice(choiceIdx = 0) {
   if (!activeHazard) return { ok: false, reason: 'none' };
-  if (key !== null && key.toLowerCase() !== activeHazard.key) {
-    return { ok: false, reason: 'wrong-key', expectedKey: activeHazard.key };
-  }
+  const idx = Number(choiceIdx);
+  const batt = callbacks.getBatterySoc ? callbacks.getBatterySoc() : 84;
+  const proto = getHazardProtocol(activeHazard.kind, stateRef, batt);
+  const chosen = proto.choices[idx];
+  if (!chosen) return { ok: false, reason: 'invalid-choice' };
+
   const resolved = activeHazard;
   activeHazard = null;
-  const bonus = 75;
+  const scoreDelta = chosen.scoreDelta || 0;
+  const hullDelta = chosen.hullDelta || 0;
   anomaliesResolved += 1;
-  hullIntegrity = Math.max(5, Math.min(100, hullIntegrity - (resolved.damageOnSave || 0)));
-  resolvedBannerUntil = performance.now() + 3400;
-  resolvedBannerText = 'SYSTEMS NOMINAL — ANOMALY RESOLVED (+75)';
+  hullIntegrity = Math.max(5, Math.min(100, hullIntegrity + hullDelta));
+  resolvedBannerUntil = performance.now() + 3600;
+  resolvedBannerText = chosen.toast;
   scheduleNext();
-  playRepairSuccess();
+  if (hullDelta <= -10) playWarning(); else playRepairSuccess();
+
   const payload = {
     ok: true,
     kind: resolved.kind,
     title: resolved.title,
-    bonus,
-    hardwareProtected: resolved.hardwareProtected,
-    damageTaken: resolved.damageOnSave || 0,
+    choiceIndex: idx,
+    choice: chosen,
+    bonus: scoreDelta,
+    scoreDelta,
+    hullDelta,
+    batteryDelta: chosen.batteryDelta || 0,
+    solarPauseSec: chosen.solarPauseSec || 0,
+    sensorOfflineSec: chosen.sensorOfflineSec || 0,
+    commsPauseSec: chosen.commsPauseSec || 0,
+    omniReducedCount: chosen.omniReducedCount || 0,
+    toast: chosen.toast,
     hullIntegrity,
     anomaliesResolved
   };
   callbacks.onResolve?.(payload);
   return payload;
+}
+
+/**
+ * Legacy helper preserving numeric hotkey ('1'|'2'|'3') or default index 0 resolution.
+ */
+export function resolveActiveHazard(key = null) {
+  if (!activeHazard) return { ok: false, reason: 'none' };
+  if (key === '1' || key === '2' || key === '3') {
+    return resolveActiveHazardChoice(Number(key) - 1);
+  }
+  return resolveActiveHazardChoice(0);
 }
 
 export function applyHullDelta(delta, minHull = 5) {
@@ -204,7 +149,9 @@ export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tu
       const missed = activeHazard;
       activeHazard = null;
       anomaliesMissed += 1;
-      hullIntegrity = Math.max(10, hullIntegrity - missed.hullLossOnMiss);
+      hullIntegrity = Math.max(5, hullIntegrity - missed.hullLossOnMiss);
+      resolvedBannerUntil = performance.now() + 3600;
+      resolvedBannerText = `💥 RESPONSE TIMED OUT — -${missed.hullLossOnMiss}% HULL & -${missed.batteryLossOnMiss}% BATTERY!`;
       scheduleNext();
       playHullSpark();
       callbacks.onExpire?.({
@@ -220,9 +167,11 @@ export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tu
     return;
   }
 
-  if (timeWarp > 0) {
+  const canAutoTrigger = stateRef?.sandboxMode || autoTriggeredCount < MAX_SIMULATION_AUTO_HAZARDS;
+  if (timeWarp > 0 && canAutoTrigger) {
     nextScheduleSec -= realDt;
     if (nextScheduleSec <= 0) {
+      autoTriggeredCount += 1;
       const autoKind = inEclipse && (cycleIdx % 2 === 1) ? 'cryo' : null;
       triggerRandomHazard(autoKind);
     }
@@ -234,27 +183,28 @@ export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tu
  */
 export function getHazardSnapshot() {
   const now = performance.now();
+  const batt = callbacks.getBatterySoc ? callbacks.getBatterySoc() : 84;
+  let activeSnap = null;
+  if (activeHazard) {
+    const liveProto = getHazardProtocol(activeHazard.kind, stateRef, batt);
+    activeSnap = {
+      kind: activeHazard.kind,
+      icon: activeHazard.icon,
+      title: activeHazard.title,
+      detail: activeHazard.detail,
+      choices: liveProto.choices,
+      drainMult: activeHazard.drainMult,
+      durationSec: activeHazard.durationSec,
+      remainingSec: Number(activeHazard.remainingSec.toFixed(1)),
+      pct: Math.max(0, Math.round((activeHazard.remainingSec / activeHazard.durationSec) * 100))
+    };
+  }
   return {
     hullIntegrity: Math.round(hullIntegrity),
     anomaliesResolved,
     anomaliesMissed,
+    lowBattery: batt < 15,
     resolvedBanner: now < resolvedBannerUntil ? resolvedBannerText : '',
-    activeHazard: activeHazard
-      ? {
-          kind: activeHazard.kind,
-          icon: activeHazard.icon,
-          title: activeHazard.title,
-          detail: activeHazard.detail,
-          key: activeHazard.key,
-          keyLabel: activeHazard.keyLabel,
-          actionLabel: activeHazard.actionLabel,
-          hardwareProtected: activeHazard.hardwareProtected,
-          hardwareNote: activeHazard.hardwareNote,
-          drainMult: activeHazard.drainMult,
-          durationSec: activeHazard.durationSec,
-          remainingSec: Number(activeHazard.remainingSec.toFixed(1)),
-          pct: Math.max(0, Math.round((activeHazard.remainingSec / activeHazard.durationSec) * 100))
-        }
-      : null
+    activeHazard: activeSnap
   };
 }

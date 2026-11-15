@@ -4,7 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { generateOrbitTrack, propagateOrbit } from './missionVizPropagator.js';
 import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpaceTexture } from './solarSystem.js';
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
-import { applyHullDelta, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=14';
+import { applyHullDelta, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=15';
 import { isTutorialActive } from './tutorial.js';
 import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSafeMode, playWarning } from './sfx.js';
 
@@ -28,7 +28,7 @@ let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTa
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs = 0, fitDist = 7.2, sunElapsed = 0;
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
 let downlinkPts = 0, anomalyPts = 0, scanPts = 0, decisionPts = 0;
-let brownoutLocked = false, sensorOfflineUntil = 0, dragLossKm = 0, dragHullAccum = 0;
+let brownoutLocked = false, sensorOfflineUntil = 0, solarChargePauseUntil = 0, commsPauseUntil = 0, omniReducedDownlinks = 0, dragLossKm = 0, dragHullAccum = 0;
 let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
 let hazardEventCb = null, hazardFx = null, dodgeT = 0, heaterGlowT = 0, repairSweepT = 0, sparkFlashUntil = 0;
 let deployActive = false, deployCompleted = false, deployElapsed = 0, deployProgress = 1, deployStageMask = 0;
@@ -1339,6 +1339,8 @@ function animate() {
   const stormActive = now < stormUntil || activeKind === 'cme';
   const safeModeActive = now < safeModeUntil;
   const gimbalJammed = activeKind === 'gimbal';
+  const solarPaused = now < solarChargePauseUntil;
+  const commsPaused = now < commsPauseUntil || now < sensorOfflineUntil;
   const risks = evalRef?.designRisks || {};
   const canDegrade = !showcaseMode && !victoryMode && !briefingPaused && !isTutorialActive();
   if (canDegrade && risks.massOverrun) {
@@ -1352,6 +1354,7 @@ function animate() {
   hazardNow = prop.inEclipse || stormActive || Boolean(activeHaz);
   const cryoDrain = activeKind === 'cryo' ? -0.65 * (activeHaz?.drainMult ?? 1) : 0;
   let pwrRate = safeModeActive ? 0.35 : (cryoDrain || (hazardNow ? -0.45 : Math.max(0.15, (evalRef.metrics.powerMargin + 25) * 0.012)));
+  if (solarPaused && pwrRate > 0) pwrRate = 0;
   if (prop.inEclipse && risks.lowPowerMargin) pwrRate = Math.min(pwrRate * 2.5, -1.65);
   if (simDt > 0 && !briefingPaused) {
     const minSoc = risks.lowPowerMargin ? 0 : 5;
@@ -1359,8 +1362,8 @@ function animate() {
     batterySoc = Math.max(minSoc, Math.min(100, batterySoc + stepSoc));
     bufferGb = Math.min(32, bufferGb + (simDt / 86400) * 1.6);
   }
-  if (risks.lowPowerMargin && batterySoc <= 0.1) brownoutLocked = true;
-  if (brownoutLocked && !prop.inEclipse && batterySoc >= 15) brownoutLocked = false;
+  if (batterySoc <= 0.1 && (risks.lowPowerMargin || brownoutLocked)) brownoutLocked = true;
+  if (brownoutLocked && !prop.inEclipse && !solarPaused && batterySoc >= 15) brownoutLocked = false;
   if (earthshineLight) earthshineLight.intensity = prop.inEclipse ? 0.24 : 0.95;
 
   inLineOfSight = false; activeStationName = 'None';
@@ -1374,7 +1377,7 @@ function animate() {
     tmpNorm.copy(activeGs.localNorm).applyQuaternion(earthGroup.quaternion);
     const losDot = tmpSat.clone().sub(tmpGs).normalize().dot(tmpNorm);
     const rangeOk = orbitEl.deepSpace ? true : tmpSat.distanceTo(tmpGs) < 5.6;
-    const losOk = losDot > 0.08 && rangeOk && !stormActive && !gimbalJammed;
+    const losOk = losDot > 0.08 && rangeOk && !stormActive && !gimbalJammed && !commsPaused;
 
     if (activeGs.cone) {
       activeGs.cone.material.opacity = losOk
@@ -1478,6 +1481,9 @@ function animate() {
       latDeg: Number(latDeg.toFixed(1)), lonDeg: Number(lonDeg.toFixed(1)),
       inEclipse: prop.inEclipse, stormActive, safeModeActive, inLineOfSight,
       brownoutLocked, sensorOfflineSec: Number(offlineRem.toFixed(1)),
+      solarPausedSec: Number(Math.max(0, (solarChargePauseUntil - now) / 1000).toFixed(1)),
+      commsPausedSec: Number(Math.max(0, (commsPauseUntil - now) / 1000).toFixed(1)),
+      omniReducedDownlinks,
       batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
       linkedStation: activeStationName, missionScore, downlinkCount, flareMitigated, asteroidsScanned,
       downlinkPts, anomalyPts, scanPts, decisionPts,
@@ -1922,11 +1928,25 @@ export function triggerTestHazard(forcedKind = null) {
 export function repairActiveHazard(key = null) {
   return resolveActiveHazard(key);
 }
+export function resolveOrbitHazardChoice(choiceIdx = 0) {
+  return resolveActiveHazardChoice(choiceIdx);
+}
 export function transmitScience() {
+  const now = performance.now();
   if (brownoutLocked) return { ok: false, reason: 'brownout', points: 0, station: activeStationName };
+  if (now < commsPauseUntil || now < sensorOfflineUntil) {
+    const rem = Math.max(commsPauseUntil - now, sensorOfflineUntil - now) / 1000;
+    return { ok: false, reason: 'paused', pausedSec: Number(rem.toFixed(1)), points: 0, station: activeStationName };
+  }
   if (!inLineOfSight) return { ok: false, points: 0, station: 'None' };
   const risks = evalRef?.designRisks || {};
   let pts = 50;
+  let omniReduced = false;
+  if (omniReducedDownlinks > 0) {
+    pts = Math.round(pts * 0.7);
+    omniReducedDownlinks -= 1;
+    omniReduced = true;
+  }
   if (risks.weakCommsMargin) pts = Math.round(pts * 0.5);
   if (risks.wavelengthMismatch) pts = Math.round(pts * 0.6);
   const xfer = Math.max(0.15, Math.min(bufferGb, 1.4));
@@ -1934,7 +1954,7 @@ export function transmitScience() {
   downlinkCount += 1; downlinkPts += pts; missionScore += pts; beamBoostUntil = performance.now() + 900;
   lastHudMs = 0;
   playDownlinkPing();
-  return { ok: true, points: pts, station: activeStationName, weakComms: Boolean(risks.weakCommsMargin), wavelengthMismatch: Boolean(risks.wavelengthMismatch) };
+  return { ok: true, points: pts, station: activeStationName, omniReduced, weakComms: Boolean(risks.weakCommsMargin), wavelengthMismatch: Boolean(risks.wavelengthMismatch) };
 }
 export function activateSafeMode() {
   safeModeUntil = performance.now() + 6500; batterySoc = Math.min(100, batterySoc + 8);
@@ -1978,7 +1998,7 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
   downlinkPts = 0; anomalyPts = 0; scanPts = 0; decisionPts = 0; lastAutoFlare = 14; lastHudMs = 0; lastCamMs = 0;
-  brownoutLocked = false; sensorOfflineUntil = 0; dragLossKm = 0; dragHullAccum = 0;
+  brownoutLocked = false; sensorOfflineUntil = 0; solarChargePauseUntil = 0; commsPauseUntil = 0; omniReducedDownlinks = 0; dragLossKm = 0; dragHullAccum = 0;
   sensorCamEnabled = Boolean(options.sensorCam);
   dodgeT = 0; heaterGlowT = 0; repairSweepT = 0; sparkFlashUntil = 0;
   holoTargets = {}; holoProxies = []; gsHoloProxies = []; earthSolidMesh = null; earthOuterProxy = null;
@@ -1996,27 +2016,40 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
 
   if (!showcaseMode) {
     initOrbitHazards(missionState, evaluation, {
+      getBatterySoc: () => batterySoc,
       onTrigger: (hazard) => {
         if (hazard.kind === 'cme') stormUntil = performance.now() + hazard.durationSec * 1000;
         lastHudMs = 0;
         hazardEventCb?.({ type: 'trigger', timeWarp, ...hazard });
       },
       onResolve: (res) => {
-        anomalyPts += res.bonus;
-        missionScore += res.bonus;
+        const nowMs = performance.now();
+        const deltaScore = res.scoreDelta ?? res.bonus ?? 0;
+        anomalyPts += deltaScore;
+        missionScore += deltaScore;
         flareMitigated += 1;
+        if (res.batteryDelta) {
+          batterySoc = Math.max(0, Math.min(100, batterySoc + res.batteryDelta));
+          if (batterySoc <= 0.1) { brownoutLocked = true; batterySoc = 0; }
+        }
+        if (res.solarPauseSec > 0) solarChargePauseUntil = nowMs + res.solarPauseSec * 1000;
+        if (res.sensorOfflineSec > 0) sensorOfflineUntil = nowMs + res.sensorOfflineSec * 1000;
+        if (res.commsPauseSec > 0) commsPauseUntil = nowMs + res.commsPauseSec * 1000;
+        if (res.omniReducedCount > 0) omniReducedDownlinks += res.omniReducedCount;
         if (res.kind === 'cme') stormUntil = 0;
         repairSweepT = 1.0;
-        if (res.kind === 'debris' && res.damageTaken === 0) dodgeT = 1.0;
-        if (res.kind === 'cryo') heaterGlowT = 1.0;
+        if (res.kind === 'debris' && (res.hullDelta || 0) >= 0) dodgeT = 1.0;
+        if (res.kind === 'cryo' && (res.batteryDelta || 0) <= -20) heaterGlowT = 1.0;
+        if ((res.hullDelta || 0) <= -10) sparkFlashUntil = nowMs + 950;
         lastHudMs = 0;
         hazardEventCb?.({ type: 'resolve', ...res });
       },
       onExpire: (exp) => {
-        batterySoc = Math.max(5, batterySoc - (exp.batteryLoss || 8));
+        batterySoc = Math.max(0, batterySoc - (exp.batteryLoss || 18));
+        if (batterySoc <= 0.1) { brownoutLocked = true; batterySoc = 0; }
         if (exp.dataLossRatio > 0) bufferGb = Math.max(0, bufferGb * (1 - exp.dataLossRatio));
         if (exp.kind === 'cme') stormUntil = 0;
-        sparkFlashUntil = performance.now() + 1100;
+        sparkFlashUntil = performance.now() + 1200;
         lastHudMs = 0;
         hazardEventCb?.({ type: 'expire', ...exp });
       }

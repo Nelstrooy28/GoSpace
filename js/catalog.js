@@ -620,3 +620,146 @@ export const CELESTIAL_DATABASE = {
     scienceFact: 'Composed of pristine water ice, frozen CO₂, and silicate dust, active comets sprout twin plasma-ion and golden dust tails pushed away by solar radiation and solar wind. Rendezvous missions like ESA’s Rosetta orbiter and Philae lander sampled comet 67P’s organics up close.'
   }
 };
+
+export const HAZARD_PROTOCOLS = {
+  debris: {
+    kind: 'debris',
+    icon: '☄️',
+    title: 'MICROMETEOROID / DEBRIS CONJUNCTION',
+    detail: 'High-velocity orbital fragment cloud intersecting your ground track.',
+    durationSec: 14.0,
+    buildChoices: (state) => {
+      const hasThruster = ['cold-gas-rcs', 'green-monoprop', 'xenon-ion'].includes(state?.thermalId);
+      return [
+        hasThruster
+          ? {
+              index: 0, key: '1', label: 'Collision Avoidance Burn',
+              batteryDelta: -12, hullDelta: 0, scoreDelta: 40,
+              tone: 'amber', badges: [{ text: '0% Hull', cls: 'ok' }, { text: '-12% Batt', cls: 'warn' }, { text: '+40 PTS', cls: 'ok' }],
+              toast: '🚀 Collision Avoidance Burn Executed — Debris Cleared! (+40 PTS)'
+            }
+          : {
+              index: 0, key: '1', label: 'Edge-On Attitude Profile (Wheels)',
+              batteryDelta: 0, hullDelta: -4, scoreDelta: 40,
+              tone: 'amber', badges: [{ text: '-4% Hull Graze', cls: 'warn' }, { text: 'No Thruster', cls: 'warn' }, { text: '+40 PTS', cls: 'ok' }],
+              toast: '🛰️ Edge-On Attitude Profile Held — Minor Debris Graze! (+40 PTS)'
+            },
+        {
+          index: 1, key: '2', label: 'Feather Solar Arrays Edge-On',
+          batteryDelta: 0, hullDelta: 0, solarPauseSec: 8, scoreDelta: 30,
+          tone: 'green', badges: [{ text: '0% Hull', cls: 'ok' }, { text: '8s Solar Pause', cls: 'warn' }, { text: '+30 PTS', cls: 'ok' }],
+          toast: '🛡️ Solar Wings Feathered — Debris Cleared! (+30 PTS)'
+        },
+        {
+          index: 2, key: '3', label: 'Hold Nadir & Track Debris Flux',
+          batteryDelta: 0, hullDelta: -22, scoreDelta: 160,
+          tone: 'red', badges: [{ text: '+160 Science', cls: 'ok' }, { text: '-22% Hull', cls: 'bad' }],
+          toast: '🔭 Debris Flux Logged — Rare Impact Telemetry Captured! (+160 PTS)'
+        }
+      ];
+    }
+  },
+  cme: {
+    kind: 'cme',
+    icon: '☀️',
+    title: 'SOLAR PROTON STORM (CME)',
+    detail: 'Coronal mass ejection particle surge sweeping through magnetosphere.',
+    durationSec: 14.0,
+    buildChoices: () => [
+      {
+        index: 0, key: '1', label: 'Enter Faraday Safe-Hold',
+        batteryDelta: 0, hullDelta: 0, sensorOfflineSec: 8, commsPauseSec: 8, scoreDelta: 30,
+        tone: 'green', badges: [{ text: '0% Damage', cls: 'ok' }, { text: '8s Sensor/DL Pause', cls: 'warn' }, { text: '+30 PTS', cls: 'ok' }],
+        toast: '🛡️ Faraday Safe-Hold Engaged — Avionics Shielded! (+30 PTS)'
+      },
+      {
+        index: 1, key: '2', label: 'Magnetorquer Bus Reroute',
+        batteryDelta: -18, hullDelta: -5, scoreDelta: 75,
+        tone: 'amber', badges: [{ text: 'Sensors Active', cls: 'ok' }, { text: '-18% Batt', cls: 'warn' }, { text: '-5% Hull', cls: 'warn' }, { text: '+75 PTS', cls: 'ok' }],
+        toast: '🧲 Magnetorquer Bus Reroute Executed — Surge Dumped! (+75 PTS)'
+      },
+      {
+        index: 2, key: '3', label: 'Sample High-Energy Flare Plasma',
+        batteryDelta: -25, hullDelta: -18, scoreDelta: 190,
+        tone: 'red', badges: [{ text: '+190 Science', cls: 'ok' }, { text: '-25% Batt', cls: 'warn' }, { text: '-18% Hull', cls: 'bad' }],
+        toast: '⚡ High-Energy Flare Plasma Sampled! (+190 PTS)'
+      }
+    ]
+  },
+  cryo: {
+    kind: 'cryo',
+    icon: '❄️',
+    title: 'DEEP ECLIPSE THERMAL DROP',
+    detail: 'External skin and propellant lines dropping below -145 °C in deep umbra.',
+    durationSec: 14.0,
+    buildChoices: () => [
+      {
+        index: 0, key: '1', label: 'Engage Survival Heaters',
+        batteryDelta: -24, hullDelta: 0, scoreDelta: 40,
+        tone: 'amber', badges: [{ text: '0% Hull', cls: 'ok' }, { text: '-24% Batt', cls: 'warn' }, { text: '+40 PTS', cls: 'ok' }],
+        toast: '🔥 Survival Heaters Engaged — Bus Temp Stabilized! (+40 PTS)'
+      },
+      {
+        index: 1, key: '2', label: 'Passive Barbecue Thermal Roll',
+        batteryDelta: -6, hullDelta: 0, commsPauseSec: 7, scoreDelta: 50,
+        tone: 'green', badges: [{ text: '0% Hull', cls: 'ok' }, { text: '-6% Batt', cls: 'warn' }, { text: '7s DL Pause', cls: 'warn' }, { text: '+50 PTS', cls: 'ok' }],
+        toast: '🔄 Barbecue Thermal Roll Stabilized Bus! (+50 PTS)'
+      },
+      {
+        index: 2, key: '3', label: 'Cold-Soak Cryo Calibration',
+        batteryDelta: 0, hullDelta: -16, scoreDelta: 150,
+        tone: 'red', badges: [{ text: '+150 Science', cls: 'ok' }, { text: '-16% Hull', cls: 'bad' }],
+        toast: '❄️ Cold-Soak Cryo Baseline Calibrated! (+150 PTS)'
+      }
+    ]
+  },
+  gimbal: {
+    kind: 'gimbal',
+    icon: '📡',
+    title: 'HIGH-GAIN ANTENNA GIMBAL JAM',
+    detail: 'Primary parabolic dish actuator stalled off nadir station tracking axis.',
+    durationSec: 14.0,
+    buildChoices: () => [
+      {
+        index: 0, key: '1', label: 'Failover to Omni Backup Antenna',
+        batteryDelta: 0, hullDelta: 0, omniReducedCount: 1, scoreDelta: 35,
+        tone: 'green', badges: [{ text: '0% Cost', cls: 'ok' }, { text: 'Next DL 70% Pts', cls: 'warn' }, { text: '+35 PTS', cls: 'ok' }],
+        toast: '📡 Omni Backup Active — Next Downlink at 70% Pts! (+35 PTS)'
+      },
+      {
+        index: 1, key: '2', label: 'Surge Gimbal Heater & Torque',
+        batteryDelta: -18, hullDelta: 0, scoreDelta: 65,
+        tone: 'amber', badges: [{ text: '100% Dish', cls: 'ok' }, { text: '-18% Batt', cls: 'warn' }, { text: '+65 PTS', cls: 'ok' }],
+        toast: '⚙️ Gimbal De-Iced at Full Torque — 100% Dish Restored! (+65 PTS)'
+      },
+      {
+        index: 2, key: '3', label: 'Overdrive RF Power Amplifier',
+        batteryDelta: -20, hullDelta: -12, scoreDelta: 140,
+        tone: 'red', badges: [{ text: '+140 Science', cls: 'ok' }, { text: '-20% Batt', cls: 'warn' }, { text: '-12% Hull', cls: 'bad' }],
+        toast: '⚡ RF Amplifier Overdriven — Telemetry Forced Through! (+140 PTS)'
+      }
+    ]
+  }
+};
+
+export function getHazardProtocol(kind, missionState, batterySoc = 84) {
+  const tpl = HAZARD_PROTOCOLS[kind] || HAZARD_PROTOCOLS.debris;
+  const lowBattery = batterySoc < 15;
+  const choices = tpl.buildChoices(missionState).map((c) => {
+    const powerHeavy = (c.batteryDelta || 0) <= -12;
+    const lowBattWarn = lowBattery && powerHeavy;
+    return {
+      ...c,
+      lowBattWarn,
+      lowBattText: lowBattWarn ? 'LOW BATT -> BROWNOUT RISK' : ''
+    };
+  });
+  return {
+    kind: tpl.kind,
+    icon: tpl.icon,
+    title: tpl.title,
+    detail: tpl.detail,
+    durationSec: tpl.durationSec,
+    choices
+  };
+}

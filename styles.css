@@ -3148,6 +3148,201 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   border-radius: 6px;
 }
 
+/* ================================================================
+   MISSION CONTROL ANOMALY PROTOCOL (#hazard-alert-hud 3-Choice UI)
+   ================================================================ */
+#hazard-alert-hud,
+.hazard-alert-hud {
+  width: min(550px, calc(100vw - 360px));
+  padding: 13px 15px 14px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(248, 113, 113, 0.78);
+  border-left: 5px solid #ef4444;
+  background: linear-gradient(155deg, rgba(24, 10, 22, 0.94), rgba(10, 18, 36, 0.95));
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.72), 0 0 26px rgba(239, 68, 68, 0.25);
+  pointer-events: auto;
+}
+
+#hazard-alert-hud.is-nominal {
+  border-color: rgba(52, 211, 153, 0.75);
+  border-left-color: #10b981;
+  background: linear-gradient(155deg, rgba(6, 40, 32, 0.94), rgba(9, 20, 40, 0.95));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65), 0 0 24px rgba(16, 185, 129, 0.24);
+}
+
+.hazard-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hazard-kicker {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 9px 2px 7px;
+  background: linear-gradient(115deg, rgba(239, 68, 68, 0.34), rgba(245, 158, 11, 0.22));
+  border-left: 3px solid #f87171;
+  transform: skewX(-10deg);
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #fca5a5;
+}
+
+.hazard-title {
+  font-family: var(--font-hud);
+  font-size: 16px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.hazard-desc {
+  font-size: 14.5px;
+  line-height: 1.38;
+  color: #e2e8f0;
+  margin: 6px 0 8px;
+}
+
+.hazard-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.hazard-choice-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  background: rgba(15, 23, 42, 0.88);
+  color: #f8fafc;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hazard-choice-btn:hover {
+  transform: translateX(3px);
+}
+
+.hazard-choice-btn.tone-green {
+  border-color: rgba(52, 211, 153, 0.55);
+  border-left: 4px solid #10b981;
+}
+
+.hazard-choice-btn.tone-green:hover {
+  background: rgba(6, 78, 59, 0.55);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.28);
+}
+
+.hazard-choice-btn.tone-amber {
+  border-color: rgba(251, 191, 36, 0.58);
+  border-left: 4px solid #f59e0b;
+}
+
+.hazard-choice-btn.tone-amber:hover {
+  background: rgba(120, 53, 15, 0.52);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.26);
+}
+
+.hazard-choice-btn.tone-red {
+  border-color: rgba(248, 113, 113, 0.62);
+  border-left: 4px solid #ef4444;
+}
+
+.hazard-choice-btn.tone-red:hover {
+  background: rgba(127, 29, 29, 0.52);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.28);
+}
+
+.hazard-choice-btn.has-lowbatt {
+  border-color: rgba(251, 146, 60, 0.85);
+  background: rgba(67, 20, 7, 0.72);
+}
+
+.hazard-choice-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hazard-keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(30, 41, 59, 0.96);
+  border: 1px solid rgba(56, 189, 248, 0.65);
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #67e8f9;
+  flex-shrink: 0;
+}
+
+.hazard-choice-label {
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.hazard-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
+}
+
+.haz-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 700;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(30, 41, 59, 0.82);
+  color: #e2e8f0;
+}
+
+.haz-badge.is-ok {
+  background: rgba(6, 95, 70, 0.58);
+  border-color: rgba(52, 211, 153, 0.7);
+  color: #a7f3d0;
+}
+
+.haz-badge.is-warn {
+  background: rgba(146, 64, 14, 0.58);
+  border-color: rgba(251, 191, 36, 0.72);
+  color: #fde68a;
+}
+
+.haz-badge.is-bad {
+  background: rgba(153, 27, 27, 0.62);
+  border-color: rgba(248, 113, 113, 0.75);
+  color: #fecaca;
+}
+
+.hazard-lowbatt-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(217, 119, 6, 0.34);
+  border: 1px solid #fb923c;
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #fed7aa;
+}
+
 /* Always honor HTML [hidden] above all ID display rules */
 [hidden],
 #hangar-loadout[hidden],
@@ -3158,6 +3353,7 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 #orbit-deploy-banner[hidden],
 #holo-scanner-card[hidden],
 #autobuild-btn[hidden],
+#hazard-alert-hud[hidden],
 #decision-alert-hud[hidden],
 #mission-progress-bar[hidden],
 #codex-menu[hidden],
