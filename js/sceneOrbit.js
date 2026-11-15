@@ -1740,16 +1740,16 @@ function animate() {
   if (overlayEl) {
     if (brownoutLocked) {
       const flickerOn = Math.sin(now * 0.025) > -0.35;
-      overlayEl.textContent = `⚡ BROWNOUT — RECHARGING (${Math.round(batterySoc)}% -> 15%)`;
+      overlayEl.textContent = `BROWNOUT — RECHARGING (${Math.round(batterySoc)}% -> 15%)`;
       overlayEl.style.opacity = flickerOn ? '1' : '0.45';
       overlayEl.hidden = false;
     } else if (offlineRem > 0) {
       overlayEl.style.opacity = '1';
-      overlayEl.textContent = `🛡️ SENSORS SHIELDED — OFFLINE (${offlineRem.toFixed(1)}s)`;
+      overlayEl.textContent = `SENSORS SHIELDED — OFFLINE (${offlineRem.toFixed(1)}s)`;
       overlayEl.hidden = false;
     } else if (driftRem > 0) {
       overlayEl.style.opacity = '1';
-      overlayEl.textContent = `🔬 Sensor Re-calibrating... (${driftRem.toFixed(1)}s)`;
+      overlayEl.textContent = `SENSOR RE-CALIBRATING (${driftRem.toFixed(1)}s)`;
       overlayEl.hidden = false;
     } else {
       overlayEl.style.opacity = '1';
@@ -1902,7 +1902,7 @@ function drawSensorCamFeed(latDeg, lonDeg, inEclipse, stormActive, tReal, tSim) 
   let telemText = formatLatLon(latDeg, lonDeg);
 
   const titleEl = document.getElementById('sensor-pip-title');
-  if (titleEl) titleEl.textContent = `📷 ${spec.label}`;
+  if (titleEl) titleEl.textContent = spec.label;
   const lightEl = document.getElementById('sensor-pip-light');
   if (lightEl) {
     lightEl.textContent = stormActive ? 'SOLAR STORM' : (inEclipse ? 'ECLIPSE' : 'SUNLIT');
@@ -2133,7 +2133,7 @@ function drawSensorCamFeed(latDeg, lonDeg, inEclipse, stormActive, tReal, tSim) 
     ctx.fillRect(8, h - 26, w - 16, 20);
     ctx.fillStyle = '#fecaca';
     ctx.font = '700 11px Orbitron, sans-serif';
-    ctx.fillText('⚠ SPECTRAL MISMATCH · -40% SCI', 14, h - 12);
+    ctx.fillText('SPECTRAL MISMATCH · -40% SCI', 14, h - 12);
   }
 
   const telemEl = document.getElementById('sensor-pip-telem');

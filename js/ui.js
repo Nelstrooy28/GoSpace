@@ -1,4 +1,5 @@
 import { CATALOG, CELESTIAL_DATABASE, OFFICIAL_RESOURCES, SCENARIOS, getMissionOrbitGuide, getOrbitActiveDebuffs, getOrbitObjectivesStatus } from './catalog.js';
+import { svgIcon, svgStars, stripEmoji } from './icons.js';
 import { playRankStamp, playStarChime } from './sfx.js';
 
 let debriefTimers = [];
@@ -13,14 +14,10 @@ function cancelDebriefAnim() {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function trimWords(text, maxWords = 12) {
-  const clean = String(text ?? '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').replace(/\s+/g, ' ').trim();
+  const clean = stripEmoji(text);
   const words = clean.split(' ').filter(Boolean);
   if (words.length <= maxWords) return clean;
-  return `${words.slice(0, maxWords).join(' ')}…`;
-}
-
-function stripEmoji(text) {
-  return String(text ?? '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').replace(/\s+/g, ' ').trim();
+  return `${words.slice(0, maxWords).join(' ')}...`;
 }
 
 export const SUB_TABS = {
@@ -44,7 +41,7 @@ const cardHtml = ({ field, id, name, pills, selected, ok = true, multi = false, 
     <div class="equip-head equip-row-top">
       <span class="equip-name" title="${esc(name)}">${esc(name)}</span>
       ${selected
-        ? '<span class="equip-check-badge" title="Equipped" aria-label="Equipped">✓</span>'
+        ? `<span class="equip-check-badge" title="Equipped" aria-label="Equipped">${svgIcon('check')}</span>`
         : `<span class="spill ${ok ? 'ok' : 'bad'}">${ok ? '+' : '!'}</span>`}
     </div>
     <div class="stat-pills equip-row-stats">${pills.slice(0, 3).map((p) => `<span class="spill">${esc(p)}</span>`).join('')}</div>
@@ -114,20 +111,22 @@ export function renderTitleOverlay(sandboxMode, activeScenarioId, progressMap = 
     const m = CONTRACT_META[s.id] || { title: s.name, wave: 'OBS', obj: trimWords(s.summary, 9) };
     const selected = s.id === activeScenarioId;
     const prog = progressMap[s.id];
+    const diffStars = Math.max(1, Math.min(3, (s.stars || '').split('★').length - 1 || s.level || 1));
+    const earnedStars = Math.max(1, Math.min(3, prog?.stars || 1));
     const statusBadge = prog?.status === 'completed'
-      ? `<span class="contract-status-badge is-done">${'★'.repeat(Math.max(1, Math.min(3, prog.stars || 1)))}</span>`
+      ? `<span class="contract-status-badge is-done">${svgStars(earnedStars, earnedStars)}</span>`
       : (prog?.status === 'in_progress'
         ? '<span class="contract-status-badge is-progress">ACTIVE</span>'
         : '<span class="contract-status-badge">NEW</span>');
     const budBadge = sandboxMode
-      ? '<span class="spill ok">∞</span>'
+      ? '<span class="spill ok">INF</span>'
       : `<span class="spill ok">$${s.budgetLimitM}M</span>`;
     return `
     <div class="contract-card ${selected ? 'selected' : ''}" data-start-scenario="${s.id}" role="button" tabindex="0">
       <div class="contract-art">${CONTRACT_ART[s.id] || ''}</div>
       <div class="contract-body">
         <div class="contract-top">
-          <span class="contract-stars">${s.stars}</span>
+          <span class="contract-stars" aria-label="Difficulty ${diffStars} of 3">${svgStars(diffStars, 3)}</span>
           ${statusBadge}
         </div>
         <h3 class="contract-title">${esc(m.title)}</h3>
@@ -175,15 +174,16 @@ function getGaugeRows(ev) {
   const c = ev?.constraints;
   if (!c) return [];
   const entries = [
-    { key: 'BUD', c: c.budget },
-    { key: 'MASS', c: c.mass },
-    { key: 'PWR', c: c.power },
-    { key: 'DATA', c: c.data },
-    { key: 'LIFE', c: c.lifetime },
-    { key: 'SCI', c: c.science }
+    { key: 'BUD', icon: 'budget', c: c.budget },
+    { key: 'MASS', icon: 'mass', c: c.mass },
+    { key: 'PWR', icon: 'power', c: c.power },
+    { key: 'DATA', icon: 'data', c: c.data },
+    { key: 'LIFE', icon: 'lifetime', c: c.lifetime },
+    { key: 'SCI', icon: 'science', c: c.science }
   ];
-  return entries.map(({ key, c: item }) => ({
+  return entries.map(({ key, icon, c: item }) => ({
     key,
+    icon,
     title: item.title,
     val: item.displayText,
     isInf: Boolean(item.isSandbox),
@@ -201,6 +201,7 @@ export function renderHud(ev, stage, opts = {}) {
   const run = opts.runSession || {};
   const unlocked = opts.unlockedStages || { hangar: true, launch: Boolean(allPopulated), orbit: false, review: false };
   const stageLabels = { hangar: '01 HANGAR', launch: '02 PAD', orbit: '03 ORBIT', review: '04 REVIEW' };
+  const stageIcons = { hangar: 'hangar', launch: 'launchpad', orbit: 'orbit', review: 'debrief' };
   const lockReasons = {
     hangar: 'Mission Hangar',
     launch: unlocked.launch ? 'Launchpad' : 'Locked: Equip all 4 segments',
@@ -218,7 +219,7 @@ export function renderHud(ev, stage, opts = {}) {
     if (isBreadcrumb) b.setAttribute('tabindex', '-1');
     else b.removeAttribute('tabindex');
     b.title = lockReasons[s] || '';
-    b.textContent = stageLabels[s];
+    b.innerHTML = `${svgIcon(stageIcons[s])}<span class="stage-lbl">${stageLabels[s]}</span>`;
   });
 
   const slBtn = document.getElementById('save-load-btn');
@@ -254,7 +255,7 @@ export function renderHud(ev, stage, opts = {}) {
       ? `<div class="gm-tip-debuff">${esc(g.orbitSideEffect)}</div><div class="gm-tip-fix">Fix: ${esc(g.fixTab)}</div>`
       : `<div class="gm-tip-ok">Nominal</div>`;
     return `<div class="gm-item ${itemTone}" tabindex="0" data-constraint="${g.key}" aria-label="${esc(`${g.title} ${g.val}: ${g.reason}`)}">
-      <div class="gm-top"><span>${g.key}</span><b class="${valClass}">${esc(g.val)}</b></div>
+      <div class="gm-top"><span>${svgIcon(g.icon)}${g.key}</span><b class="${valClass}">${esc(g.val)}</b></div>
       <div class="gm-bar"><div class="gm-fill ${toneClass}" style="width:${g.pct}%"></div></div>
       <div class="gm-tooltip" role="tooltip">
         <div class="gm-tip-head"><span>${esc(g.title)}</span><b>${esc(g.val)}</b></div>
@@ -275,22 +276,22 @@ export function renderHud(ev, stage, opts = {}) {
   cta.classList.toggle('is-risk', stage === 'hangar' && hasRisks);
   if (stage === 'hangar') {
     cta.disabled = !allPopulated;
-    cta.textContent = !allPopulated ? 'Equip Parts' : (hasRisks ? 'Launch Risks' : 'Roll Out');
+    cta.innerHTML = !allPopulated ? `${svgIcon('lock')}Equip Parts` : (hasRisks ? `${svgIcon('warning')}Launch Risks` : `${svgIcon('rocket')}Roll Out`);
     cta.title = !allPopulated ? 'Equip all 4 mission segments' : (hasRisks ? warnings.map((w) => w.text).join(' | ') : 'Roll out to launchpad');
   } else if (stage === 'launch') {
     const readyOrbit = Boolean(unlocked.orbit);
     cta.disabled = !readyOrbit;
-    cta.textContent = readyOrbit ? 'Orbit' : 'Ascent...';
+    cta.innerHTML = readyOrbit ? `${svgIcon('orbit')}Orbit` : `${svgIcon('rocket')}Ascent...`;
     cta.title = readyOrbit ? 'Enter Orbit' : 'Complete ascent first';
   } else if (stage === 'orbit') {
     const canFinish = Boolean(run.orbitObjectivesMet);
     cta.disabled = !canFinish;
     cta.classList.toggle('is-ready', canFinish);
-    cta.textContent = canFinish ? 'Debrief' : 'In Progress';
+    cta.innerHTML = canFinish ? `${svgIcon('debrief')}Debrief` : `${svgIcon('orbit')}In Progress`;
     cta.title = canFinish ? 'Open Mission Review' : 'Complete orbit objectives first';
   } else {
     cta.disabled = false;
-    cta.textContent = 'Hangar';
+    cta.innerHTML = `${svgIcon('hangar')}Hangar`;
     cta.title = 'Return to Hangar';
   }
 
@@ -315,16 +316,13 @@ export function renderStageHud(stage, state, ev, opts) {
   if (stage === 'hangar') {
     hud.innerHTML = `<div class="stage-card plate cam-pill-card">
       <button id="vp-autorotate-btn" class="btn-sci ${opts.autoRotate ? 'is-on' : ''}" type="button" title="Toggle Auto-Rotate">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.5"/><path d="M13 2v3h-3"/></svg>
-        <span>Rotate</span>
+        ${svgIcon('rotate')}<span>Rotate</span>
       </button>
       <button id="vp-explode-btn" class="btn-sci ${opts.exploded ? 'is-on' : ''}" type="button" title="Explode View">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 5L2 2M11 5l3-3M5 11l-3 3M11 11l3 3"/><rect x="5" y="5" width="6" height="6" rx="1"/></svg>
-        <span>Explode</span>
+        ${svgIcon('explode')}<span>Explode</span>
       </button>
       <button id="vp-reset-btn" class="btn-sci" type="button" title="Reset View">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="2"/><path d="M2 5V2h3M11 2h3v3M2 11v3h3M11 14h3v-3"/></svg>
-        <span>Reset</span>
+        ${svgIcon('target')}<span>Reset</span>
       </button>
     </div>`;
     actions.innerHTML = '';
@@ -340,7 +338,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <span>ASCENT</span>
         <div class="ascent-head-right">
           <span id="launch-phase-pill" class="badge-tag">ARMED</span>
-          <button id="lch-skip-btn" class="btn-sci active skip-launch-btn" data-action="skip-launch" type="button" title="Skip to Orbit [ESC]">Skip</button>
+          <button id="lch-skip-btn" class="btn-sci active skip-launch-btn" data-action="skip-launch" type="button" title="Skip to Orbit [ESC]">${svgIcon('skip')}Skip</button>
         </div>
       </div>
       <div class="ascent-stats-grid">
@@ -360,28 +358,28 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.launchCam === 'free' ? 'is-on' : ''}" data-lcam="free" type="button">Free</button>
       </div>
     </div>`;
-    actions.innerHTML = `<button id="lch-ignite-btn" class="action-prompt is-ignite" type="button">IGNITE <span class="keycap">SPACE</span></button>`;
+    actions.innerHTML = `<button id="lch-ignite-btn" class="action-prompt is-ignite cta-btn" type="button">${svgIcon('rocket')}IGNITE <span class="keycap">SPACE</span></button>`;
     return;
   }
 
   if (stage === 'orbit') {
     const testHazBtn = state.sandboxMode === true
-      ? '<button id="orb-test-hazard-btn" class="btn-sci danger" type="button">Hazard</button>'
+      ? `<button id="orb-test-hazard-btn" class="btn-sci danger" type="button">${svgIcon('warning')}Hazard</button>`
       : '';
     const unfoldBtn = !opts.deployCompleted
-      ? '<button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Unfold Arrays [U]">Unfold <span class="keycap">U</span></button>'
+      ? `<button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Unfold Arrays [U]">${svgIcon('spacecraft')}Unfold <span class="keycap">U</span></button>`
       : '';
     const debOk = Boolean(opts.orbitObjectivesMet);
     const bufPkts = opts.onboardBuffer || 0;
     const battInit = opts.batterySoc ?? 84;
     const wVal = Number(opts.orbitWarp ?? 1);
     const warpBtns = [
-      { w: 0, label: '⏸' },
-      { w: 1, label: '1x' },
-      { w: 5, label: '5x' },
-      { w: 20, label: '20x' },
-      { w: 100, label: '100x' }
-    ].map((b) => `<button class="btn-sci warp-btn ${wVal === b.w ? 'active is-on' : ''}" data-warp="${b.w}" type="button">${b.label}</button>`).join('');
+      { w: 0, html: svgIcon('pause'), label: 'Pause' },
+      { w: 1, html: `${svgIcon('play')}1x`, label: '1x' },
+      { w: 5, html: '5x', label: '5x' },
+      { w: 20, html: '20x', label: '20x' },
+      { w: 100, html: '100x', label: '100x' }
+    ].map((b) => `<button class="btn-sci warp-btn ${wVal === b.w ? 'active is-on' : ''}" data-warp="${b.w}" type="button" title="Time Warp ${b.label}">${b.html}</button>`).join('');
 
     hud.innerHTML = `<div class="stage-card plate orbit-ops-card">
       <div class="card-head">
@@ -393,9 +391,9 @@ export function renderStageHud(stage, state, ev, opts) {
       </div>
 
       <div class="hull-meter-row">
-        <div class="hull-meter-head"><span>HULL</span><span id="orb-hull-pct" class="tabular">${opts.hullIntegrity ?? 100}%</span></div>
+        <div class="hull-meter-head"><span class="hull-meter-lbl">${svgIcon('hull')}HULL</span><span id="orb-hull-pct" class="tabular">${opts.hullIntegrity ?? 100}%</span></div>
         <div class="hull-meter-track"><div id="orb-hull-fill" class="hull-meter-fill" style="width:${opts.hullIntegrity ?? 100}%"></div></div>
-        <div class="hull-meter-head"><span>BATT</span><span id="orb-batt-pct" class="tabular">${battInit}%</span></div>
+        <div class="hull-meter-head"><span class="hull-meter-lbl">${svgIcon('battery')}BATT</span><span id="orb-batt-pct" class="tabular">${battInit}%</span></div>
         <div class="hull-meter-track"><div id="orb-batt-fill" class="hull-meter-fill" style="width:${battInit}%"></div></div>
       </div>
 
@@ -415,18 +413,18 @@ export function renderStageHud(stage, state, ev, opts) {
       </div>
 
       <div class="btn-row">
-        <button id="orb-sensorcam-btn" class="btn-sci ${opts.sensorCamOpen ? 'is-on' : ''}" type="button" title="Sensor Cam [C]">Cam <span class="keycap">C</span></button>
-        <button id="hud-mission-guide-btn" class="btn-sci" type="button">Guide</button>
+        <button id="orb-sensorcam-btn" class="btn-sci ${opts.sensorCamOpen ? 'is-on' : ''}" type="button" title="Sensor Cam [C]">${svgIcon('camera')}Cam <span class="keycap">C</span></button>
+        <button id="hud-mission-guide-btn" class="btn-sci" type="button">${svgIcon('help')}Guide</button>
         ${unfoldBtn}
         ${testHazBtn}
-        <button id="orb-debrief-btn" class="btn-sci ${debOk ? 'active' : ''}" type="button" ${debOk ? '' : 'disabled title="Finish orbit tasks first"'}>${debOk ? 'Debrief' : 'Locked'}</button>
+        <button id="orb-debrief-btn" class="btn-sci ${debOk ? 'active' : ''}" type="button" ${debOk ? '' : 'disabled title="Finish orbit tasks first"'}>${svgIcon(debOk ? 'debrief' : 'lock')}${debOk ? 'Debrief' : 'Locked'}</button>
       </div>
     </div>`;
 
     actions.innerHTML = `<div class="flight-deck-stack">
       <div class="flight-action-row">
-        <button id="orb-scan-btn" class="action-prompt is-status-pill" type="button" hidden><span class="keycap">E</span> SCAN</button>
-        <button id="orb-transmit-btn" class="action-prompt is-cyan" type="button" hidden><span class="keycap">SPC</span> DOWNLINK</button>
+        <button id="orb-scan-btn" class="action-prompt is-status-pill" type="button" hidden>${svgIcon('scan')}<span class="keycap">E</span> SCAN</button>
+        <button id="orb-transmit-btn" class="action-prompt is-cyan cta-btn" type="button" hidden>${svgIcon('transmit')}<span class="keycap">SPC</span> DOWNLINK</button>
       </div>
       <div class="warp-pill-bar plate" role="group" aria-label="Time Warp">${warpBtns}</div>
     </div>`;
@@ -463,8 +461,8 @@ export function renderStageHud(stage, state, ev, opts) {
     : starCount === 3
       ? { label: 'A-RANK // COMMANDER', cls: 'rank-a', tip: '' }
       : starCount === 2
-        ? { label: 'B-RANK // ENGINEER', cls: 'rank-b', tip: budgetOverrun ? 'Budget overrun capped max rating at 2 ★.' : 'Reach CML 4 & >=85% Science for 3 ★.' }
-        : { label: 'MISSION AT RISK', cls: 'rank-risk', tip: 'Resolve Hangar warnings and complete orbit downlink for 3 ★.' };
+        ? { label: 'B-RANK // ENGINEER', cls: 'rank-b', tip: budgetOverrun ? 'Budget overrun capped max rating at 2 stars.' : 'Reach CML 4 & >=85% Science for 3 stars.' }
+        : { label: 'MISSION AT RISK', cls: 'rank-risk', tip: 'Resolve Hangar warnings and complete orbit downlink for 3 stars.' };
 
   const busObj = CATALOG.space.buses.find((b) => b.id === state.busId);
   const bandObj = CATALOG.user.wavelengths.find((w) => w.id === state.wavelengthBand);
@@ -503,7 +501,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <h2 class="debrief-title">${esc(scenario.name)}</h2>
         <div class="debrief-sub">${esc(orbitElements.name)} · Hull ${hullFinal}% · ${resolvedCount} Resolved</div>
       </div>
-      <button id="rev-close-btn" class="debrief-close-btn" type="button">Close <span class="keycap">ESC</span></button>
+      <button id="rev-close-btn" class="btn-sci debrief-close-btn" type="button">${svgIcon('close')}Close <span class="keycap">ESC</span></button>
     </div>
 
     <div class="debrief-hero-band">
@@ -545,7 +543,7 @@ export function renderStageHud(stage, state, ev, opts) {
           <span class="holo-pill">Bus: ${esc(busObj?.name || state.busId)}</span>
         </div>
         <div class="holo-telemetry-mini">
-          <span>Bud ${sandboxMode ? '∞' : `$${metrics.budget.usedM}M`}</span>
+          <span>Bud ${sandboxMode ? 'INF' : `$${metrics.budget.usedM}M`}</span>
           <span>Pwr ${metrics.powerMargin}%</span>
           <span>Sci ${metrics.scienceScore}%</span>
         </div>
@@ -553,9 +551,9 @@ export function renderStageHud(stage, state, ev, opts) {
     </div>
 
     <div class="debrief-footer-nav">
-      <button id="rev-menu-btn" class="debrief-cta" type="button">Main Menu</button>
-      <button id="rev-export-btn" class="debrief-cta" type="button">Export JSON</button>
-      <button id="rev-next-btn" class="debrief-cta is-primary" type="button">Next Mission</button>
+      <button id="rev-menu-btn" class="btn-sci debrief-cta" type="button">${svgIcon('home')}Main Menu</button>
+      <button id="rev-export-btn" class="btn-sci debrief-cta" type="button">${svgIcon('export')}Export JSON</button>
+      <button id="rev-next-btn" class="btn-sci debrief-cta cta-btn is-primary" type="button">${svgIcon('rocket')}Next Mission</button>
     </div>
   </div>`;
 
@@ -655,7 +653,7 @@ export function updateOrbitOverlay(t, objStatus = null) {
         const shortDesc = trimWords(haz.detail, 12);
         hazBox.innerHTML = `<div class="hazard-head">
             <div class="hazard-title-wrap">
-              <span class="hazard-kicker">ANOMALY</span>
+              <span class="hazard-kicker">${svgIcon('warning')} ANOMALY</span>
               <span class="hazard-title">${esc(stripEmoji(haz.title))}</span>
             </div>
             <span id="hazard-timer-pill" class="hazard-timer-pill">${haz.remainingSec.toFixed(1)}s</span>
@@ -666,11 +664,11 @@ export function updateOrbitOverlay(t, objStatus = null) {
             ${(haz.choices || []).map((c) => {
               const primaryBadge = c.badges && c.badges.length ? c.badges[0] : null;
               const impactTag = c.lowBattWarn
-                ? `<span class="haz-badge is-bad">${esc(stripEmoji(c.lowBattText || 'LOW BATT'))}</span>`
+                ? `<span class="haz-badge is-bad">${svgIcon('battery')} ${esc(stripEmoji(c.lowBattText || 'LOW BATT'))}</span>`
                 : (primaryBadge ? `<span class="haz-badge is-${esc(primaryBadge.cls || 'warn')}">${esc(stripEmoji(primaryBadge.text))}</span>` : '');
               return `<button class="hazard-choice-btn tone-${esc(c.tone || 'amber')}${c.lowBattWarn ? ' has-lowbatt' : ''}" data-choice-idx="${c.index}" type="button">
                 <div class="hazard-choice-top">
-                  <span class="hazard-keycap">${esc(c.key)}</span>
+                  <span class="hazard-keycap keycap">${esc(c.key)}</span>
                   <span class="hazard-choice-label">${esc(stripEmoji(c.label))}</span>
                 </div>
                 ${impactTag ? `<div class="hazard-badges">${impactTag}</div>` : ''}
@@ -697,7 +695,7 @@ export function updateOrbitOverlay(t, objStatus = null) {
         const pillStyle = isTimeout
           ? 'background:rgba(239,68,68,0.22);border-color:#ef4444;color:#fecaca'
           : 'background:rgba(16,185,129,0.22);border-color:#10b981;color:#d1fae5';
-        hazBox.innerHTML = `<div class="hazard-head" style="color:${isTimeout ? '#fecaca' : '#6ee7b7'}"><span>${esc(headText)}</span><span class="hazard-timer-pill" style="${pillStyle}">${esc(badgeText)}</span></div>
+        hazBox.innerHTML = `<div class="hazard-head" style="color:${isTimeout ? '#fecaca' : '#6ee7b7'}"><span>${svgIcon(isTimeout ? 'explode' : 'check')} ${esc(headText)}</span><span class="hazard-timer-pill" style="${pillStyle}">${esc(badgeText)}</span></div>
           <div class="hazard-desc">${esc(descText)}</div>`;
       }
     } else {
@@ -727,49 +725,49 @@ export function updateOrbitOverlay(t, objStatus = null) {
     const showTxPill = readyToTx || (hasLinkLock && (bufPkts >= 1 || Boolean(t?.brownoutLocked) || dlPaused));
     tx.hidden = !showTxPill;
     tx.disabled = Boolean(destroyed || t?.brownoutLocked || dlPaused);
-    tx.classList.remove('is-cooldown', 'is-standby', 'is-cyan', 'is-status-pill');
+    tx.classList.remove('cta-btn', 'is-cooldown', 'is-standby', 'is-cyan', 'is-status-pill');
     if (t?.brownoutLocked) {
-      tx.innerHTML = 'BROWNOUT &lt;15%';
+      tx.innerHTML = `${svgIcon('warning')} BROWNOUT &lt;15%`;
     } else if (dlPaused) {
-      tx.innerHTML = `DL PAUSED ${t.commsPausedSec}s`;
+      tx.innerHTML = `${svgIcon('pause')} DL PAUSED ${t.commsPausedSec}s`;
     } else if (dlCooling) {
-      tx.innerHTML = `COOLDOWN ${t.downlinkCooldownSec || 1}s`;
+      tx.innerHTML = `${svgIcon('transmit')} COOLDOWN ${t.downlinkCooldownSec || 1}s`;
       tx.classList.add('is-status-pill');
     } else if (readyToTx) {
       let pts = 50;
       const weakComms = Boolean(t?.activeDebuffs?.dataBottleneck?.active);
       if (weakComms) pts = Math.round(pts * 0.5);
       if ((t?.omniReducedDownlinks || 0) > 0) pts = Math.round(pts * 0.7);
-      tx.classList.add('is-cyan');
-      tx.innerHTML = `<span class="keycap">SPC</span> DOWNLINK +${pts}`;
+      tx.classList.add('is-cyan', 'cta-btn');
+      tx.innerHTML = `${svgIcon('transmit')} <span class="keycap">SPC</span> DOWNLINK +${pts}`;
     }
   }
 
   const scanBtn = document.getElementById('orb-scan-btn');
   if (scanBtn) {
     scanBtn.disabled = destroyed || Boolean(t?.brownoutLocked) || Boolean(t?.sensorCalibrating);
-    scanBtn.classList.remove('is-swath-ready', 'is-cooldown', 'is-standby', 'is-cyan', 'is-status-pill');
+    scanBtn.classList.remove('cta-btn', 'is-swath-ready', 'is-cooldown', 'is-standby', 'is-cyan', 'is-status-pill');
     if (destroyed) {
       scanBtn.hidden = true;
     } else if (t?.sensorCalibrating) {
       scanBtn.hidden = false;
-      scanBtn.innerHTML = `RE-CAL ${t.sensorCalibratingSec || 1}s`;
+      scanBtn.innerHTML = `${svgIcon('rotate')} RE-CAL ${t.sensorCalibratingSec || 1}s`;
       scanBtn.classList.add('is-status-pill');
     } else if (t?.swathReady) {
       scanBtn.hidden = false;
       const basePts = t.swathZonePoints || 60;
       const sciBad = Boolean(t?.activeDebuffs?.scienceMismatch?.active);
       const scanPts = sciBad ? Math.round(basePts * 0.6) : basePts;
-      scanBtn.innerHTML = `<span class="keycap">E</span> SCAN +${scanPts}`;
-      scanBtn.classList.add('is-swath-ready');
+      scanBtn.innerHTML = `${svgIcon('scan')} <span class="keycap">E</span> SCAN +${scanPts}`;
+      scanBtn.classList.add('is-swath-ready', 'cta-btn');
     } else if ((t?.swathCooldownSec || 0) > 0) {
       scanBtn.hidden = false;
-      scanBtn.innerHTML = `ZONE ${t.swathCooldownSec}s`;
+      scanBtn.innerHTML = `${svgIcon('target')} ZONE ${t.swathCooldownSec}s`;
       scanBtn.classList.add('is-status-pill');
     } else if (t?.nextZoneName) {
       scanBtn.hidden = false;
       const degPart = typeof t.nextZoneDeg === 'number' && t.nextZoneDeg > 0 ? `${t.nextZoneDeg}°` : '~';
-      scanBtn.innerHTML = `GATE ${degPart}`;
+      scanBtn.innerHTML = `${svgIcon('target')} GATE ${degPart}`;
       scanBtn.classList.add('is-status-pill');
     } else {
       scanBtn.hidden = true;
@@ -785,9 +783,10 @@ export function updateOrbitOverlay(t, objStatus = null) {
   if (debBtn) {
     debBtn.disabled = !dlDone;
     debBtn.classList.toggle('active', dlDone);
-    debBtn.textContent = dlDone
-      ? 'Debrief'
-      : `${objStatus ? `${objStatus.completedCount}/${objStatus.totalCount}` : `${Math.min(t?.downlinkCount || 0, 1)}/1`}`;
+    debBtn.classList.toggle('cta-btn', dlDone);
+    debBtn.innerHTML = dlDone
+      ? `${svgIcon('check')} Debrief`
+      : `${svgIcon('goal')} ${objStatus ? `${objStatus.completedCount}/${objStatus.totalCount}` : `${Math.min(t?.downlinkCount || 0, 1)}/1`}`;
   }
   const db = document.getElementById('orbit-deploy-banner');
   if (db) {
@@ -828,11 +827,11 @@ export function renderMissionBriefing(ev, stage, open) {
   el.innerHTML = `<div class="briefing-card plate" role="dialog" aria-modal="true" aria-labelledby="brief-title-heading">
     <div class="brief-topbar">
       <div class="brief-head-copy">
-        <span class="brief-kicker">ORBIT BRIEFING</span>
-        <h2 id="brief-title-heading" class="brief-title">${esc(guide.headline)}</h2>
-        <div class="brief-sub">${esc(ev.orbitElements.name)} · ${esc(ev.metrics.mass.totalKg)} kg</div>
+        <span class="brief-kicker">${svgIcon('orbit')} ORBIT BRIEFING</span>
+        <h2 id="brief-title-heading" class="brief-title">${esc(stripEmoji(guide.headline))}</h2>
+        <div class="brief-sub">${esc(stripEmoji(ev.orbitElements.name))} · ${esc(ev.metrics.mass.totalKg)} kg</div>
       </div>
-      <button id="brief-close-btn" class="brief-close-btn" type="button" title="Close [ESC]" aria-label="Close">✕</button>
+      <button id="brief-close-btn" class="brief-close-btn" type="button" title="Close [ESC]" aria-label="Close">${svgIcon('close')}</button>
     </div>
 
     <section class="brief-story">
@@ -850,14 +849,14 @@ export function renderMissionBriefing(ev, stage, open) {
     </div>
 
     <div class="brief-keybinds" aria-label="Controls">
-      <span><kbd>E</kbd> Scan</span>
-      <span><kbd>SPC</kbd> Downlink</span>
-      <span><kbd>1-3</kbd> Hazard</span>
-      <span><kbd>U</kbd> Unfold</span>
+      <span><span class="keycap">E</span> Scan</span>
+      <span><span class="keycap">SPC</span> Downlink</span>
+      <span><span class="keycap">1-3</span> Hazard</span>
+      <span><span class="keycap">U</span> Unfold</span>
     </div>
 
     <div class="brief-actions">
-      <button id="brief-start-btn" class="brief-start-btn" type="button">${startLabel} <span class="keycap">SPACE</span></button>
+      <button id="brief-start-btn" class="brief-start-btn cta-btn" type="button">${svgIcon('play')} ${startLabel} <span class="keycap">SPACE</span></button>
     </div>
   </div>`;
 }
@@ -881,15 +880,15 @@ export function renderHoloScannerCard(holoId, focusedHoloId = null) {
   card.innerHTML = `<div class="holo-scan-head">
     <div class="holo-scan-title-wrap">
       <div>
-        <div class="holo-scan-kicker">SCANNER</div>
-        <h3 class="holo-scan-name">${esc(data.name)}</h3>
+        <div class="holo-scan-kicker">${svgIcon('target')} SCANNER</div>
+        <h3 class="holo-scan-name">${esc(stripEmoji(data.name))}</h3>
       </div>
     </div>
-    <button id="holo-close-btn" class="holo-scan-close" type="button" aria-label="Close">✕</button>
+    <button id="holo-close-btn" class="holo-scan-close" type="button" aria-label="Close">${svgIcon('close')}</button>
   </div>
 
   <div class="holo-scan-class-row">
-    <span class="holo-class-pill">${esc(data.classification)}</span>
+    <span class="holo-class-pill">${esc(stripEmoji(data.classification))}</span>
     <span class="holo-dist-pill">${esc(data.stats.distanceAU)}</span>
   </div>
 
@@ -901,8 +900,8 @@ export function renderHoloScannerCard(holoId, focusedHoloId = null) {
   <p class="holo-scan-fact">${esc(trimWords(data.scienceFact, 16))}</p>
 
   <div class="holo-scan-actions">
-    <button id="holo-zoom-btn" class="btn-sci ${focusedHoloId === data.id ? 'is-on' : ''}" type="button">Zoom</button>
-    <button id="holo-return-btn" class="btn-sci" type="button">Satellite</button>
+    <button id="holo-zoom-btn" class="btn-sci ${focusedHoloId === data.id ? 'is-on' : ''}" type="button">${svgIcon('camera')} Zoom</button>
+    <button id="holo-return-btn" class="btn-sci" type="button">${svgIcon('spacecraft')} Satellite</button>
   </div>`;
 }
 
@@ -944,18 +943,18 @@ export function renderDecisionCard(decision) {
   if (el.dataset.decisionId !== decision.id) {
     el.dataset.decisionId = decision.id;
     el.innerHTML = `<div class="decision-head">
-        <span>${esc(stripEmoji(decision.title))}</span>
+        <span>${svgIcon('warning')} ${esc(stripEmoji(decision.title))}</span>
         <span id="decision-timer-pill" class="decision-timer">${decision.remainingSec.toFixed(1)}s</span>
       </div>
       <div class="decision-desc">${esc(trimWords(decision.prompt, 12))}</div>
       <div class="decision-actions">
         <button id="dec-opt-risky" class="btn-sci decision-btn is-risky" type="button">
           <span>${esc(stripEmoji(decision.risky.label))}</span>
-          <small>${esc(decision.risky.deltaText)}</small>
+          <small>${esc(stripEmoji(decision.risky.deltaText))}</small>
         </button>
         <button id="dec-opt-safe" class="btn-sci decision-btn is-safe" type="button">
           <span>${esc(stripEmoji(decision.safe.label))}</span>
-          <small>${esc(decision.safe.deltaText)}</small>
+          <small>${esc(stripEmoji(decision.safe.deltaText))}</small>
         </button>
       </div>`;
   } else {
@@ -1050,10 +1049,10 @@ export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run
 
   box.innerHTML = `<div class="orb-obj-head">
       <div class="orb-obj-head-top">
-        <span class="orb-obj-kicker">OBJECTIVES</span>
+        <span class="orb-obj-kicker">${svgIcon('goal')} OBJECTIVES</span>
         <div class="orb-obj-head-right">
           <span class="orb-obj-count ${status.canDebrief ? 'is-done' : ''}">${status.completedCount}/${status.totalCount}</span>
-          <button id="orb-obj-collapse-btn" class="orb-obj-collapse" type="button" aria-expanded="${collapsed ? 'false' : 'true'}" title="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▸' : '▾'}</button>
+          <button id="orb-obj-collapse-btn" class="orb-obj-collapse" type="button" aria-expanded="${collapsed ? 'false' : 'true'}" title="${collapsed ? 'Expand' : 'Collapse'}">${svgIcon(collapsed ? 'chevron-right' : 'chevron-down')}</button>
         </div>
       </div>
     </div>
@@ -1062,7 +1061,7 @@ export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run
       <ul class="orb-obj-list">
         ${status.tasks.map((t, idx) => `
           <li class="orb-obj-item ${t.complete ? 'is-complete' : (t.isWarning ? 'is-risk' : 'is-pending')}">
-            <span class="orb-obj-check">${t.complete ? '✓' : `0${idx + 1}`}</span>
+            <span class="orb-obj-check">${t.complete ? svgIcon('check') : `0${idx + 1}`}</span>
             <span class="orb-obj-label">${esc(stripEmoji(t.title).replace(/\(\[.*?\]\s*\/\s*Auto\)|\(\[.*?\]\)/g, '').trim())}</span>
             <span class="orb-obj-val tabular">${esc(stripEmoji(t.progressText))}</span>
           </li>`).join('')}
@@ -1071,8 +1070,8 @@ export function renderOrbitObjectivesSidebar(stage, state, telemetry = null, run
         <div class="orb-debuffs-head">DEBUFFS</div>
         ${debuffsHtml}
       </div>
-      <button id="orb-obj-debrief-btn" class="orb-obj-footer-btn ${status.canDebrief ? 'is-unlocked' : ''}" type="button" ${status.canDebrief ? '' : 'disabled'}>
-        ${status.isDestroyed ? 'VEHICLE LOST' : (status.canDebrief ? 'Finish & Review' : 'Incomplete')}
+      <button id="orb-obj-debrief-btn" class="orb-obj-footer-btn ${status.canDebrief ? 'is-unlocked cta-btn' : ''}" type="button" ${status.canDebrief ? '' : 'disabled'}>
+        ${status.isDestroyed ? `${svgIcon('explode')} VEHICLE LOST` : (status.canDebrief ? `${svgIcon('check')} Finish & Review` : `${svgIcon('lock')} Incomplete`)}
       </button>
     </div>`;
   return status;
@@ -1100,14 +1099,14 @@ export function renderLossOfVehicleModal(open, reason = '', ev = null) {
     : '';
 
   el.innerHTML = `<div class="loss-card plate" role="alertdialog" aria-modal="true" aria-labelledby="loss-title">
-      <div class="loss-kicker">TELEMETRY LOST // STAGE 03</div>
+      <div class="loss-kicker">${svgIcon('explode')} TELEMETRY LOST // STAGE 03</div>
       <h2 id="loss-title" class="loss-title">VEHICLE LOST (0% HULL)</h2>
       <div class="loss-cause-box"><span>CAUSE</span><strong>${esc(causeText)}</strong></div>
       ${debuffNote}
       <div class="loss-actions">
-        <button id="loss-hangar-btn" class="loss-btn is-fix" type="button">Hangar</button>
-        <button id="loss-retry-btn" class="loss-btn is-retry" type="button">Retry</button>
-        <button id="loss-menu-btn" class="loss-btn is-menu" type="button">Main Menu</button>
+        <button id="loss-hangar-btn" class="loss-btn is-fix" type="button">${svgIcon('hangar')} Hangar</button>
+        <button id="loss-retry-btn" class="loss-btn is-retry cta-btn" type="button">${svgIcon('restart')} Retry</button>
+        <button id="loss-menu-btn" class="loss-btn is-menu" type="button">${svgIcon('home')} Main Menu</button>
       </div>
     </div>`;
 }
@@ -1126,13 +1125,13 @@ export function renderQuitConfirmModal(open, scenarioName = 'Active Mission') {
   if (el.dataset.key === name && el.innerHTML) return;
   el.dataset.key = name;
   el.innerHTML = `<div class="quit-modal-card plate" role="alertdialog" aria-modal="true" aria-labelledby="quit-modal-title">
-      <div class="quit-kicker">MISSION CONTROL</div>
+      <div class="quit-kicker">${svgIcon('warning')} MISSION CONTROL</div>
       <h2 id="quit-modal-title" class="quit-title">QUIT MISSION?</h2>
-      <p class="quit-sub">Unsaved flight progress on <strong>${esc(name)}</strong> will reset.</p>
+      <p class="quit-sub">Unsaved flight progress on <strong>${esc(stripEmoji(name))}</strong> will reset.</p>
       <div class="quit-actions">
-        <button id="quit-resume-btn" class="quit-btn is-resume" type="button">Resume</button>
-        <button id="quit-hangar-btn" class="quit-btn is-hangar" type="button">Restart</button>
-        <button id="quit-menu-btn" class="quit-btn is-danger" type="button">Main Menu</button>
+        <button id="quit-resume-btn" class="quit-btn is-resume cta-btn" type="button">${svgIcon('play')} Resume</button>
+        <button id="quit-hangar-btn" class="quit-btn is-hangar" type="button">${svgIcon('restart')} Restart</button>
+        <button id="quit-menu-btn" class="quit-btn is-danger danger" type="button">${svgIcon('quit')} Main Menu</button>
       </div>
     </div>`;
 }

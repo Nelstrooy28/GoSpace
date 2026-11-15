@@ -1,3 +1,4 @@
+import { svgIcon } from './icons.js';
 import { playEquip, playHover, playVictoryFanfare } from './sfx.js';
 
 let active = false;
@@ -64,13 +65,13 @@ function ensureDom() {
             <div id="tut-step-dots" class="tut-step-dots"></div>
           </div>
         </div>
-        <button id="tut-skip-btn" class="btn-sci tut-skip-btn" type="button">Skip Tutorial [ESC]</button>
+        <button id="tut-skip-btn" class="btn-sci tut-skip-btn" type="button">${svgIcon('skip')} Skip <span class="keycap">ESC</span></button>
       </div>
       <h3 id="tut-headline" class="tut-headline"></h3>
       <p id="tut-prompt" class="tut-prompt"></p>
       <div id="tut-tip" class="tut-tip"></div>
       <div class="tut-actions">
-        <button id="tut-assist-btn" class="btn-sci active tut-assist-btn" type="button">Auto-Select / Next →</button>
+        <button id="tut-assist-btn" class="btn-sci active cta-btn tut-assist-btn" type="button">Auto-Select / Next ${svgIcon('chevron-right')}</button>
       </div>
     </aside>
     <div id="tut-complete-toast" class="tut-toast plate" hidden>
@@ -137,7 +138,7 @@ function getStepDescriptor(ctx) {
       headline: 'Lock Mission Science Goal',
       prompt: 'Click the Wildfire Thermal Mapping card to confirm our 575km Sun-Synchronous Infrared wildfire watch objective.',
       tip: 'Why it matters: Target wavelength rules dictate which sensors, solar power, and orbits stay valid at Flight Readiness.',
-      assistLabel: 'Next Step →',
+      assistLabel: 'Next Step',
     };
   }
 
@@ -149,7 +150,7 @@ function getStepDescriptor(ctx) {
         headline: 'Open Sat Bus & Payload',
         prompt: 'Click the Sat Bus & Payload segment tab to inspect instruments mounted on our 6U CubeSat.',
         tip: 'Why it matters: Bus payload capacity and wavelength compatibility work together as one coupled system.',
-        assistLabel: 'Auto-Select Payload →',
+        assistLabel: 'Auto-Select Payload',
       };
     }
     if (activeSub !== 'inst') {
@@ -159,7 +160,7 @@ function getStepDescriptor(ctx) {
         headline: 'Select Payload Category',
         prompt: 'Click the Payload sub-tab to browse compatible thermal science instruments.',
         tip: 'Why it matters: Every instrument must match the mission band (Thermal IR) and fit inside the 6U mass limit.',
-        assistLabel: 'Auto-Select Payload →',
+        assistLabel: 'Auto-Select Payload',
       };
     }
     return {
@@ -168,7 +169,7 @@ function getStepDescriptor(ctx) {
       headline: 'Mount Thermal IR Sensor',
       prompt: 'Equip the Un-cooled IR Microbolometer card onto the 3D spacecraft to hit 100% wildfire science return.',
       tip: 'Why it matters: Pairing the primary bolometer with the Arctic radiometer maximizes thermal hotspot detection.',
-      assistLabel: 'Auto-Select Payload →',
+      assistLabel: 'Auto-Select Payload',
     };
   }
 
@@ -180,7 +181,7 @@ function getStepDescriptor(ctx) {
         headline: 'Balance Spacecraft Power',
         prompt: 'Open Sat Bus & Payload so we can upgrade the solar panels for Earth eclipse survival.',
         tip: 'Why it matters: Body-mounted panels run a negative power margin across 32% orbital eclipse.',
-        assistLabel: 'Auto-Select Solar →',
+        assistLabel: 'Auto-Select Solar',
       };
     }
     if (activeSub !== 'solar') {
@@ -190,7 +191,7 @@ function getStepDescriptor(ctx) {
         headline: 'Check Power & Select Solar',
         prompt: 'Your Power gauge is red! Click the Solar sub-tab to view higher-output deployable solar arrays.',
         tip: 'Why it matters: Positive eclipse power margin keeps batteries charged and science sensors online.',
-        assistLabel: 'Auto-Select Solar →',
+        assistLabel: 'Auto-Select Solar',
       };
     }
     return {
@@ -199,7 +200,7 @@ function getStepDescriptor(ctx) {
       headline: 'Deploy GaAs Solar Wings',
       prompt: 'Select Deployable GaAs Wings (68W) to flip the bottom Power gauge green while staying light on Mass.',
       tip: 'Why it matters: Solar wings unfold in orbit, tripling watt generation for just +2.2 kg over body panels.',
-      assistLabel: 'Auto-Select Solar →',
+      assistLabel: 'Auto-Select Solar',
     };
   }
 
@@ -211,7 +212,7 @@ function getStepDescriptor(ctx) {
         headline: 'Match Rocket & Budget',
         prompt: 'Budget exceeds the $24M cap. Click 03 Launch to swap down from Falcon 9 rideshare.',
         tip: 'Why it matters: Choosing a right-sized launcher keeps small missions profitable without wasting payload capacity.',
-        assistLabel: 'Auto-Select Rocket →',
+        assistLabel: 'Auto-Select Rocket',
       };
     }
     if (activeSub !== 'veh') {
@@ -221,7 +222,7 @@ function getStepDescriptor(ctx) {
         headline: 'Open Launch Vehicles',
         prompt: 'Select the Rocket sub-tab to compare payload limits and launch costs.',
         tip: 'Why it matters: Our 15.9 kg CubeSat easily fits inside dedicated small-lift rockets.',
-        assistLabel: 'Auto-Select Rocket →',
+        assistLabel: 'Auto-Select Rocket',
       };
     }
     return {
@@ -230,7 +231,7 @@ function getStepDescriptor(ctx) {
       headline: 'Select Rocket Lab Electron',
       prompt: 'Choose Rocket Lab Electron ($7.5M, 300kg max) to bring your mission Budget safely green under $24M.',
       tip: 'Why it matters: Electron delivers dedicated Sun-Synchronous LEO insertion ideal for afternoon wildfire passes.',
-      assistLabel: 'Auto-Select Rocket →',
+      assistLabel: 'Auto-Select Rocket',
     };
   }
 
@@ -243,7 +244,7 @@ function getStepDescriptor(ctx) {
           headline: 'Upgrade Downlink Comms',
           prompt: 'Data rate is bottlenecked. Click 04 Comms to upgrade your radio transceiver.',
           tip: 'Why it matters: High-resolution thermal maps generate 1,500 MB/day—too fast for slow UHF beacons.',
-          assistLabel: 'Auto-Equip Comms →',
+          assistLabel: 'Auto-Equip Comms',
         };
       }
       if (activeSub !== 'tx') {
@@ -253,7 +254,7 @@ function getStepDescriptor(ctx) {
           headline: 'Open Radio Transceivers',
           prompt: 'Click the Transceiver sub-tab to install a high-speed RF downlink.',
           tip: 'Why it matters: Ground station pass windows only last minutes—higher Mbps clears onboard buffers quickly.',
-          assistLabel: 'Auto-Equip Comms →',
+          assistLabel: 'Auto-Equip Comms',
         };
       }
       return {
@@ -262,7 +263,7 @@ function getStepDescriptor(ctx) {
         headline: 'Equip S/X-Band Transceiver',
         prompt: 'Select S/X-Band High-Rate Transceiver (45 Mbps) to unlock CML 4 Launch Clearance!',
         tip: 'Why it matters: Reaching green across all 6 gauges promotes your build to Verified Point Design (CML 4).',
-        assistLabel: 'Auto-Equip Comms →',
+        assistLabel: 'Auto-Equip Comms',
       };
     }
     return {
@@ -271,7 +272,7 @@ function getStepDescriptor(ctx) {
       headline: 'CML 4 Clearance Unlocked!',
       prompt: 'All 6 gauges are green! Click Roll Out to move your rocket onto Launchpad 39G.',
       tip: 'Why it matters: Only CML 4 designs achieve full Flight Readiness before orbital rollout.',
-      assistLabel: 'Roll Out To Pad →',
+      assistLabel: 'Roll Out To Pad',
     };
   }
 
@@ -283,7 +284,7 @@ function getStepDescriptor(ctx) {
         headline: 'Roll Out To Pad',
         prompt: 'Click Roll Out to enter the 3D coastal launch complex.',
         tip: 'Why it matters: Pre-launch hold-down clamps stabilize thrust until T-0 ignition.',
-        assistLabel: 'Roll Out To Pad →',
+        assistLabel: 'Roll Out To Pad',
       };
     }
     const armed = !launchTelemetry || launchTelemetry.armed;
@@ -294,7 +295,7 @@ function getStepDescriptor(ctx) {
         headline: 'Ignite Rocket Engines',
         prompt: 'Click IGNITE [SPACE] (or press Spacebar) to launch into Sun-Synchronous LEO.',
         tip: 'Why it matters: Umbilical swing arms retract at T-0 as full throttle clears the steel launch tower.',
-        assistLabel: 'Ignite Now →',
+        assistLabel: 'Ignite Now',
       };
     }
     return {
@@ -303,7 +304,7 @@ function getStepDescriptor(ctx) {
       headline: 'Ascent & Fairing Separation',
       prompt: 'Liftoff! Click Hull Cam to inspect fairing separation above the cloud deck, or ride smoothly into orbit.',
       tip: 'Why it matters: Upper stages jettison protective fairings above the atmosphere to deploy your 3D CubeSat.',
-      assistLabel: 'Continue to Orbit →',
+      assistLabel: 'Continue to Orbit',
     };
   }
 
@@ -315,7 +316,7 @@ function getStepDescriptor(ctx) {
         headline: 'Enter Orbit Operations',
         prompt: 'Switch to 03 ORBIT to command live ground station passes.',
         tip: 'Why it matters: Orbital ops combine real-time attitude, solar power, and RF line-of-sight links.',
-        assistLabel: 'Enter Orbit →',
+        assistLabel: 'Enter Orbit',
       };
     }
     if (!orbitTelemetry?.inLineOfSight) {
@@ -325,7 +326,7 @@ function getStepDescriptor(ctx) {
         headline: 'Approaching Ground Radar Cone',
         prompt: 'Orbital speed is boosted cleanly toward the glowing green Arctic Polar Station cone—get ready to transmit!',
         tip: 'Why it matters: Ground stations only lock RF signals while the satellite rises above the horizon cone.',
-        assistLabel: 'Next / Force Pass →',
+        assistLabel: 'Next / Force Pass',
       };
     }
     return {
@@ -334,7 +335,7 @@ function getStepDescriptor(ctx) {
       headline: 'Beam Live Data Down',
       prompt: 'Line-of-sight locked at 1x speed! Click [SPC] DOWNLINK (or press Spacebar) to transmit science data.',
       tip: 'Why it matters: Executing passes on schedule converts onboard storage into science score before the next orbit.',
-      assistLabel: 'Transmit Data Now →',
+      assistLabel: 'Transmit Data Now',
     };
   }
 
@@ -356,7 +357,8 @@ function updateCoachContent(desc) {
   document.getElementById('tut-headline').textContent = desc.headline;
   document.getElementById('tut-prompt').textContent = desc.prompt;
   document.getElementById('tut-tip').textContent = desc.tip;
-  document.getElementById('tut-assist-btn').textContent = desc.assistLabel || 'Auto-Select / Next →';
+  const assistText = (desc.assistLabel || 'Auto-Select / Next').replace(/\s*→\s*$/, '');
+  document.getElementById('tut-assist-btn').innerHTML = `${assistText} ${svgIcon('chevron-right')}`;
 
   const targetEl = document.querySelector(desc.target);
   if (targetEl && targetEl !== lastTargetEl) {

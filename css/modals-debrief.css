@@ -1,4 +1,4 @@
-/* GoSpace — Stage 04 Debrief, Orbit Briefing, Quit/Loss Modals, Dialogs & Responsive Breakpoints */
+/* GoSpace — Stage 04 Debrief, Orbit Briefing, Quit/Loss Modals, Dialogs & Responsive Breakpoints (fluid rem) */
 
 /* ------------------------------------------------------------------
    SHARED MODAL BACKDROP CONTAINERS
@@ -13,7 +13,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 1.15rem;
   background: rgba(7, 8, 11, 0.72);
   backdrop-filter: blur(6px);
   pointer-events: auto;
@@ -31,22 +31,22 @@
    STAGE 04 MISSION DEBRIEF SHOWCASE
    ------------------------------------------------------------------ */
 .debrief-showcase {
-  width: min(760px, 94vw);
+  width: min(52rem, 94vw);
   max-height: 92vh;
   overflow-y: auto;
-  padding: 16px 18px;
+  padding: 1.15rem 1.3rem;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background-color: var(--panel-strong);
+  gap: 0.86rem;
+  --plate-bg: var(--panel-strong);
 }
 
 .debrief-topbar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 10px;
+  gap: 0.86rem;
+  padding-bottom: 0.72rem;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -59,9 +59,9 @@
 }
 
 .debrief-title {
-  margin: 2px 0;
+  margin: 0.14rem 0;
   font-family: var(--font-hud);
-  font-size: var(--fs-title);
+  font-size: var(--fs-hero);
   font-weight: 900;
   color: var(--text-main);
 }
@@ -77,9 +77,8 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
+  gap: 0.86rem;
+  padding: 0.72rem 0.86rem;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--border-subtle);
 }
@@ -93,12 +92,12 @@
 .debrief-stars-row {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.57rem;
 }
 
 .debrief-star {
-  width: 30px;
-  height: 30px;
+  width: 2.15rem;
+  height: 2.15rem;
   fill: rgba(255, 255, 255, 0.06);
   stroke: var(--border-mid);
   stroke-width: 2;
@@ -110,7 +109,7 @@
 .debrief-star.lit {
   fill: var(--accent-bright);
   stroke: #fef3c7;
-  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.45));
+  filter: drop-shadow(0 0 0.57rem rgba(245, 158, 11, 0.45));
 }
 
 .debrief-star.is-slammed {
@@ -128,8 +127,8 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 5px;
-  height: 5px;
+  width: 0.36rem;
+  height: 0.36rem;
   background: var(--col, #fbbf24);
   opacity: 0;
 }
@@ -145,14 +144,14 @@
 
 .rank-crest {
   font-family: var(--font-hud);
-  font-size: var(--fs-title);
+  font-size: var(--fs-lg);
   font-weight: 900;
   letter-spacing: 0.06em;
   color: var(--accent-bright);
-  padding: 4px 10px;
-  border-radius: var(--radius);
+  padding: 0.32rem 0.78rem;
   border: 1px solid rgba(245, 158, 11, 0.45);
   background: rgba(245, 158, 11, 0.12);
+  clip-path: polygon(0.36rem 0, 100% 0, 100% calc(100% - 0.36rem), calc(100% - 0.36rem) 100%, 0 100%, 0 0.36rem);
 }
 
 .rank-crest.rank-b {
@@ -180,22 +179,21 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  padding: 4px 10px;
-  border-radius: var(--radius);
+  padding: 0.29rem 0.72rem;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-subtle);
 }
 
 .debrief-total-lbl {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   color: var(--text-muted);
 }
 
 .debrief-total-num {
   font-family: var(--font-hud);
-  font-size: var(--fs-title);
+  font-size: var(--fs-hero);
   font-weight: 900;
   color: var(--text-main);
 }
@@ -205,26 +203,24 @@
   color: #fecaca;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  padding: 0.43rem 0.72rem;
 }
 
 .debrief-main-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 0.72rem;
 }
 
 .debrief-panel,
 .holo-card {
   position: relative;
-  padding: 10px 12px;
-  border-radius: var(--radius);
+  padding: 0.72rem 0.86rem;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 0.5rem;
   overflow: hidden;
 }
 
@@ -244,7 +240,7 @@
 .score-rows {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.29rem;
 }
 
 .score-row {
@@ -253,7 +249,7 @@
   align-items: center;
   font-size: var(--fs-sm);
   color: var(--text-dim);
-  padding: 3px 0;
+  padding: 0.21rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
@@ -270,22 +266,21 @@
 .holo-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 0.36rem;
 }
 
 .medal-chip,
 .holo-pill {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
+  padding: 0.14rem 0.5rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
   color: var(--text-main);
 }
 
 .holo-name {
-  font-family: var(--font-hud);
+  font-family: var(--font-ui);
   font-size: var(--fs-md);
   font-weight: 700;
   color: var(--text-main);
@@ -300,7 +295,7 @@
 
 .holo-telemetry-mini {
   margin-top: auto;
-  padding-top: 6px;
+  padding-top: 0.43rem;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
@@ -313,55 +308,50 @@
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
-  padding-top: 4px;
+  gap: 0.57rem;
+  padding-top: 0.29rem;
 }
 
 .debrief-cta {
-  padding: 7px 14px !important;
-  font-family: var(--font-mono) !important;
+  padding: 0.5rem 1rem 0.5rem 1.1rem !important;
+  font-family: var(--font-ui) !important;
   font-size: var(--fs-sm) !important;
-}
-
-.debrief-cta.is-primary {
-  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%) !important;
-  border-color: #fde68a !important;
-  color: #090b0f !important;
+  font-weight: 700;
 }
 
 /* ------------------------------------------------------------------
-   COMPACT ORBIT BRIEFING MODAL (<=460px)
+   COMPACT ORBIT BRIEFING MODAL
    ------------------------------------------------------------------ */
 .briefing-card {
-  width: min(460px, 94vw);
+  width: min(31.5rem, 94vw);
   max-height: 90vh;
   overflow-y: auto;
-  padding: 14px 16px;
+  padding: 1rem 1.15rem;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background-color: var(--panel-strong);
+  gap: 0.72rem;
+  --plate-bg: var(--panel-strong);
 }
 
 .brief-topbar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 0.72rem;
 }
 
 .brief-kicker {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--accent-bright);
 }
 
 .brief-title {
-  margin: 2px 0;
+  margin: 0.14rem 0;
   font-family: var(--font-hud);
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
   color: var(--text-main);
 }
 
@@ -369,18 +359,6 @@
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--text-dim);
-}
-
-.brief-close-btn {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-card);
-  color: var(--text-dim);
-  cursor: pointer;
-  flex-shrink: 0;
 }
 
 .brief-about {
@@ -392,16 +370,15 @@
 .brief-tasks {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.43rem;
 }
 
 .brief-task-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
-  gap: 9px;
-  padding: 7px 9px;
-  border-radius: var(--radius-sm);
+  gap: 0.64rem;
+  padding: 0.5rem 0.64rem;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
 }
@@ -420,7 +397,7 @@
 }
 
 .brief-task-copy p {
-  margin: 2px 0 0;
+  margin: 0.14rem 0 0;
   font-size: var(--fs-xs);
   color: var(--text-dim);
 }
@@ -429,24 +406,13 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: var(--radius-sm);
+  gap: 0.57rem;
+  padding: 0.36rem 0.57rem;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--border-subtle);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--text-dim);
-}
-
-.brief-keybinds kbd {
-  padding: 1px 4px;
-  border-radius: 2px;
-  border: 1px solid var(--border-mid);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-main);
-  font-family: var(--font-mono);
-  font-size: 9px;
 }
 
 .brief-actions {
@@ -455,25 +421,12 @@
 }
 
 .brief-start-btn {
-  height: 34px;
-  padding: 0 16px;
-  border-radius: var(--radius);
-  border: 1px solid #fde68a;
-  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
-  color: #090b0f;
-  font-family: var(--font-hud);
+  height: 2.45rem;
+  padding: 0 1.15rem 0 1.25rem;
+  font-family: var(--font-ui);
   font-size: var(--fs-sm);
   font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.brief-start-btn .keycap {
-  background: rgba(9, 11, 15, 0.85);
-  color: var(--accent-bright);
-  border-color: transparent;
+  gap: 0.57rem;
 }
 
 /* ------------------------------------------------------------------
@@ -481,16 +434,17 @@
    ------------------------------------------------------------------ */
 .loss-card,
 .quit-modal-card {
-  width: min(420px, 92vw);
-  padding: 16px 18px;
+  width: min(29rem, 92vw);
+  padding: 1.15rem 1.3rem;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background-color: var(--panel-strong);
+  gap: 0.72rem;
+  --plate-bg: var(--panel-strong);
 }
 
 .loss-card {
-  border-color: rgba(239, 68, 68, 0.65);
+  --plate-rim: rgba(239, 68, 68, 0.65);
+  --tick: var(--status-bad);
 }
 
 .loss-kicker,
@@ -513,23 +467,22 @@
 .quit-title {
   margin: 0;
   font-family: var(--font-hud);
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
   color: var(--text-main);
 }
 
 .loss-cause-box {
-  padding: 7px 9px;
-  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.64rem;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.45);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0.14rem;
 }
 
 .loss-cause-box span {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-xs);
   color: #fca5a5;
 }
 
@@ -545,59 +498,42 @@
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 4px;
+  gap: 0.5rem;
+  margin-top: 0.29rem;
 }
 
 .loss-btn,
 .quit-btn {
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-mid);
-  background: var(--bg-card);
-  color: var(--text-main);
-  font-family: var(--font-mono);
+  height: 2.15rem;
+  min-height: 0;
+  padding: 0 0.86rem 0 0.96rem;
+  font-family: var(--font-ui);
   font-size: var(--fs-xs);
   font-weight: 700;
-  cursor: pointer;
 }
 
-.loss-btn:hover,
-.quit-btn:hover {
-  border-color: var(--border-focus);
-  background: var(--bg-card-hover);
-}
-
-.quit-btn.is-resume,
-.loss-btn.is-retry {
-  border-color: var(--accent);
-  background: rgba(245, 158, 11, 0.16);
+.quit-btn.is-resume {
+  --rim: var(--rim-amber);
+  --bar: var(--accent);
   color: var(--accent-bright);
 }
 
 .loss-btn.is-fix {
-  border-color: rgba(16, 185, 129, 0.55);
-  background: rgba(16, 185, 129, 0.14);
+  --rim: var(--rim-emerald);
+  --bar: var(--status-good);
   color: #6ee7b7;
-}
-
-.quit-btn.is-danger {
-  border-color: rgba(239, 68, 68, 0.6);
-  background: rgba(185, 28, 28, 0.35);
-  color: #fecaca;
 }
 
 /* ------------------------------------------------------------------
    NATIVE CODEX & SAVED BUILDS DIALOGS
    ------------------------------------------------------------------ */
 dialog.modal {
-  width: min(500px, 94vw);
+  width: min(34rem, 94vw);
   max-height: 82vh;
-  padding: 14px 16px;
+  padding: 1rem 1.15rem;
   color: var(--text-main);
-  background-color: var(--panel-strong);
-  border: 1px solid var(--border-mid);
+  --plate-bg: var(--panel-strong);
+  --plate-rim: var(--border-mid);
 }
 
 dialog.modal::backdrop {
@@ -613,14 +549,14 @@ dialog.modal:not([open]) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 0.72rem;
+  margin-bottom: 0.72rem;
 }
 
 .modal-head h2 {
   margin: 0;
   font-family: var(--font-hud);
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
   color: var(--accent-bright);
 }
 
@@ -630,7 +566,7 @@ dialog.modal:not([open]) {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.43rem;
   max-height: 52vh;
   overflow-y: auto;
 }
@@ -640,9 +576,8 @@ dialog.modal:not([open]) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
+  gap: 0.57rem;
+  padding: 0.43rem 0.57rem;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   font-size: var(--fs-sm);
@@ -658,15 +593,14 @@ dialog.modal:not([open]) {
 
 .save-form {
   display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 0.43rem;
+  margin-bottom: 0.72rem;
 }
 
 .save-form input {
   flex: 1;
   min-width: 0;
-  padding: 5px 8px;
-  border-radius: var(--radius);
+  padding: 0.36rem 0.57rem;
   border: 1px solid var(--border-mid);
   background: rgba(0, 0, 0, 0.45);
   color: var(--text-main);
@@ -675,9 +609,8 @@ dialog.modal:not([open]) {
 }
 
 .compare-box {
-  margin-top: 10px;
-  padding: 7px 9px;
-  border-radius: var(--radius-sm);
+  margin-top: 0.72rem;
+  padding: 0.5rem 0.64rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-subtle);
   font-family: var(--font-mono);
@@ -686,63 +619,12 @@ dialog.modal:not([open]) {
 }
 
 /* ------------------------------------------------------------------
-   RESPONSIVE COMPACT BREAKPOINTS (1366x768 & <=960px)
+   STRUCTURAL BREAKPOINTS FOR NARROW VIEWPORTS ONLY (in rem)
    ------------------------------------------------------------------ */
-@media (max-width: 1366px), (max-height: 768px) {
-  .hud-layer {
-    gap: 6px;
-    padding: 6px 8px 8px;
-  }
-
-  .hangar-loadout {
-    width: 264px;
-    max-width: min(275px, 31vw);
-    padding: 7px;
-  }
-
-  .orbit-objectives-sidebar {
-    width: 204px;
-    max-width: 210px;
-    padding: 7px 8px;
-  }
-
-  .orbit-ops-card {
-    width: 202px;
-    padding: 7px 8px;
-  }
-
-  .sensor-cam-pip {
-    width: 170px;
-  }
-
-  .sensor-pip-canvas-wrap {
-    height: 92px;
-  }
-
-  .ascent-card {
-    width: 212px;
-    padding: 7px 8px;
-  }
-
-  .status-cta-bar {
-    max-width: 760px;
-    padding: 5px 8px;
-    gap: 8px;
-  }
-
-  .title-stage {
-    gap: 18px;
-  }
-
-  .contract-art {
-    height: 62px;
-  }
-}
-
-@media (max-width: 960px) {
+@media (max-width: 60rem) {
   .hud-top {
-    padding: 0 7px;
-    gap: 6px;
+    padding: 0 0.5rem;
+    gap: 0.43rem;
   }
 
   #active-mission-pill {
@@ -750,50 +632,17 @@ dialog.modal:not([open]) {
   }
 
   #stage-switcher .stage-btn {
-    padding: 0 6px;
+    padding: 0 0.43rem 0 0.5rem;
   }
 
   .cml-nodes {
-    padding: 0 5px;
-    gap: 4px;
-  }
-
-  .hangar-loadout {
-    width: 226px;
-    max-width: 34vw;
-  }
-
-  .orbit-objectives-sidebar {
-    width: 184px;
-  }
-
-  .orbit-ops-card {
-    width: 188px;
-  }
-
-  .sensor-cam-pip {
-    width: 156px;
-  }
-
-  .sensor-pip-canvas-wrap {
-    height: 84px;
-  }
-
-  .status-cta-bar {
-    gap: 6px;
-  }
-
-  .gauges-mini {
-    gap: 4px;
-  }
-
-  .gm-item {
-    padding: 3px 4px;
+    padding: 0 0.36rem;
+    gap: 0.29rem;
   }
 
   .title-stage {
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 1rem;
     overflow-y: auto;
     align-content: start;
   }

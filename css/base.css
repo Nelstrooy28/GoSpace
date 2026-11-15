@@ -1,58 +1,94 @@
-/* GoSpace — Grounded Tactical Aerospace UI Design System */
+/* GoSpace — Tactical Aerospace Game UI Design System
+   Fluid game-engine viewport scale: every HUD dimension is authored in rem,
+   and the root rem tracks the viewport so the HUD shrinks on 720p laptops
+   and grows on 1440p / 4K monitors like a native PC game HUD. */
+
+html {
+  font-size: clamp(10.5px, calc(0.48vw + 0.52vh), 20px);
+}
+
 :root {
   /* Deep Matte Carbon & Obsidian Surfaces */
   --bg: #07080b;
   --bg-dark: #07080b;
-  --bg-hud: rgba(12, 14, 18, 0.84);
-  --bg-hud-elevated: rgba(20, 23, 30, 0.90);
-  --bg-card: rgba(20, 23, 30, 0.90);
-  --bg-card-hover: rgba(28, 32, 42, 0.95);
+  --bg-hud: rgba(10, 12, 16, 0.88);
+  --bg-hud-elevated: rgba(20, 23, 30, 0.92);
+  --bg-card: #12151c;
+  --bg-card-hover: #181c25;
   --bg-card-active: rgba(245, 158, 11, 0.14);
-  --panel: rgba(12, 14, 18, 0.84);
-  --panel-strong: rgba(14, 17, 23, 0.96);
+  --panel: rgba(10, 12, 16, 0.88);
+  --panel-strong: rgba(12, 14, 19, 0.97);
+  --graphite: #12151c;
+  --ink: #090b0f;
 
-  /* Crisp 1px Hairline Borders & Tight 4px Tactical Corners */
+  /* Hairlines */
   --border-subtle: rgba(255, 255, 255, 0.10);
   --border-mid: rgba(255, 255, 255, 0.18);
   --border-focus: rgba(245, 158, 11, 0.55);
   --border-bright: rgba(245, 158, 11, 0.72);
   --line: rgba(255, 255, 255, 0.10);
   --line-bright: rgba(245, 158, 11, 0.65);
-  --radius-sm: 3px;
-  --radius: 4px;
-  --radius-md: 4px;
-  --radius-lg: 4px;
+  --radius-sm: 0;
+  --radius: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
 
-  /* Aerospace Kapton Amber / Gold + Crisp Bone White */
+  /* Kapton Amber + Bone White */
   --accent: #f59e0b;
   --accent-bright: #fbbf24;
+  --accent-deep: #d97706;
   --amber: #f59e0b;
   --amber-soft: #fbbf24;
   --cyan: #f59e0b;
   --cyan-soft: #fbbf24;
   --scan-teal: #38bdf8;
+  --steel: rgba(156, 163, 175, 0.78);
   --text: #f3f4f6;
   --text-main: #f3f4f6;
   --text-dim: #9ca3af;
   --muted: #9ca3af;
   --text-muted: #6b7280;
 
-  /* Strict Semantic Colors Only */
+  /* Semantic */
   --green: #10b981;
   --status-good: #10b981;
   --status-warn: #f59e0b;
   --red: #ef4444;
   --status-bad: #ef4444;
 
-  /* Strict 4-Step Game HUD Type Scale */
-  --fs-xs: 10px;
-  --fs-sm: 11.5px;
-  --fs-md: 12.5px;
-  --fs-title: clamp(18px, 1.8vw, 24px);
+  /* Fluid rem type scale */
+  --fs-xs: 0.72rem;
+  --fs-sm: 0.82rem;
+  --fs-md: 0.92rem;
+  --fs-lg: 1.15rem;
+  --fs-hero: clamp(1.8rem, 3.2vmin, 2.8rem);
+  --fs-title: var(--fs-hero);
 
-  --font-hud: 'Orbitron', 'Segoe UI', sans-serif;
-  --font-ui: 'Chakra Petch', 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+  /* Spatial tokens */
+  --sp-1: 0.21rem;
+  --sp-2: 0.36rem;
+  --sp-3: 0.5rem;
+  --sp-4: 0.64rem;
+  --sp-5: 0.86rem;
+  --cut: 0.48rem;
+  --pcut: 0.42rem;
+  --gi-size: 1.05rem;
+
+  /* Typography: geometric sci-fi UI + tactical mono telemetry */
+  --font-hud: 'Orbitron', 'Chakra Petch', sans-serif;
+  --font-ui: 'Chakra Petch', 'Orbitron', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+
+  /* Instrument segment mask */
+  --seg-mask: repeating-linear-gradient(90deg, transparent 0 0.38rem, rgba(10, 12, 16, 0.85) 0.38rem 0.48rem);
+
+  /* Metal rims */
+  --rim-steel: linear-gradient(155deg, rgba(255, 255, 255, 0.36) 0%, rgba(148, 163, 184, 0.10) 42%, rgba(255, 255, 255, 0.22) 100%);
+  --rim-amber: linear-gradient(155deg, #fde68a 0%, rgba(245, 158, 11, 0.40) 48%, #f59e0b 100%);
+  --rim-crimson: linear-gradient(155deg, #fca5a5 0%, rgba(239, 68, 68, 0.38) 48%, #ef4444 100%);
+  --rim-emerald: linear-gradient(155deg, #a7f3d0 0%, rgba(16, 185, 129, 0.38) 48%, #10b981 100%);
+  --plate-amber: repeating-linear-gradient(-45deg, rgba(9, 11, 15, 0.55) 0 2px, transparent 2px 0.32rem) right top / 1.7rem 0.34rem no-repeat, linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  --plate-amber-hot: repeating-linear-gradient(-45deg, rgba(9, 11, 15, 0.55) 0 2px, transparent 2px 0.32rem) right top / 1.7rem 0.34rem no-repeat, linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
 }
 
 *, *::before, *::after {
@@ -70,15 +106,23 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: var(--bg-dark);
+}
+
+body {
   color: var(--text-main);
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
+  font-weight: 500;
   line-height: 1.35;
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
 
-/* Tabular Numerals on All Telemetry & Counters */
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Tabular numerals on all telemetry & counters */
 .tabular,
 .gm-top b,
 .gm-val,
@@ -91,9 +135,39 @@ html, body {
 .orb-obj-count,
 .lch-stat-val,
 .spill,
+.badge-tag,
+.keycap,
+.cml-text,
 .equip-row-stats {
   font-variant-numeric: tabular-nums;
 }
+
+/* ------------------------------------------------------------------
+   VECTOR GLYPHS
+   ------------------------------------------------------------------ */
+.gi {
+  width: var(--gi-size);
+  height: var(--gi-size);
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: -0.2em;
+  overflow: visible;
+}
+
+.gi-rate {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--text-muted);
+}
+
+.gi-rate.is-lit {
+  color: var(--accent-bright);
+  fill: currentColor;
+}
+
+.gi.when-off { display: none; }
+.is-muted > .gi.when-on { display: none; }
+.is-muted > .gi.when-off { display: inline-block; }
 
 /* 3D WebGL Canvas Layer */
 #viewport-container {
@@ -129,117 +203,319 @@ html, body {
   100% { opacity: 0; transform: scale(1.26); }
 }
 
-/* Tactical Matte Carbon Surface + 2px Corner Ticks */
+/* ------------------------------------------------------------------
+   TACTICAL HUD PLATES — chamfered obsidian + corner L-reticles
+   ::before = amber reticles (top-right / bottom-left)
+   ::after  = steel reticles (top-left / bottom-right, inside chamfer)
+   ------------------------------------------------------------------ */
 .plate,
 .hud-panel {
-  background-color: var(--bg-hud);
-  background-image:
-    linear-gradient(var(--accent-bright), var(--accent-bright)),
-    linear-gradient(var(--accent-bright), var(--accent-bright)),
-    linear-gradient(var(--accent-bright), var(--accent-bright)),
-    linear-gradient(var(--accent-bright), var(--accent-bright)),
-    linear-gradient(var(--accent-bright), var(--accent-bright)),
-    linear-gradient(var(--accent-bright), var(--accent-bright)),
-    linear-gradient(var(--accent-bright), var(--accent-bright)),
-    linear-gradient(var(--accent-bright), var(--accent-bright));
-  background-size: 6px 1px, 1px 6px, 6px 1px, 1px 6px, 6px 1px, 1px 6px, 6px 1px, 1px 6px;
-  background-position: top left, top left, top right, top right, bottom left, bottom left, bottom right, bottom right;
-  background-repeat: no-repeat;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
+  --plate-bg: var(--bg-hud);
+  --plate-rim: rgba(255, 255, 255, 0.12);
+  --tick: var(--accent);
+  --tick-2: var(--steel);
+  position: relative;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.8px), var(--plate-rim) calc(50% - 0.8px) calc(50% + 0.8px), transparent calc(50% + 0.8px)) left top / var(--pcut) var(--pcut) no-repeat border-box,
+    linear-gradient(to bottom right, transparent calc(50% - 0.8px), var(--plate-rim) calc(50% - 0.8px) calc(50% + 0.8px), transparent calc(50% + 0.8px)) right bottom / var(--pcut) var(--pcut) no-repeat border-box,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, transparent 2.4rem) border-box,
+    var(--plate-bg);
+  border: 1px solid var(--plate-rim);
+  border-radius: 0;
+  clip-path: polygon(var(--pcut) 0, 100% 0, 100% calc(100% - var(--pcut)), calc(100% - var(--pcut)) 100%, 0 100%, 0 var(--pcut));
   backdrop-filter: blur(10px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
 }
 
-/* Shared Tactical Controls */
-.btn-sci,
-#hud-top button,
-#stage-hud button,
-#center-action-hud button,
-#review-overlay button,
-#hangar-loadout button,
-dialog button {
+.plate::before,
+.plate::after,
+.hud-panel::before,
+.hud-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0.26rem;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  z-index: 3;
+}
+
+.plate::before,
+.hud-panel::before {
+  background-image:
+    linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick));
+  background-size: 0.5rem 2px, 2px 0.5rem, 0.5rem 2px, 2px 0.5rem;
+  background-position: right top, right top, left bottom, left bottom;
+  filter: drop-shadow(0 0 0.18rem rgba(245, 158, 11, 0.55));
+}
+
+.plate::after,
+.hud-panel::after {
+  inset: 0.38rem;
+  background-image:
+    linear-gradient(var(--tick-2), var(--tick-2)),
+    linear-gradient(var(--tick-2), var(--tick-2)),
+    linear-gradient(var(--tick-2), var(--tick-2)),
+    linear-gradient(var(--tick-2), var(--tick-2));
+  background-size: 0.5rem 1px, 1px 0.5rem, 0.5rem 1px, 1px 0.5rem;
+  background-position: left top, left top, right bottom, right bottom;
+}
+
+/* Uppercase header strips with slash accents */
+.loadout-title::before,
+.orb-obj-kicker::before,
+.card-head > span:first-child::before,
+.contract-col-title::before,
+.debrief-sec-head::before,
+.debrief-kicker::before,
+.holo-head::before,
+.holo-scan-kicker::before,
+.brief-kicker::before,
+.quit-kicker::before,
+.loss-kicker::before,
+.drawer-head strong::before,
+.sensor-pip-title::before,
+.orb-debuffs-head::before,
+.modal-head h2::before {
+  content: '//';
+  margin-right: 0.36rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* ------------------------------------------------------------------
+   CHAMFERED SCI-FI GAME BUTTONS
+   Outer metallic rim = ::before evenodd ring, inner graphite fill =
+   element background, 2px amber accent bar = inset box-shadow,
+   hover sheen sweep = ::after.
+   :where() keeps base specificity at zero so state rules always win.
+   ------------------------------------------------------------------ */
+:where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild) {
+  --cut: 0.48rem;
+  --fill: var(--graphite);
+  --rim: var(--rim-steel);
+  --bar: rgba(245, 158, 11, 0.72);
+  position: relative;
+  isolation: isolate;
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
   font-weight: 600;
+  letter-spacing: 0.03em;
   color: var(--text-main);
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  padding: 5px 9px;
+  background: var(--fill);
+  border: 0;
+  border-radius: 0;
+  padding: 0.36rem 0.72rem 0.36rem 0.82rem;
+  min-height: 1.9rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  transition: border-color 0.14s ease, background-color 0.14s ease, color 0.14s ease;
+  gap: 0.42rem;
   white-space: nowrap;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  box-shadow: inset 2px 0 0 var(--bar);
+  transition: color 0.14s ease, filter 0.14s ease, transform 0.08s ease;
 }
 
-.btn-sci:hover,
-#hud-top button:hover,
-#stage-hud button:hover,
-#hangar-loadout button:hover,
-dialog button:hover {
-  border-color: var(--border-focus);
-  background: var(--bg-card-hover);
+:where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--rim);
+  clip-path: polygon(evenodd,
+    var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut), var(--cut) 0,
+    calc(var(--cut) + 0.42px) 1px, 1px calc(var(--cut) + 0.42px), 1px calc(100% - 1px), calc(100% - var(--cut) - 0.42px) calc(100% - 1px), calc(100% - 1px) calc(100% - var(--cut) - 0.42px), calc(100% - 1px) 1px, calc(var(--cut) + 0.42px) 1px);
+}
+
+:where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 34%, rgba(255, 255, 255, 0.16) 47%, rgba(255, 255, 255, 0.04) 53%, transparent 62%);
+  transform: translateX(-115%);
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+:where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):not(:disabled):hover {
+  --fill: var(--bg-card-hover);
+  --rim: linear-gradient(155deg, rgba(253, 230, 138, 0.85) 0%, rgba(245, 158, 11, 0.28) 48%, rgba(255, 255, 255, 0.4) 100%);
   color: #ffffff;
 }
 
+:where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):not(:disabled):hover::after {
+  transform: translateX(115%);
+}
+
+:where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):not(:disabled):active {
+  transform: translateY(1px);
+  filter: brightness(0.92);
+}
+
+:where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):focus-visible {
+  outline: none;
+  --rim: linear-gradient(#ffffff, #ffffff) !important;
+  --bar: #ffffff !important;
+}
+
+:where(.hud-btn, .btn-sci, .stage-btn, .cta-btn, .part-card, .equip-card, .seg-tab, .sub-chip, .menu-btn, .btn-rollout, .quit-btn, .loss-btn, .debrief-cta, .debrief-close-btn, .brief-start-btn, .brief-close-btn, .hazard-choice-btn, .orb-obj-footer-btn, .orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .action-prompt, .btn-autobuild):disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  --bar: rgba(156, 163, 175, 0.4);
+}
+
+/* Square icon-only switches (close / collapse) */
+:where(.orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .brief-close-btn) {
+  --cut: 0.3rem;
+  --bar: transparent;
+  width: 1.55rem;
+  height: 1.55rem;
+  min-height: 0;
+  padding: 0;
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+:where(.orb-obj-collapse, .sensor-pip-close, .holo-scan-close, .brief-close-btn) .gi {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+/* Selected / engaged state */
 .btn-sci.active,
 .btn-sci.is-on,
 .stage-btn.active,
 .seg-tab.active,
 .sub-pill.active,
-.sub-chip.active {
-  background: rgba(245, 158, 11, 0.18) !important;
-  border-color: var(--accent) !important;
-  color: var(--accent-bright) !important;
+.sub-chip.active,
+.equip-card.selected,
+.part-card.selected {
+  --fill: linear-gradient(180deg, rgba(245, 158, 11, 0.24) 0%, rgba(245, 158, 11, 0.08) 100%), var(--graphite);
+  --rim: var(--rim-amber);
+  --bar: var(--accent-bright);
+  color: var(--accent-bright);
 }
 
-.btn-sci.danger {
-  border-color: rgba(239, 68, 68, 0.55);
-  background: rgba(127, 29, 29, 0.45);
+/* Primary action: Kapton Amber tactical plate with hazard-stripe corner */
+.cta-btn,
+.btn-rollout.is-ready,
+.orb-obj-footer-btn.is-unlocked,
+#orb-scan-btn.is-swath-ready,
+#orb-transmit-btn.is-cyan,
+.debrief-cta.is-primary,
+.loss-btn.is-retry,
+.brief-start-btn {
+  --fill: var(--plate-amber);
+  --rim: linear-gradient(155deg, #fef3c7 0%, #b45309 55%, #fbbf24 100%);
+  --bar: var(--ink);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.cta-btn:not(:disabled):hover,
+.btn-rollout.is-ready:not(:disabled):hover,
+.orb-obj-footer-btn.is-unlocked:not(:disabled):hover,
+#orb-scan-btn.is-swath-ready:not(:disabled):hover,
+#orb-transmit-btn.is-cyan:not(:disabled):hover,
+.debrief-cta.is-primary:hover,
+.loss-btn.is-retry:hover,
+.brief-start-btn:hover {
+  --fill: var(--plate-amber-hot);
+  --rim: linear-gradient(155deg, #ffffff 0%, #d97706 55%, #fde68a 100%);
+  color: var(--ink);
+}
+
+.cta-btn .keycap,
+.btn-rollout.is-ready .keycap,
+#orb-scan-btn.is-swath-ready .keycap,
+#orb-transmit-btn.is-cyan .keycap,
+.brief-start-btn .keycap,
+.debrief-cta.is-primary .keycap {
+  color: var(--accent-bright);
+  background: linear-gradient(180deg, #1a1d24 0%, #090b0f 100%);
+  border-color: rgba(9, 11, 15, 0.8);
+  border-bottom-color: rgba(255, 255, 255, 0.28);
+  text-shadow: none;
+}
+
+/* Emerald "complete" plate variant */
+.cta-btn.is-complete {
+  --fill: repeating-linear-gradient(-45deg, rgba(4, 19, 12, 0.5) 0 2px, transparent 2px 0.32rem) right top / 1.7rem 0.34rem no-repeat, linear-gradient(180deg, #10b981 0%, #059669 100%);
+  --rim: var(--rim-emerald);
+  color: #04130c;
+}
+
+/* Crimson-edged tactical abort switch */
+.btn-quit-mission,
+.btn-sci.danger,
+.quit-btn.is-danger {
+  --fill: linear-gradient(180deg, rgba(127, 29, 29, 0.55) 0%, rgba(40, 10, 12, 0.9) 100%);
+  --rim: var(--rim-crimson);
+  --bar: #ef4444;
   color: #fecaca;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-.btn-sci.danger:hover {
-  border-color: var(--status-bad);
-  background: rgba(153, 27, 27, 0.72);
+.btn-quit-mission:not(:disabled):hover,
+.btn-sci.danger:not(:disabled):hover,
+.quit-btn.is-danger:not(:disabled):hover {
+  --fill: linear-gradient(180deg, rgba(185, 28, 28, 0.78) 0%, rgba(80, 14, 16, 0.95) 100%);
+  --rim: linear-gradient(155deg, #ffffff 0%, #ef4444 55%, #fca5a5 100%);
   color: #ffffff;
 }
 
 .btn-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 0.36rem;
 }
 
-/* Crisp Monospace Keycap & Small Status Badges */
-.keycap {
+/* ------------------------------------------------------------------
+   3D PHYSICAL KEYCAPS
+   ------------------------------------------------------------------ */
+.keycap,
+.hazard-keycap,
+.brief-keybinds kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  min-width: 1.4rem;
+  height: 1.3rem;
+  padding: 0 0.34rem;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   font-weight: 700;
-  line-height: 1.2;
-  color: var(--text-main);
-  letter-spacing: 0.02em;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e5e7eb;
+  background: linear-gradient(180deg, #2b313c 0%, #171b22 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.28);
+  border-radius: 3px;
+  box-shadow: 0 0.12rem 0 rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.10);
   flex-shrink: 0;
 }
 
 .badge-tag {
   display: inline-flex;
   align-items: center;
+  gap: 0.28rem;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   font-weight: 700;
@@ -247,15 +523,16 @@ dialog button:hover {
   color: var(--accent-bright);
   background: rgba(245, 158, 11, 0.12);
   border: 1px solid rgba(245, 158, 11, 0.38);
-  border-radius: var(--radius-sm);
-  padding: 2px 6px;
+  border-radius: 0;
+  padding: 0.14rem 0.43rem;
   white-space: nowrap;
+  clip-path: polygon(0.24rem 0, 100% 0, 100% calc(100% - 0.24rem), calc(100% - 0.24rem) 100%, 0 100%, 0 0.24rem);
 }
 
 .stat-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 0.29rem;
   align-items: center;
 }
 
@@ -264,12 +541,12 @@ dialog button:hover {
   align-items: center;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-dim);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 1px 5px;
+  border-radius: 0;
+  padding: 0.07rem 0.36rem;
   white-space: nowrap;
 }
 
@@ -291,10 +568,50 @@ dialog button:hover {
   border-color: rgba(239, 68, 68, 0.5);
 }
 
+/* ------------------------------------------------------------------
+   SEGMENTED COCKPIT INSTRUMENT BARS
+   ------------------------------------------------------------------ */
+.seg-bar,
+.gm-bar,
+.hull-meter-track,
+.ascent-prog-track,
+.orb-obj-track,
+.hazard-bar-track {
+  position: relative;
+  height: 0.5rem;
+  border-radius: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.seg-bar::after,
+.gm-bar::after,
+.hull-meter-track::after,
+.ascent-prog-track::after,
+.orb-obj-track::after,
+.hazard-bar-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--seg-mask);
+}
+
+.gm-fill,
+.hull-meter-fill,
+.ascent-prog-fill,
+.orb-obj-fill,
+.hazard-bar-fill {
+  height: 100%;
+  border-radius: 0;
+  box-shadow: 0 0 0.4rem rgba(255, 255, 255, 0.12);
+}
+
 /* Custom Subtle Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 0.36rem;
+  height: 0.36rem;
 }
 
 ::-webkit-scrollbar-track {
@@ -303,9 +620,15 @@ dialog button:hover {
 
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.18);
-  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(245, 158, 11, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -5,6 +5,7 @@ import { haltLaunchLoop, mountLaunch, setLaunchCamera, setLaunchPaused, setLaunc
 import { clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, markOrbitPlayerAction, mountOrbit, mountShowcase, replayOrbitDeployment, resolveOrbitHazardChoice, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
 import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
 import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, stopAllSfx, stopRocketRumbling, toggleMute } from './sfx.js';
+import { hydrateIcons, stripEmoji } from './icons.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
 import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderLossOfVehicleModal, renderMissionBriefing, renderOrbitObjectivesSidebar, renderQuitConfirmModal, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
@@ -241,7 +242,7 @@ function updateDebug(ev) {
 
 function spawnPopup(text) {
   const box = document.getElementById('score-popups'), el = document.createElement('div');
-  el.className = 'pop-float'; el.textContent = text;
+  el.className = 'pop-float'; el.textContent = stripEmoji(text);
   box.appendChild(el);
   setTimeout(() => el.remove(), 1450);
 }
@@ -1077,6 +1078,7 @@ function init() {
   });
   document.querySelectorAll('.close-modal').forEach((b) => b.addEventListener('click', () => document.getElementById(b.dataset.close).close()));
   setLaunchSkipHandler(skipLaunchToOrbit);
+  hydrateIcons();
   initMusic();
   renderAll(true);
 }

@@ -1,4 +1,5 @@
 import { getHazardProtocol } from './catalog.js';
+import { stripEmoji } from './icons.js';
 import { playAlertKlaxon, playHullSpark, playRepairSuccess, playWarning } from './sfx.js';
 
 const KIND_ORDER = ['debris', 'cme', 'cryo', 'gimbal'];
@@ -137,7 +138,7 @@ export function resolveActiveHazardChoice(choiceIdx = 0, requiredEvents = 2) {
   anomaliesResolved += 1;
   hullIntegrity = Math.max(0, Math.min(100, hullIntegrity + hullDelta));
   resolvedBannerUntil = hullIntegrity > 0 ? performance.now() + 3600 : 0;
-  resolvedBannerText = chosen.toast;
+  resolvedBannerText = stripEmoji(chosen.toast);
   scheduleNext(requiredEvents, false);
   if (hullDelta <= -10) playWarning(); else playRepairSuccess();
 
@@ -155,7 +156,7 @@ export function resolveActiveHazardChoice(choiceIdx = 0, requiredEvents = 2) {
     sensorOfflineSec: chosen.sensorOfflineSec || 0,
     commsPauseSec: chosen.commsPauseSec || 0,
     omniReducedCount: chosen.omniReducedCount || 0,
-    toast: chosen.toast,
+    toast: stripEmoji(chosen.toast),
     hullIntegrity,
     anomaliesResolved
   };
@@ -216,7 +217,7 @@ export function updateOrbitHazards(
       const effHullLoss = Math.round(missed.hullLossOnMiss * hazMult);
       hullIntegrity = Math.max(0, hullIntegrity - effHullLoss);
       resolvedBannerUntil = hullIntegrity > 0 ? now + 3600 : 0;
-      resolvedBannerText = `💥 RESPONSE TIMED OUT — -${effHullLoss}% HULL & -${missed.batteryLossOnMiss}% BATTERY!`;
+      resolvedBannerText = `RESPONSE TIMED OUT — -${effHullLoss}% HULL & -${missed.batteryLossOnMiss}% BATTERY!`;
       scheduleNext(requiredEvents, false);
       playHullSpark();
       callbacks.onExpire?.({
