@@ -358,25 +358,119 @@ function makePlasmaSunMaterial() {
         float v = 0.0, a = 0.5;
         for (int i = 0; i < 5; i++) {
           v += a * noise3(p);
-          p = p * 2.12 + vec3(0.14 * uTime, -0.1 * uTime, 0.09 * uTime);
+          p = p * 2.12 + vec3(0.11 * uTime, -0.08 * uTime, 0.07 * uTime);
           a *= 0.5;
         }
         return v;
       }
       void main() {
-        float n = fbm3(vPos * 6.8 + vec3(uTime * 0.16));
-        float flares = pow(fbm3(vPos * 11.5 - vec3(uTime * 0.22)), 2.2);
-        vec3 crimson = vec3(0.92, 0.25, 0.02);
-        vec3 gold = vec3(1.15, 0.82, 0.20);
-        vec3 plasmaWhite = vec3(1.45, 1.38, 1.15);
-        vec3 col = mix(crimson, gold, smoothstep(0.26, 0.72, n));
-        col = mix(col, plasmaWhite, smoothstep(0.65, 0.92, n + flares * 0.45));
-        float fresnel = pow(1.0 - max(0.0, dot(vNormal, vViewDir)), 2.1);
-        col += vec3(1.25, 0.62, 0.14) * fresnel * 0.75;
+        float macro = fbm3(vPos * 4.4 + vec3(uTime * 0.08, -uTime * 0.05, 0.0));
+        float gran = fbm3(vPos * 12.5 - vec3(uTime * 0.14));
+        float cell = mix(macro, gran, 0.52);
+        float flares = pow(clamp(fbm3(vPos * 8.8 + vec3(-uTime * 0.16, uTime * 0.12, 0.0)), 0.0, 1.0), 2.4);
+
+        // Dark magnetic sunspot clusters along solar active latitudes
+        float latBand = exp(-pow(abs(vPos.y) * 3.2, 2.0));
+        float spotField = fbm3(vPos * 3.1 + vec3(0.0, uTime * 0.02, 0.0)) * (0.45 + 0.55 * latBand);
+        float spotUmbra = smoothstep(0.68, 0.84, spotField);
+
+        vec3 ember = vec3(0.36, 0.09, 0.01);
+        vec3 deepAmber = vec3(0.82, 0.25, 0.02);
+        vec3 richGold = vec3(0.98, 0.58, 0.07);
+        vec3 whiteGold = vec3(1.16, 0.92, 0.46);
+
+        vec3 col = mix(deepAmber, richGold, smoothstep(0.28, 0.72, cell));
+        col = mix(col, whiteGold, smoothstep(0.62, 0.90, cell * 0.65 + flares * 0.58));
+        col = mix(col, ember, spotUmbra * 0.78);
+
+        // Solar limb darkening preserves crisp fiery sphere edge under bloom
+        float mu = max(0.0, dot(normalize(vNormal), normalize(vViewDir)));
+        float limbDark = 0.34 + 0.66 * pow(mu, 0.48);
+        vec3 limbTint = mix(vec3(0.92, 0.30, 0.05), vec3(1.0), pow(mu, 0.6));
+        col *= limbDark * limbTint;
+        col = min(col, vec3(1.15, 0.96, 0.62));
         gl_FragColor = vec4(col, 1.0);
       }
     `
   });
+}
+
+function makeSolarCoronaMat() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: `
+      varying vec3 vNormal; varying vec3 vViewDir; varying vec3 vLocalDir;
+      void main() {
+        vLocalDir = normalize(position);
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vViewDir = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime; varying vec3 vNormal; varying vec3 vViewDir; varying vec3 vLocalDir;
+      void main() {
+        float fres = clamp(1.0 - abs(dot(normalize(vNormal), normalize(vViewDir))), 0.0, 1.0);
+        float halo = pow(fres, 2.7);
+        float ang = atan(vLocalDir.y, vLocalDir.z);
+        float streamer = 0.72 + 0.28 * sin(ang * 9.0 + uTime * 0.55) * cos(vLocalDir.x * 7.0 - uTime * 0.4);
+        vec3 cInner = vec3(1.0, 0.62, 0.16);
+        vec3 cOuter = vec3(0.88, 0.28, 0.03);
+        vec3 col = mix(cOuter, cInner, halo) * halo * streamer * 0.72;
+        gl_FragColor = vec4(col, halo * 0.62);
+      }
+    `,
+    side: THREE.BackSide,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+}
+
+function makeCoronaStreamerSprite(size, rayCount, seed) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const ctx = c.getContext('2d'), cx = 256, cy = 256;
+  const ring = ctx.createRadialGradient(cx, cy, 34, cx, cy, 248);
+  ring.addColorStop(0.0, 'rgba(255,210,120,0.0)');
+  ring.addColorStop(0.18, 'rgba(251,146,60,0.12)');
+  ring.addColorStop(0.32, 'rgba(245,158,11,0.34)');
+  ring.addColorStop(0.54, 'rgba(234,88,12,0.14)');
+  ring.addColorStop(1.0, 'rgba(0,0,0,0)');
+  ctx.fillStyle = ring;
+  ctx.fillRect(0, 0, 512, 512);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  for (let i = 0; i < rayCount; i += 1) {
+    const a = (i / rayCount) * Math.PI * 2 + hash2(i, seed) * 0.25;
+    const len = 145 + hash2(seed, i) * 95;
+    const w = 10 + hash2(i + 7, seed) * 14;
+    ctx.save();
+    ctx.rotate(a);
+    const rg = ctx.createLinearGradient(56, 0, len, 0);
+    rg.addColorStop(0, 'rgba(255,220,140,0.0)');
+    rg.addColorStop(0.25, 'rgba(251,146,60,0.22)');
+    rg.addColorStop(0.65, 'rgba(234,88,12,0.09)');
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.moveTo(52, -w * 0.35);
+    ctx.lineTo(len, 0);
+    ctx.lineTo(52, w * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({
+    map: tex, transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(size, size, 1);
+  return { sprite, tex, mat };
 }
 
 function makeLabelSprite(text, color = '#94a3b8') {
@@ -446,16 +540,18 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
   track(stars.geo); track(stars.mat);
   scene.add(stars.points);
 
-  // 2. Animated Plasma Sun + Dual HDR Corona Sprites
+  // 2. Animated Boiling Plasma Sun + Volumetric Fresnel Corona + Counter-Rotating Streamers
   const sunPos = new THREE.Vector3(260, 0, 0);
   const sunGroup = new THREE.Group();
   sunGroup.position.copy(sunPos);
   const sunMat = track(makePlasmaSunMaterial());
-  sunGroup.add(new THREE.Mesh(track(new THREE.SphereGeometry(16, 48, 32)), sunMat));
-  const c1 = makeGlowSprite('rgba(255,252,232,0.98)', 'rgba(251,146,60,0.48)', 74);
-  const c2 = makeGlowSprite('rgba(253,224,71,0.38)', 'rgba(234,88,12,0)', 136);
+  const sunSphere = new THREE.Mesh(track(new THREE.SphereGeometry(16, 48, 32)), sunMat);
+  const sunCoronaMat = track(makeSolarCoronaMat());
+  const sunCoronaHalo = new THREE.Mesh(track(new THREE.SphereGeometry(16 * 1.24, 48, 32)), sunCoronaMat);
+  const c1 = makeCoronaStreamerSprite(64, 18, 13);
+  const c2 = makeCoronaStreamerSprite(94, 14, 29);
   track(c1.tex); track(c1.mat); track(c2.tex); track(c2.mat);
-  sunGroup.add(c1.sprite, c2.sprite);
+  sunGroup.add(sunSphere, sunCoronaHalo, c1.sprite, c2.sprite);
   addHoloProxy(sunGroup, 16 * 2.8, 'sun', 17.5, () => sunPos.clone(), new THREE.Vector3(34, 15, 44));
   scene.add(sunGroup);
 
@@ -633,6 +729,10 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
   function update(dt, elapsed) {
     stars.mat.uniforms.uTime.value = elapsed;
     sunMat.uniforms.uTime.value = elapsed;
+    sunCoronaMat.uniforms.uTime.value = elapsed;
+    sunSphere.rotation.y += dt * 0.035;
+    c1.mat.rotation = elapsed * 0.05;
+    c2.mat.rotation = -elapsed * 0.035;
     moon.rotation.y += dt * 0.05;
     planets.forEach((p) => { p.sphere.rotation.y += dt * p.spin; });
 

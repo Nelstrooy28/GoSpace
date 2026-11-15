@@ -16,7 +16,7 @@ let becoDone = false, mecoDone = false, fairingDone = false, completed = false, 
 let updateCb = null, completeCb = null;
 
 const clock = new THREE.Clock();
-const launchTexCache = { ready: false, hullWhite: null, hullBlack: null, fairing: null };
+const launchTexCache = { ready: false, hullWhite: null, hullBlack: null, fairing: null, steam: null };
 
 function getLaunchTextures() {
   if (launchTexCache.ready) return launchTexCache;
@@ -48,6 +48,22 @@ function getLaunchTextures() {
   launchTexCache.hullWhite = makeHull('#f1f5f9', '#0f172a', '#0f172a');
   launchTexCache.hullBlack = makeHull('#18181b', '#94a3b8', '#e2e8f0');
   launchTexCache.fairing = Object.assign(new THREE.CanvasTexture(fc), { colorSpace: THREE.SRGBColorSpace });
+
+  const sc = document.createElement('canvas'); sc.width = 128; sc.height = 128;
+  const sCtx = sc.getContext('2d');
+  const lobes = [
+    [64, 64, 58, 0.52], [48, 56, 38, 0.34], [82, 60, 36, 0.34],
+    [62, 46, 34, 0.30], [58, 78, 36, 0.28]
+  ];
+  lobes.forEach(([lx, ly, lr, la]) => {
+    const g = sCtx.createRadialGradient(lx, ly, 2, lx, ly, lr);
+    g.addColorStop(0, `rgba(255,255,255,${la})`);
+    g.addColorStop(0.45, `rgba(241,245,249,${la * 0.55})`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    sCtx.fillStyle = g;
+    sCtx.fillRect(0, 0, 128, 128);
+  });
+  launchTexCache.steam = Object.assign(new THREE.CanvasTexture(sc), { colorSpace: THREE.SRGBColorSpace });
   launchTexCache.ready = true;
   return launchTexCache;
 }
@@ -58,32 +74,107 @@ function addMesh(parent, geo, mat, pos = [0, 0, 0], rot = [0, 0, 0]) {
   return m;
 }
 
+function makeMachPlumeMaterial(isCore = false) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uCore: { value: isCore ? 1.0 : 0.0 } },
+    vertexShader: `
+      uniform float uTime;
+      uniform float uCore;
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vViewDir;
+      void main() {
+        vUv = uv;
+        float d = 1.0 - uv.y;
+        float shock = cos((d * 5.2 + sin(uTime * 22.0) * 0.04) * 6.283185);
+        float pinch = 1.0 - (uCore > 0.5 ? 0.34 : 0.14) * max(0.0, shock) * exp(-d * 0.95);
+        vec3 p = vec3(position.x * pinch, position.y, position.z * pinch);
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        vViewDir = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uCore;
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vViewDir;
+      void main() {
+        float d = 1.0 - vUv.y;
+        float nozzleHot = exp(-d * 7.2);
+        float wave = cos((d * 5.2 + sin(uTime * 24.0) * 0.05) * 6.283185);
+        float diamonds = pow(max(0.0, wave), uCore > 0.5 ? 5.8 : 7.0) * exp(-d * 1.05) * (1.0 - smoothstep(0.84, 1.0, d));
+        float shear = 0.78 + 0.22 * sin(vUv.y * 22.0 + uTime * 28.0 + sin(vUv.x * 12.566) * 2.0);
+        float edge = pow(abs(dot(normalize(vNormal), normalize(vViewDir))), 0.62);
+        float tailFade = smoothstep(0.0, 0.24, vUv.y) * smoothstep(1.0, 0.96, vUv.y);
+
+        vec3 outerAmber = vec3(0.95, 0.24, 0.02);
+        vec3 innerFlame = vec3(1.06, 0.52, 0.08);
+        vec3 diamondWhite = vec3(1.36, 1.18, 0.82);
+
+        vec3 col = mix(outerAmber, innerFlame, uCore * 0.45 + nozzleHot * 0.45);
+        col = mix(col, diamondWhite, clamp(diamonds * (uCore > 0.5 ? 1.15 : 0.78) + nozzleHot * 0.85, 0.0, 1.0));
+        float alpha = clamp((0.24 + diamonds * 0.78 + nozzleHot * 0.52) * shear * edge * tailFade, 0.0, uCore > 0.5 ? 0.95 : 0.72);
+        gl_FragColor = vec4(min(col, vec3(1.36, 1.18, 0.84)) * alpha, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+}
+
+function makeMvacPlumeMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: `
+      varying vec2 vUv; varying vec3 vNormal; varying vec3 vViewDir;
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vViewDir = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime; varying vec2 vUv; varying vec3 vNormal; varying vec3 vViewDir;
+      void main() {
+        float edge = pow(abs(dot(normalize(vNormal), normalize(vViewDir))), 0.65);
+        float pulse = 0.85 + 0.15 * sin(vUv.y * 18.0 + uTime * 22.0);
+        float fade = smoothstep(0.0, 0.45, vUv.y);
+        vec3 col = mix(vec3(0.32, 0.48, 0.98), vec3(0.45, 0.90, 1.15), smoothstep(0.55, 1.0, vUv.y));
+        float alpha = clamp(fade * edge * pulse * 0.76, 0.0, 0.82);
+        gl_FragColor = vec4(col * alpha, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+}
+
 function createPlumeAssembly(r, height) {
   const grp = new THREE.Group();
-  addMesh(
-    grp,
-    new THREE.ConeGeometry(r * 1.05, height, 20, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }),
-    [0, -height * 0.5, 0], [Math.PI, 0, 0]
-  );
-  addMesh(
-    grp,
-    new THREE.ConeGeometry(r * 0.52, height * 0.78, 14),
-    new THREE.MeshBasicMaterial({ color: 0xfffbeb, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending, depthWrite: false }),
-    [0, -height * 0.39, 0], [Math.PI, 0, 0]
-  );
-  const diamonds = [];
-  for (let d = 0; d < 6; d += 1) {
-    const dm = addMesh(
-      grp,
-      new THREE.OctahedronGeometry(r * (0.44 - d * 0.055), 0),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending, depthWrite: false }),
-      [0, -0.24 - d * (height * 0.14), 0]
-    );
-    dm.scale.set(0.72, 1.45, 0.72);
-    diamonds.push(dm);
-  }
-  return { grp, diamonds };
+  const outerGeo = new THREE.CylinderGeometry(r * 0.42, r * 1.12, height, 28, 22, true);
+  outerGeo.translate(0, -height * 0.5, 0);
+  const outerMat = makeMachPlumeMaterial(false);
+  const outerMesh = new THREE.Mesh(outerGeo, outerMat);
+  outerMesh.renderOrder = 2;
+  grp.add(outerMesh);
+
+  const coreGeo = new THREE.CylinderGeometry(r * 0.28, r * 0.58, height * 0.86, 22, 22, true);
+  coreGeo.translate(0, -height * 0.43, 0);
+  const coreMat = makeMachPlumeMaterial(true);
+  const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+  coreMesh.renderOrder = 3;
+  grp.add(coreMesh);
+
+  return { grp, outerMat, coreMat };
 }
 
 function createEngineCluster(parent, radius, yPos, bellMat) {
@@ -159,12 +250,9 @@ function buildRocket(missionState) {
   addMesh(stage2Group, new THREE.CylinderGeometry(r * 0.98, r * 0.98, 0.95, 26), hullMat, [0, s2Y + 0.48, 0]);
   mvacBell = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.3, emissive: 0xff4500, emissiveIntensity: 0 });
   addMesh(stage2Group, new THREE.CylinderGeometry(r * 0.36, r * 0.64, 0.32, 18), mvacBell, [0, s2Y - 0.1, 0]);
-  mvacPlume = addMesh(
-    stage2Group,
-    new THREE.ConeGeometry(r * 1.15, 1.75, 20, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }),
-    [0, s2Y - 1.08, 0], [Math.PI, 0, 0]
-  );
+  const mvacGeo = new THREE.CylinderGeometry(r * 0.48, r * 1.38, 1.85, 24, 16, true);
+  mvacGeo.translate(0, -0.925, 0);
+  mvacPlume = addMesh(stage2Group, mvacGeo, makeMvacPlumeMaterial(), [0, s2Y - 0.24, 0], [0, 0, 0]);
   mvacPlume.visible = false;
 
   // Player Configured Payload Spacecraft inside Fairing (identical to Hangar build, stowed at t=0)
@@ -252,12 +340,21 @@ function buildSpaceportAndHorizon() {
   trenchLight = new THREE.PointLight(0xf97316, 0, 36); trenchLight.position.set(0, 0.9, 1.4);
   scene.add(trenchLight);
 
-  // 72 Steam/Smoke Puffs & 40 Ember/Sep Sparks
-  const puffGeo = new THREE.SphereGeometry(0.32, 8, 8);
-  const puffMat = new THREE.MeshBasicMaterial({ color: 0xf1f5f9, transparent: true, opacity: 0.45 });
-  for (let i = 0; i < 72; i += 1) {
-    const m = new THREE.Mesh(puffGeo, puffMat.clone()); m.visible = false; scene.add(m);
-    puffs.push({ m, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 1 });
+  // 110 Soft Volumetric Steam/Smoke Sprites & 40 Ember/Sep Sparks
+  const tex = getLaunchTextures();
+  for (let i = 0; i < 110; i += 1) {
+    const spMat = new THREE.SpriteMaterial({
+      map: tex.steam,
+      color: 0xf8fafc,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      rotation: (i * 0.9) % (Math.PI * 2)
+    });
+    const m = new THREE.Sprite(spMat);
+    m.visible = false;
+    scene.add(m);
+    puffs.push({ m, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 1, size: 1, grow: 2.2, kind: 'cryo', baseOp: 0.45 });
   }
   const sparkGeo = new THREE.SphereGeometry(0.045, 6, 6), sparkMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
   for (let i = 0; i < 40; i += 1) {
@@ -335,8 +432,9 @@ function animate() {
   const updatePlume = (f, vis) => {
     f.grp.visible = vis;
     if (vis) {
-      f.grp.scale.set(altScale, 0.88 + Math.random() * 0.38, altScale);
-      f.diamonds.forEach((dm, idx) => { dm.visible = Math.sin(padClock * 44 + idx) > -0.25 && elapsed < 8.4; });
+      f.grp.scale.set(altScale, 0.92 + Math.sin(padClock * 38) * 0.08 + Math.random() * 0.14, altScale);
+      if (f.outerMat) f.outerMat.uniforms.uTime.value = padClock;
+      if (f.coreMat) f.coreMat.uniforms.uTime.value = padClock;
     }
   };
   flames.forEach((f) => updatePlume(f, s1Active));
@@ -344,9 +442,16 @@ function animate() {
   if (mvacBell) mvacBell.emissiveIntensity = THREE.MathUtils.lerp(mvacBell.emissiveIntensity, elapsed >= 9.45 ? 1.8 : 0, dt * 5);
   if (mvacPlume) {
     mvacPlume.visible = ignitedCmd && elapsed >= 9.5;
-    if (mvacPlume.visible) mvacPlume.scale.set(1.2, 0.9 + Math.random() * 0.25, 1.2);
+    if (mvacPlume.visible) {
+      mvacPlume.material.uniforms.uTime.value = padClock;
+      mvacPlume.scale.set(1.18, 0.94 + Math.random() * 0.18, 1.18);
+    }
   }
-  if (trenchLight) trenchLight.intensity = s1Active && elapsed < 6.4 ? 14 + Math.random() * 6 : 0;
+  if (trenchLight) {
+    const padLit = s1Active && elapsed < 7.0;
+    trenchLight.position.y = Math.max(0.85, rocketGroup.position.y * 0.35 + 0.75);
+    trenchLight.intensity = padLit ? (18 + Math.sin(padClock * 42) * 5 + Math.random() * 5) * Math.max(0.25, 1 - Math.max(0, elapsed - 4.5) / 2.6) : 0;
+  }
 
   let altKm = 0, velKms = 0, phase = ignitedCmd ? 'COUNTDOWN' : 'ARMED ON PAD', callout = ignitedCmd ? 'T-MINUS' : 'READY FOR IGNITION';
   let cdLabel = !ignitedCmd ? 'HOLD' : (elapsed < 0.85 ? 'T-3' : (elapsed < 1.7 ? 'T-2' : (elapsed < 2.55 ? 'T-1' : 'IGNITION')));
@@ -404,32 +509,50 @@ function animate() {
     }
   });
 
-  // Pooled Cryo Venting, Trench Blast & Vertical Ascent Exhaust Trail
-  const spawnMode = !ignitedCmd || elapsed < 1.9 ? 'cryo' : (elapsed < 5.6 ? 'trench' : (elapsed < 9.2 ? 'trail' : 'none'));
-  const spawnModulo = spawnMode === 'cryo' ? 4 : 1;
+  // Pooled Cryo Venting, Coastal Pad Water-Deluge Steam & Vertical Ascent Exhaust Trail
+  const spawnMode = !ignitedCmd || elapsed < 1.9 ? 'cryo' : (elapsed < 6.9 ? 'trench' : (elapsed < 9.3 ? 'trail' : 'none'));
+  const spawnModulo = spawnMode === 'cryo' ? 6 : 1;
   puffs.forEach((p, idx) => {
-    if (spawnMode !== 'none' && p.life <= 0 && (idx % spawnModulo === Math.floor(padClock * 30) % spawnModulo)) {
-      p.life = 1; p.maxLife = spawnMode === 'cryo' ? 1.5 : 1.9; p.m.visible = true;
+    if (spawnMode !== 'none' && p.life <= 0 && (idx % spawnModulo === Math.floor(padClock * 36) % spawnModulo)) {
+      p.life = 1; p.kind = spawnMode; p.m.visible = true;
       if (spawnMode === 'cryo') {
+        p.maxLife = 1.6; p.size = 0.75; p.grow = 0.9; p.baseOp = 0.32;
+        p.m.material.color.setHex(0xe2e8f0);
         p.m.position.set(rocketSpec.r + 0.08, 2.8 + (idx % 2) * 0.9, (Math.random() - 0.5) * 0.15);
-        p.vx = 0.55 + Math.random() * 0.4; p.vy = -0.28; p.vz = (Math.random() - 0.5) * 0.35;
-        p.m.scale.setScalar(0.35);
+        p.vx = 0.52 + Math.random() * 0.4; p.vy = -0.22; p.vz = (Math.random() - 0.5) * 0.35;
       } else if (spawnMode === 'trench') {
-        const end = idx % 2 === 0 ? 1 : -1;
-        p.m.position.set((Math.random() - 0.5) * 0.8, 0.25, end * (1.2 + Math.random() * 1.4));
-        p.vx = (Math.random() - 0.5) * 3.0; p.vy = 0.4 + Math.random() * 1.3; p.vz = end * (6.2 + Math.random() * 4.2);
-        p.m.scale.setScalar(0.95);
+        const radialDeck = idx % 3 === 0;
+        p.maxLife = 1.95 + Math.random() * 0.45; p.size = 1.35 + Math.random() * 0.55; p.grow = 2.85; p.baseOp = 0.44;
+        const warm = idx % 4 === 0 && elapsed < 4.5;
+        p.m.material.color.setHex(warm ? 0xffedd5 : 0xf1f5f9);
+        if (radialDeck) {
+          const ang = Math.random() * Math.PI * 2;
+          p.m.position.set(Math.cos(ang) * 1.25, 0.22 + Math.random() * 0.15, Math.sin(ang) * 1.25);
+          p.vx = Math.cos(ang) * (4.5 + Math.random() * 3.0);
+          p.vy = 0.45 + Math.random() * 0.95;
+          p.vz = Math.sin(ang) * (4.5 + Math.random() * 3.0);
+        } else {
+          const end = idx % 2 === 0 ? 1 : -1;
+          p.m.position.set((Math.random() - 0.5) * 0.85, 0.22 + Math.random() * 0.18, end * (1.45 + Math.random() * 1.3));
+          p.vx = (Math.random() - 0.5) * 3.4;
+          p.vy = 0.45 + Math.random() * 1.2;
+          p.vz = end * (7.2 + Math.random() * 4.2);
+        }
       } else {
-        p.m.position.set((Math.random() - 0.5) * 0.3, rocketGroup.position.y - 0.8, (Math.random() - 0.5) * 0.3);
-        p.vx = (Math.random() - 0.5) * 0.9; p.vy = -1.6 - Math.random() * 1.2; p.vz = (Math.random() - 0.5) * 0.9;
-        p.m.scale.setScalar(0.85);
+        p.maxLife = 1.75; p.size = 1.45; p.grow = 2.6; p.baseOp = 0.48;
+        p.m.material.color.setHex(0xf1f5f9);
+        p.m.position.set((Math.random() - 0.5) * 0.32, rocketGroup.position.y - 0.85, (Math.random() - 0.5) * 0.32);
+        p.vx = (Math.random() - 0.5) * 0.95; p.vy = -1.7 - Math.random() * 1.2; p.vz = (Math.random() - 0.5) * 0.95;
       }
+      p.m.scale.set(p.size, p.size, 1);
     }
     if (p.life > 0) {
       p.life -= dt / p.maxLife;
       p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
-      p.m.scale.addScalar(dt * (spawnMode === 'cryo' ? 0.55 : 2.3));
-      p.m.material.opacity = Math.max(0, p.life * (spawnMode === 'cryo' ? 0.24 : 0.48));
+      if (p.kind === 'trench') { p.vx *= (1 - dt * 0.65); p.vz *= (1 - dt * 0.65); p.vy += dt * 0.85; }
+      p.size += dt * p.grow;
+      p.m.scale.set(p.size, p.size, 1);
+      p.m.material.opacity = Math.max(0, Math.sin(Math.min(1, 1 - p.life) * Math.PI * 0.22 + 0.15) * p.life * p.baseOp);
       if (p.life <= 0) p.m.visible = false;
     }
   });

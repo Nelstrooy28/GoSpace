@@ -18,8 +18,8 @@ const STATIONS = [
 ];
 
 let renderer = null, bloomComp = null, scene = null, camera = null, controls = null, resizeObserver = null, spaceEnv = null, envRT = null;
-let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = null, earthshineLight = null;
-let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, beamHalo = null, scanLine = null;
+let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = null, auroraMat = null, earthshineLight = null;
+let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, downlinkRig = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
 let gsNodes = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
 let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false, sensorCamEnabled = false;
@@ -33,7 +33,7 @@ let deployActive = false, deployCompleted = false, deployElapsed = 0, deployProg
 let holoSelectCb = null, holoTargets = {}, holoProxies = [], gsHoloProxies = [], earthSolidMesh = null, earthOuterProxy = null;
 let selectedHoloId = null, followHoloId = null, hasPrevFollow = false, selectionRing = null;
 let pointerDownPos = null, lastHoverMs = 0, pointerCleanup = null;
-const prevFollowPos = new THREE.Vector3(), tmpFollowPos = new THREE.Vector3(), tmpDeltaFollow = new THREE.Vector3(), tmpUpAxis = new THREE.Vector3(0, 1, 0);
+const prevFollowPos = new THREE.Vector3(), tmpFollowPos = new THREE.Vector3(), tmpDeltaFollow = new THREE.Vector3(), tmpUpAxis = new THREE.Vector3(0, 1, 0), tmpFwdAxis = new THREE.Vector3(0, 0, 1), tmpBeamVec = new THREE.Vector3();
 const holoRaycaster = new THREE.Raycaster(), holoNdc = new THREE.Vector2();
 
 const parallaxTarget = new THREE.Vector2(), parallaxCur = new THREE.Vector2();
@@ -201,13 +201,17 @@ function makeEarthTerminatorMaterial(maps) {
         float twilight = exp(-pow((sunDot - 0.02) * 7.2, 2.0));
         vec3 termScatter = vec3(1.0, 0.45, 0.14) * twilight * 0.26;
 
+        float oceanMask = smoothstep(0.55, 0.95, waterMask);
         vec3 halfVec = normalize(sunDir + viewDir);
-        float spec = pow(max(0.0, dot(n, halfVec)), 54.0) * waterMask * smoothstep(-0.02, 0.24, sunDot);
+        float specCore = pow(max(0.0, dot(n, halfVec)), 76.0);
+        float specBroad = pow(max(0.0, dot(n, halfVec)), 16.0);
+        float oceanFres = pow(1.0 - max(0.0, dot(n, viewDir)), 2.2);
+        vec3 sunglint = (vec3(1.0, 0.94, 0.78) * specCore * 1.15 + vec3(1.0, 0.80, 0.42) * specBroad * (0.35 + 0.65 * oceanFres) * 0.48) * oceanMask * smoothstep(-0.01, 0.26, sunDot);
 
         float nightMask = smoothstep(0.14, -0.22, sunDot);
         vec3 cities = texture2D(uNight, vUv).rgb * nightMask * 1.55;
 
-        vec3 dayColor = albedo * (0.08 + 1.08 * dayLit) + termScatter + vec3(1.0, 0.96, 0.88) * spec * 1.05;
+        vec3 dayColor = albedo * (0.08 + 1.06 * dayLit) + termScatter + min(sunglint, vec3(0.95));
         gl_FragColor = vec4(dayColor + cities, 1.0);
       }
     `
@@ -241,27 +245,211 @@ function makeAtmosphereRimMaterial() {
   });
 }
 
-function makeTagSprite(label, color) {
-  const c = document.createElement('canvas'); c.width = 224; c.height = 56;
+function makeAuroraCurtainGeo(signY, segs = 128, rings = 8) {
+  const pos = [];
+  const uvs = [];
+  const idx = [];
+  const colatBase = (22 * Math.PI) / 180; // ~68 deg N/S geomagnetic latitude
+  for (let r = 0; r <= rings; r += 1) {
+    const v = r / rings;
+    const rad = EARTH_R * (1.032 + v * 0.135);
+    const latTilt = colatBase + (v - 0.5) * 0.036;
+    for (let s = 0; s <= segs; s += 1) {
+      const u = s / segs;
+      const theta = u * Math.PI * 2;
+      const ripple = 0.052 * Math.sin(theta * 2.0 + 0.7 * signY) + 0.024 * Math.cos(theta * 5.0 - 0.4);
+      const phi = latTilt + ripple;
+      const xz = Math.sin(phi) * rad;
+      const y = signY * Math.cos(phi) * rad;
+      pos.push(Math.cos(theta) * xz, y, Math.sin(theta) * xz);
+      uvs.push(u, v);
+    }
+  }
+  const row = segs + 1;
+  for (let r = 0; r < rings; r += 1) {
+    for (let s = 0; s < segs; s += 1) {
+      const a = r * row + s;
+      const b = a + 1;
+      const c = a + row;
+      const d = c + 1;
+      idx.push(a, b, c, b, d, c);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function createPolarAuroraGroup() {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uSunDir: { value: SUN_DIR } },
+    vertexShader: `
+      varying vec2 vUv; varying vec3 vWorldPos;
+      void main() {
+        vUv = uv;
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime; uniform vec3 uSunDir;
+      varying vec2 vUv; varying vec3 vWorldPos;
+      void main() {
+        float altFade = smoothstep(0.0, 0.24, vUv.y) * smoothstep(1.0, 0.42, vUv.y);
+        float wave = sin(vUv.x * 18.8495 + uTime * 0.65) * 1.9 + cos(vUv.x * 31.4159 - uTime * 0.42) * 1.1;
+        float raysA = pow(max(0.0, sin(vUv.x * 88.0 + wave - uTime * 1.55) * 0.5 + 0.5), 2.1);
+        float raysB = pow(max(0.0, cos(vUv.x * 164.0 - wave * 0.6 + uTime * 2.1) * 0.5 + 0.5), 1.6);
+        float arcEnv = smoothstep(0.18, 0.88, sin(vUv.x * 12.5664 + uTime * 0.28) * 0.5 + 0.55);
+
+        float sunDot = dot(normalize(vWorldPos), normalize(uSunDir));
+        float nightWeight = mix(0.46, 1.18, smoothstep(0.28, -0.32, sunDot));
+
+        vec3 emerald = vec3(0.08, 0.96, 0.55);
+        vec3 violet = vec3(0.72, 0.36, 1.0);
+        vec3 col = mix(emerald, violet, smoothstep(0.18, 0.82, vUv.y));
+
+        float intensity = altFade * (0.28 + raysA * 0.72 + raysB * 0.38) * (0.48 + 0.52 * arcEnv) * nightWeight;
+        intensity = clamp(intensity * 1.18, 0.0, 0.92);
+        gl_FragColor = vec4(col * intensity, intensity);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const grp = new THREE.Group();
+  grp.add(new THREE.Mesh(makeAuroraCurtainGeo(1), mat), new THREE.Mesh(makeAuroraCurtainGeo(-1), mat));
+  return { grp, mat };
+}
+
+function createDownlinkStreamRig() {
+  const grp = new THREE.Group();
+  const beamGeo = new THREE.CylinderGeometry(0.015, 0.028, 1, 12, 1, true);
+  beamGeo.translate(0, 0.5, 0);
+  const beamMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uBoost: { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vUv; varying vec3 vNormal; varying vec3 vViewDir;
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vViewDir = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime; uniform float uBoost;
+      varying vec2 vUv; varying vec3 vNormal; varying vec3 vViewDir;
+      void main() {
+        float speed = mix(2.2, 5.4, uBoost);
+        float p1 = smoothstep(0.58, 0.96, fract(vUv.y * 6.0 - uTime * speed));
+        float p2 = smoothstep(0.74, 0.98, fract(vUv.y * 13.0 - uTime * (speed * 1.45) + 0.35));
+        float carrier = 0.22 + 0.14 * sin(vUv.y * 36.0 - uTime * 8.0);
+        float edge = pow(abs(dot(normalize(vNormal), normalize(vViewDir))), 0.55);
+        float endMask = smoothstep(0.0, 0.06, vUv.y) * smoothstep(1.0, 0.94, vUv.y);
+        vec3 cyan = vec3(0.14, 0.85, 0.98);
+        vec3 emerald = vec3(0.20, 0.95, 0.68);
+        vec3 packetCol = mix(cyan, emerald, clamp(uBoost * 0.75 + p2 * 0.45, 0.0, 1.0));
+        float lum = (carrier + p1 * 0.78 + p2 * 0.65) * edge * endMask * mix(0.72, 1.05, uBoost);
+        lum = clamp(lum, 0.0, 0.95);
+        gl_FragColor = vec4(packetCol * lum, lum);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const streamMesh = new THREE.Mesh(beamGeo, beamMat);
+  grp.add(streamMesh);
+
+  const waveRings = Array.from({ length: 5 }, () => {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.032, 0.048, 24),
+      new THREE.MeshBasicMaterial({
+        color: 0x34d399,
+        transparent: true,
+        opacity: 0.75,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      })
+    );
+    grp.add(ring);
+    return ring;
+  });
+
+  const packetOrbs = Array.from({ length: 6 }, () => {
+    const orb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.022, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    grp.add(orb);
+    return orb;
+  });
+
+  grp.visible = false;
+  return { grp, streamMesh, beamMat, waveRings, packetOrbs };
+}
+
+function makeTagSprite(badge, altText, color) {
+  const c = document.createElement('canvas'); c.width = 320; c.height = 96;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = 'rgba(4,10,22,0.88)'; ctx.fillRect(6, 6, 212, 44);
-  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(6, 6, 212, 44);
-  ctx.fillStyle = color; ctx.font = 'bold 24px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(label, 112, 29);
+  const cut = 14;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cut + 6, 8); ctx.lineTo(312 - cut, 8); ctx.lineTo(312, 8 + cut);
+  ctx.lineTo(312, 88 - cut); ctx.lineTo(312 - cut, 88); ctx.lineTo(6 + cut, 88);
+  ctx.lineTo(6, 88 - cut); ctx.lineTo(6, 8 + cut); ctx.closePath();
+  ctx.fillStyle = 'rgba(4, 12, 26, 0.92)';
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Inner diamond glyph + badge label + altitude value
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(30, 34); ctx.lineTo(42, 48); ctx.lineTo(30, 62); ctx.lineTo(18, 48); ctx.closePath();
+  ctx.fill();
+
+  ctx.font = 'bold 28px Orbitron, monospace';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(badge, 52, 49);
+
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
+  ctx.fillRect(114, 24, 2, 48);
+
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = 'bold 28px "Chakra Petch", monospace';
+  ctx.fillText(altText, 128, 49);
+  ctx.restore();
+
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sp.scale.set(1.55, 0.39, 1);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
+  sp.renderOrder = 11;
+  sp.scale.set(1.85, 0.55, 1);
   return sp;
 }
 
 function buildOrbitRibbon(points, halfWidth) {
   const n = points.length, pos = new Float32Array(n * 2 * 3), col = new Float32Array(n * 2 * 3), idx = [];
-  const up = new THREE.Vector3(0, 1, 0), tang = new THREE.Vector3(), side = new THREE.Vector3();
+  const tang = new THREE.Vector3(), rad = new THREE.Vector3(), side = new THREE.Vector3();
   for (let i = 0; i < n; i += 1) {
     const p = points[i], next = points[(i + 1) % n];
     tang.subVectors(next, p).normalize();
-    side.crossVectors(tang, up);
-    if (side.lengthSq() < 0.001) side.set(1, 0, 0);
+    rad.copy(p).normalize();
+    side.crossVectors(tang, rad);
+    if (side.lengthSq() < 0.001) side.set(0, 1, 0);
     side.normalize().multiplyScalar(halfWidth);
 
     const a = p.clone().add(side), b = p.clone().sub(side), v0 = i * 2, v1 = i * 2 + 1;
@@ -740,6 +928,9 @@ function buildWorld(missionState, evaluation) {
   earthGroup.add(cloudMesh);
   atmoMat = makeAtmosphereRimMaterial();
   earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.088, 48, 32), atmoMat));
+  const auroraRig = createPolarAuroraGroup();
+  auroraMat = auroraRig.mat;
+  earthGroup.add(auroraRig.grp);
 
   const umbra = new THREE.Mesh(
     new THREE.CylinderGeometry(EARTH_R * 0.65, EARTH_R * 0.96, 26, 32, 1, true),
@@ -826,11 +1017,15 @@ function buildWorld(missionState, evaluation) {
     if (d2 > apMax) { apMax = d2; apPt = p; apAlt = alt; }
   });
   const bScale = deep ? 0.24 : 0.11;
-  const peGem = new THREE.Mesh(new THREE.OctahedronGeometry(bScale, 0), new THREE.MeshBasicMaterial({ color: 0x10b981 })); peGem.position.copy(pePt);
-  const apGem = new THREE.Mesh(new THREE.OctahedronGeometry(bScale, 0), new THREE.MeshBasicMaterial({ color: 0xf59e0b })); apGem.position.copy(apPt);
-  const peTag = makeTagSprite(`Pe · ${peAlt}km`, '#10b981'); peTag.position.copy(pePt).add(new THREE.Vector3(0, 0.36, 0));
-  const apTag = makeTagSprite(`Ap · ${apAlt}km`, '#f59e0b'); apTag.position.copy(apPt).add(new THREE.Vector3(0, 0.48, 0));
-  scene.add(peGem, apGem, peTag, apTag);
+  const peGem = new THREE.Mesh(new THREE.OctahedronGeometry(bScale, 0), new THREE.MeshBasicMaterial({ color: 0x34d399 })); peGem.position.copy(pePt);
+  const apGem = new THREE.Mesh(new THREE.OctahedronGeometry(bScale, 0), new THREE.MeshBasicMaterial({ color: 0xfbbf24 })); apGem.position.copy(apPt);
+  const peRing = new THREE.Mesh(new THREE.RingGeometry(bScale * 1.4, bScale * 1.9, 24), new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.72, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  peRing.rotation.x = Math.PI / 2; peRing.position.copy(pePt);
+  const apRing = new THREE.Mesh(new THREE.RingGeometry(bScale * 1.4, bScale * 1.9, 24), new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.72, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  apRing.rotation.x = Math.PI / 2; apRing.position.copy(apPt);
+  const peTag = makeTagSprite('Pe', `${peAlt} km`, '#34d399'); peTag.position.copy(pePt).add(new THREE.Vector3(0, 0.38, 0));
+  const apTag = makeTagSprite('Ap', `${apAlt} km`, '#fbbf24'); apTag.position.copy(apPt).add(new THREE.Vector3(0, 0.48, 0));
+  scene.add(peGem, apGem, peRing, apRing, peTag, apTag);
 
   const moonPos = orbitEl.id === 'lunar-transfer' ? apPt.clone().multiplyScalar(1.04) : new THREE.Vector3(-15, 3.4, -16);
   spaceEnv = createSpaceEnvironment(scene, { moonPos, moonScale: deep ? EARTH_R * 0.44 : EARTH_R * 0.3 });
@@ -854,8 +1049,8 @@ function buildWorld(missionState, evaluation) {
   const oGeo = new THREE.BufferGeometry().setFromPoints(orbitPts);
   lineColorAttr = new THREE.BufferAttribute(new Float32Array(orbitPts.length * 3), 3);
   oGeo.setAttribute('color', lineColorAttr);
-  orbitLine = new THREE.Line(oGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 }));
-  ribbonMesh = buildOrbitRibbon(orbitPts, orbitEl.id === 'lunar-transfer' ? 0.28 : (deep ? 0.14 : 0.055));
+  orbitLine = new THREE.Line(oGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.94, blending: THREE.AdditiveBlending, depthWrite: false }));
+  ribbonMesh = buildOrbitRibbon(orbitPts, orbitEl.id === 'lunar-transfer' ? 0.28 : (deep ? 0.14 : 0.065));
   scene.add(ribbonMesh, orbitLine);
 
   const initProp = propagateOrbit(orbitEl, 0), initNext = propagateOrbit(orbitEl, 5);
@@ -868,11 +1063,11 @@ function buildWorld(missionState, evaluation) {
   satMesh.position.copy(tmpSat);
   scene.add(satMesh);
 
-  beamLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.95 }));
-  beamHalo = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending }));
+  beamLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending }));
+  downlinkRig = createDownlinkStreamRig();
   scanLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.95 }));
-  beamLine.visible = false; beamHalo.visible = false; scanLine.visible = false;
-  scene.add(beamLine, beamHalo, scanLine);
+  beamLine.visible = false; scanLine.visible = false;
+  scene.add(beamLine, downlinkRig.grp, scanLine);
 
   controls.maxDistance = 1200;
   startCameraTween(cameraMode, true);
@@ -886,6 +1081,7 @@ function animate() {
   if (showcaseMode) {
     if (earthGroup) earthGroup.rotation.y += realDt * 0.018;
     if (cloudMesh) cloudMesh.rotation.y += realDt * 0.024;
+    if (auroraMat) auroraMat.uniforms.uTime.value = sunElapsed;
     spaceEnv?.update(realDt, sunElapsed);
     if (satMesh) {
       satMesh.position.set(1.55, 1.32 + Math.sin(sunElapsed * 0.85) * 0.045, 2.05);
@@ -913,6 +1109,7 @@ function animate() {
 
   if (earthGroup) earthGroup.rotation.y += simDt * ((Math.PI * 2) / 86400);
   if (cloudMesh) cloudMesh.rotation.y += realDt * 0.015;
+  if (auroraMat) auroraMat.uniforms.uTime.value = sunElapsed;
   spaceEnv?.update(realDt, sunElapsed);
 
   const prop = propagateOrbit(orbitEl, simTime), nextP = propagateOrbit(orbitEl, simTime + 5);
@@ -1007,14 +1204,32 @@ function animate() {
   }
 
   if (lineColorAttr && ribbonColorAttr && orbitPts.length) {
-    const head = Math.floor(((prop.trueAnomalyDeg / 360) * (orbitPts.length - 1))), len = orbitPts.length;
+    const len = orbitPts.length;
+    let head = Math.floor(((prop.trueAnomalyDeg / 360) * (len - 1)));
+    let bestD2 = Infinity;
+    for (let k = 0; k < len; k += 1) {
+      const d2 = orbitPts[k].distanceToSquared(tmpSat);
+      if (d2 < bestD2) { bestD2 = d2; head = k; }
+    }
+    const trailLen = Math.max(28, Math.floor(len * 0.19)); // ~68 deg comet-tail arc
     for (let i = 0; i < len; i += 1) {
-      const distBack = (head - i + len) % len, wake = Math.max(0.14, 1 - distBack / (len * 0.55)), hot = distBack < 14;
-      const r = hot ? 0.98 : 0.16 * wake, g = hot ? 0.85 : 0.72 * wake, b = hot ? 0.55 : 1.0 * wake;
-      lineColorAttr.setXYZ(i, r, g, b);
-      const rb = hot ? 0.85 : Math.max(0.04, wake * 0.45);
-      ribbonColorAttr.setXYZ(i * 2, r * rb, g * rb, b * rb);
-      ribbonColorAttr.setXYZ(i * 2 + 1, r * rb, g * rb, b * rb);
+      const distBack = (head - i + len) % len;
+      if (distBack <= trailLen) {
+        const w = Math.pow(1 - distBack / trailLen, 1.55);
+        const core = distBack < 6 ? (1 - distBack / 6) * 0.55 : 0;
+        const r = Math.min(1.0, 0.08 * w + core);
+        const g = Math.min(1.0, 0.90 * w + core * 0.45);
+        const b = Math.min(1.0, 1.0 * w + core * 0.25);
+        lineColorAttr.setXYZ(i, r, g, b);
+        const rb = 0.95 * w;
+        ribbonColorAttr.setXYZ(i * 2, 0.10 * rb, 0.92 * rb, 1.0 * rb);
+        ribbonColorAttr.setXYZ(i * 2 + 1, 0.10 * rb, 0.92 * rb, 1.0 * rb);
+      } else {
+        const dashOn = (i % 6) < 3;
+        lineColorAttr.setXYZ(i, dashOn ? 0.10 : 0.004, dashOn ? 0.34 : 0.014, dashOn ? 0.62 : 0.032);
+        ribbonColorAttr.setXYZ(i * 2, 0, 0, 0);
+        ribbonColorAttr.setXYZ(i * 2 + 1, 0, 0, 0);
+      }
     }
     lineColorAttr.needsUpdate = true; ribbonColorAttr.needsUpdate = true;
   }
@@ -1161,11 +1376,43 @@ function animate() {
     }
     if (losOk) {
       inLineOfSight = true; activeStationName = activeGs.name;
-      beamLine.visible = true; beamHalo.visible = true;
-      beamLine.material.color.setHex(now < beamBoostUntil ? 0x34d399 : 0x22d3ee);
-      beamLine.geometry.setFromPoints([tmpSat, tmpGs]); beamHalo.geometry.setFromPoints([tmpSat, tmpGs]);
+      const boosted = now < beamBoostUntil;
+      beamLine.visible = true;
+      beamLine.material.color.setHex(boosted ? 0x34d399 : 0x38bdf8);
+      beamLine.geometry.setFromPoints([tmpSat, tmpGs]);
+      if (downlinkRig) {
+        downlinkRig.grp.visible = true;
+        tmpBeamVec.subVectors(tmpGs, tmpSat);
+        const beamLen = Math.max(0.05, tmpBeamVec.length());
+        const beamDir = tmpBeamVec.divideScalar(beamLen);
+        downlinkRig.streamMesh.position.copy(tmpSat);
+        downlinkRig.streamMesh.quaternion.setFromUnitVectors(tmpUpAxis, beamDir);
+        downlinkRig.streamMesh.scale.set(boosted ? 1.45 : 1.0, beamLen, boosted ? 1.45 : 1.0);
+        downlinkRig.beamMat.uniforms.uTime.value = sunElapsed;
+        downlinkRig.beamMat.uniforms.uBoost.value = boosted ? 1.0 : 0.0;
+        const speed = boosted ? 1.35 : 0.65;
+        const ringFit = Math.min(1.1, Math.max(0.45, beamLen * 1.4));
+        downlinkRig.waveRings.forEach((ring, idx) => {
+          const t = (sunElapsed * speed + idx / downlinkRig.waveRings.length) % 1;
+          ring.position.lerpVectors(tmpSat, tmpGs, t);
+          ring.quaternion.setFromUnitVectors(tmpFwdAxis, beamDir);
+          ring.scale.setScalar(((boosted ? 1.15 : 0.75) + t * 0.85) * ringFit);
+          ring.material.color.setHex(boosted ? 0x34d399 : 0x22d3ee);
+          ring.material.opacity = Math.sin(t * Math.PI) * (boosted ? 0.92 : 0.58);
+        });
+        downlinkRig.packetOrbs?.forEach((orb, idx) => {
+          const t = (sunElapsed * (boosted ? 1.8 : 0.95) + idx / downlinkRig.packetOrbs.length) % 1;
+          orb.position.lerpVectors(tmpSat, tmpGs, t);
+          orb.scale.setScalar((boosted ? 1.25 : 0.8) * ringFit);
+          orb.material.color.setHex(boosted ? 0x34d399 : 0x67e8f9);
+          orb.material.opacity = Math.sin(t * Math.PI) * 0.98;
+        });
+      }
       if (simDt > 0 && bufferGb > 0) { const xfer = Math.min(bufferGb, (simDt / 60) * 0.08); bufferGb -= xfer; downlinkedGb += xfer; }
-    } else { beamLine.visible = false; beamHalo.visible = false; }
+    } else {
+      beamLine.visible = false;
+      if (downlinkRig) downlinkRig.grp.visible = false;
+    }
   }
   if (scanLine) {
     scanLine.visible = now < scanUntil && Boolean(scanTarget);
@@ -1804,7 +2051,7 @@ export function unmountOrbit() {
     scene = null;
   }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
-  earthGroup = earthMat = cloudMesh = atmoMat = earthshineLight = satMesh = targetReticle = thrusterGlow = beamLine = beamHalo = scanLine = null;
+  earthGroup = earthMat = cloudMesh = atmoMat = auroraMat = earthshineLight = satMesh = targetReticle = thrusterGlow = beamLine = downlinkRig = scanLine = null;
   orbitLine = ribbonMesh = velArrow = lineColorAttr = ribbonColorAttr = hazardFx = null;
   hazardEventCb = null;
   resetOrbitHazards();
