@@ -214,8 +214,15 @@ export function renderHud(ev, stage, opts = {}) {
   document.getElementById('scenario-badge').textContent = `L${scenario.level}${sandboxMode ? ' · FREEPLAY' : ''}`;
 
   const banner = document.getElementById('comms-banner');
-  banner.classList.toggle('ok', warnings.length === 0);
-  document.getElementById('comms-text').textContent = warnings.length ? `CHIEF ENG: ${warnings[0].text}` : 'CHIEF ENG: All 4 segments green — cleared for pad rollout!';
+  if (banner) {
+    const showAdvisor = stage === 'hangar' && warnings.length > 0;
+    banner.hidden = !showAdvisor;
+    banner.classList.toggle('ok', !showAdvisor);
+    const commsText = document.getElementById('comms-text');
+    if (commsText) {
+      commsText.textContent = showAdvisor ? `CHIEF ENG: ${warnings[0].text}` : '';
+    }
+  }
 
   const mProg = document.getElementById('mission-progress-bar');
   if (mProg) {

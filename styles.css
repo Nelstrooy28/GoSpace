@@ -811,6 +811,10 @@ dialog button:hover {
   border-left: 4px solid var(--cyan);
 }
 
+#comms-banner[hidden] {
+  display: none !important;
+}
+
 .comms-head,
 #comms-banner strong,
 .comms-title {
