@@ -337,8 +337,9 @@ export function renderStageHud(stage, state, ev, opts) {
       ? '<button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Trigger Hazard</button>'
       : '';
     const debOk = Boolean(opts.orbitObjectivesMet);
+    const bufPkts = opts.onboardBuffer || 0;
     hud.innerHTML = `<div class="stage-card plate">
-      <div class="card-head"><span>ORBITAL OPS</span><span id="orb-score-pill" class="badge-tag">SCORE ${opts.orbitScore || 0}</span></div>
+      <div class="card-head"><span>ORBITAL OPS</span><div class="orb-head-pills"><span id="orb-buffer-pill" class="badge-tag orb-buffer-pill ${bufPkts > 0 ? 'is-loaded' : 'is-empty'}" title="Buffered Science Packets ready for Ground Station downlink">💾 BUFFER: ${bufPkts} Packet${bufPkts === 1 ? '' : 's'}</span><span id="orb-score-pill" class="badge-tag">SCORE ${opts.orbitScore || 0}</span></div></div>
       <div class="orbit-clock-row">
         <div class="orbit-clock-cell"><span class="orbit-clock-lbl">MET</span><span id="orb-met-val" class="orbit-clock-val">T+ 00:00:00</span></div>
         <div class="orbit-clock-cell"><span class="orbit-clock-lbl">UTC</span><span id="orb-utc-val" class="orbit-clock-val">2026-11-15 14:00:00</span></div>
@@ -368,7 +369,7 @@ export function renderStageHud(stage, state, ev, opts) {
       </div>
       <div id="orbit-telem" class="telem-mono">Propagating Keplerian track...</div></div>`;
     actions.innerHTML = `<button id="orb-transmit-btn" class="action-prompt is-cyan" type="button" hidden>📡 [SPACE] TRANSMIT SCIENCE (+50)</button>
-      <button id="orb-scan-btn" class="action-prompt is-cyan" type="button">☄️ [E] SCAN ASTEROID (+60)</button>
+      <button id="orb-scan-btn" class="action-prompt is-cyan is-standby" type="button">🔍 [E] SCAN SCIENCE ZONE (FLY INTO RING)</button>
       <button id="orb-safemode-btn" class="action-prompt" type="button" hidden>🛡️ [Q] CYCLE POWER / SAFE MODE</button>`;
     return;
   }
@@ -640,15 +641,29 @@ export function updateOrbitOverlay(t, objStatus = null) {
   document.getElementById('orb-utc-val')?.replaceChildren(document.createTextNode(t?.utcText || '2026-11-15 14:00:00'));
   const eclBadge = document.getElementById('orb-eclipse-badge');
   if (eclBadge) eclBadge.hidden = !t?.inEclipse;
+  const bufPill = document.getElementById('orb-buffer-pill');
+  const bufPkts = t?.onboardBuffer ?? 0;
+  if (bufPill) {
+    bufPill.textContent = `💾 BUFFER: ${bufPkts} Packet${bufPkts === 1 ? '' : 's'}`;
+    bufPill.classList.toggle('is-loaded', bufPkts > 0);
+    bufPill.classList.toggle('is-empty', bufPkts <= 0);
+  }
   const tx = document.getElementById('orb-transmit-btn');
   if (tx) {
     tx.hidden = destroyed || !t?.inLineOfSight;
     const dlPaused = (t?.commsPausedSec || 0) > 0;
     tx.disabled = Boolean(destroyed || t?.brownoutLocked || dlPaused);
+    tx.classList.remove('is-cooldown', 'is-standby');
     if (t?.brownoutLocked) {
       tx.textContent = '🔋 BROWNOUT: RECHARGE TO 15% IN SUNLIGHT';
     } else if (dlPaused) {
       tx.textContent = `⏸️ DOWNLINK PAUSED (${t.commsPausedSec}s)`;
+    } else if (t?.stationPassCooldownActive) {
+      tx.textContent = '⏳ PASS USED — EXIT CONE FOR NEXT DISH';
+      tx.classList.add('is-cooldown');
+    } else if (bufPkts < 1 && !t?.tutorialActive) {
+      tx.textContent = '💾 BUFFER EMPTY — SCAN ZONE [E] FIRST';
+      tx.classList.add('is-standby');
     } else {
       let pts = 50;
       if (t?.designRisks?.weakCommsMargin) pts = Math.round(pts * 0.5);
@@ -662,6 +677,17 @@ export function updateOrbitOverlay(t, objStatus = null) {
   if (scanBtn) {
     scanBtn.hidden = destroyed;
     scanBtn.disabled = destroyed;
+    scanBtn.classList.remove('is-swath-ready', 'is-cooldown', 'is-standby');
+    if (t?.swathReady) {
+      scanBtn.textContent = `🔬 TARGET IN SWATH — PRESS [E] TO CAPTURE (+${t.swathZonePoints || 60})`;
+      scanBtn.classList.add('is-swath-ready');
+    } else if ((t?.swathCooldownSec || 0) > 0) {
+      scanBtn.textContent = `⏳ ${(t.swathZoneName || 'ZONE').toUpperCase()} COOLDOWN (${t.swathCooldownSec}s)`;
+      scanBtn.classList.add('is-cooldown');
+    } else {
+      scanBtn.textContent = '🔍 [E] SCAN SCIENCE ZONE (FLY INTO RING)';
+      scanBtn.classList.add('is-standby');
+    }
   }
   const debBtn = document.getElementById('orb-debrief-btn');
   const dlDone = !destroyed && (objStatus ? Boolean(objStatus.canDebrief) : (t?.downlinkCount || 0) >= 1);
@@ -740,8 +766,8 @@ export function renderMissionBriefing(ev, stage, open) {
     <div class="brief-tip">💡 <strong>PRO TIP:</strong> ${esc(guide.proTip)}</div>
 
     <div class="brief-keybinds" aria-label="Orbital Controls">
-      <span><kbd>[SPACE]</kbd> Transmit in Green Cone</span>
-      <span><kbd>[E]</kbd> Scan Asteroid</span>
+      <span><kbd>[SPACE]</kbd> Downlink Buffer at Ground Dish</span>
+      <span><kbd>[E]</kbd> Scan Science Zone</span>
       <span><kbd>[1x–100x]</kbd> Time Warp</span>
       <span><kbd>[Click / Hotkey]</kbd> Fix Hazards</span>
     </div>

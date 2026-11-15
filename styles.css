@@ -955,6 +955,55 @@ dialog button:hover {
   box-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
 }
 
+#center-action-hud button.is-swath-ready,
+.action-prompt.is-swath-ready {
+  background: linear-gradient(135deg, #059669, #0891b2) !important;
+  border-color: #6ee7b7 !important;
+  box-shadow: 0 0 28px rgba(52, 211, 153, 0.65);
+  animation: pulseReady 1.25s ease-in-out infinite;
+}
+
+#center-action-hud button.is-cooldown,
+.action-prompt.is-cooldown {
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.9), rgba(71, 85, 105, 0.85)) !important;
+  border-color: rgba(251, 191, 36, 0.55) !important;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.25);
+  opacity: 0.9;
+}
+
+#center-action-hud button.is-standby,
+.action-prompt.is-standby {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.88)) !important;
+  border-color: rgba(56, 189, 248, 0.42) !important;
+  box-shadow: 0 0 14px rgba(15, 23, 42, 0.5);
+  opacity: 0.86;
+}
+
+.orb-head-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.orb-buffer-pill {
+  font-size: 14px !important;
+  transition: all 0.2s ease;
+}
+
+.orb-buffer-pill.is-loaded {
+  background: rgba(8, 51, 68, 0.92);
+  border-color: rgba(34, 211, 238, 0.72);
+  color: #67e8f9;
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.35);
+}
+
+.orb-buffer-pill.is-empty {
+  background: rgba(30, 41, 59, 0.88);
+  border-color: rgba(148, 163, 184, 0.45);
+  color: #cbd5e1;
+}
+
 /* Emergency Telemetry Alert Card (Center-Top in Orbit) */
 #hazard-alert-hud,
 .hazard-alert-hud {

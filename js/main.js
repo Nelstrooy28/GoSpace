@@ -19,6 +19,8 @@ function createFreshRunSession(missionId) {
     currentScore: 0,
     downlinksCompleted: 0,
     scansCompleted: 0,
+    onboardBuffer: 0,
+    eclipsesSurvived: 0,
     anomaliesResolved: 0,
     hullIntegrity: 100,
     deployCompleted: false,
@@ -224,6 +226,7 @@ function getStageHudOpts() {
     hullIntegrity: orbitTelemetry?.hullIntegrity ?? 100,
     downlinkCount: orbitTelemetry?.downlinkCount || 0,
     asteroidsScanned: orbitTelemetry?.asteroidsScanned || 0,
+    onboardBuffer: orbitTelemetry?.onboardBuffer ?? runSession.onboardBuffer ?? 0,
     downlinkPts: orbitTelemetry?.downlinkPts,
     anomalyPts: orbitTelemetry?.anomalyPts,
     scanPts: orbitTelemetry?.scanPts,
@@ -251,7 +254,9 @@ function mountLiveOrbit(vp, isVictory = false) {
     orbitTelemetry = t; orbitScore = t.missionScore || 0; orbitWarp = t.timeWarp ?? orbitWarp;
     runSession.currentScore = orbitScore;
     runSession.downlinksCompleted = t.downlinkCount || 0;
-    runSession.scansCompleted = t.asteroidsScanned || 0;
+    runSession.scansCompleted = t.scienceScansCount ?? t.asteroidsScanned ?? 0;
+    runSession.onboardBuffer = t.onboardBuffer ?? 0;
+    runSession.eclipsesSurvived = t.eclipsesSurvived ?? 0;
     runSession.anomaliesResolved = t.anomaliesResolved || 0;
     runSession.hullIntegrity = t.hullIntegrity ?? 100;
     const objStatus = syncOrbitObjectives(t);
@@ -449,14 +454,26 @@ const handleTransmit = () => {
     orbitScore += r.points;
     runSession.currentScore = orbitScore;
     runSession.downlinksCompleted += 1;
-    if (orbitTelemetry) orbitTelemetry.downlinkCount = Math.max(orbitTelemetry.downlinkCount || 0, runSession.downlinksCompleted);
-    syncOrbitObjectives(orbitTelemetry);
+    if (typeof r.onboardBuffer === 'number') runSession.onboardBuffer = r.onboardBuffer;
+    if (orbitTelemetry) {
+      orbitTelemetry.downlinkCount = Math.max(orbitTelemetry.downlinkCount || 0, runSession.downlinksCompleted);
+      orbitTelemetry.onboardBuffer = runSession.onboardBuffer;
+      orbitTelemetry.stationPassCooldownActive = true;
+    }
+    const objStatus = syncOrbitObjectives(orbitTelemetry);
+    updateOrbitOverlay(orbitTelemetry, objStatus);
     let suffix = r.weakComms ? ' · BOTTLENECK -50%' : (r.wavelengthMismatch ? ' · MISMATCH -40%' : '');
     if (r.omniReduced) suffix += ' · OMNI 70%';
     spawnPopup(`+${r.points} DATA DOWNLINKED (${r.station})${suffix}!`);
     renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
     updateDebug(lastEval);
     notifyTutorialState();
+  } else if (r.reason === 'empty-buffer') {
+    playWarning();
+    spawnPopup('💾 Data Buffer Empty — Scan a Science Target [E] first!');
+  } else if (r.reason === 'pass-cooldown') {
+    playWarning();
+    spawnPopup(`⏳ Pass Already Used at ${r.station} — Exit cone first!`);
   } else if (r.reason === 'brownout') {
     playWarning();
     spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to transmit.');
@@ -477,13 +494,32 @@ const handleScanAsteroid = () => {
   if (r.ok) {
     orbitScore += r.points;
     runSession.currentScore = orbitScore;
-    runSession.scansCompleted += 1;
+    runSession.scansCompleted = r.scienceScansCount ?? (runSession.scansCompleted + 1);
+    runSession.onboardBuffer = r.onboardBuffer ?? (runSession.onboardBuffer + 1);
     if (orbitTelemetry) {
+      orbitTelemetry.scienceScansCount = runSession.scansCompleted;
       orbitTelemetry.asteroidsScanned = Math.max(orbitTelemetry.asteroidsScanned || 0, runSession.scansCompleted);
+      orbitTelemetry.onboardBuffer = runSession.onboardBuffer;
       orbitTelemetry.missionScore = Math.max(orbitTelemetry.missionScore || 0, orbitScore);
     }
-    syncOrbitObjectives(orbitTelemetry);
-    spawnPopup(`+${r.points} ${r.isComet ? 'COMET' : 'ASTEROID'} ${r.id} SCANNED!`);
+    const objStatus = syncOrbitObjectives(orbitTelemetry);
+    updateOrbitOverlay(orbitTelemetry, objStatus);
+    spawnPopup(`+${r.points} · ${r.id} CAPTURED (+1 BUFFER PKT)!`);
+    renderHud(lastEval, stage, { runSession, unlockedStages: getUnlockedStages(lastEval) });
+    updateDebug(lastEval);
+    notifyTutorialState();
+  } else if (r.reason === 'cooldown') {
+    playWarning();
+    spawnPopup(`⏳ ${r.zoneName} on ${r.cooldownSec}s cooldown — fly to next zone!`);
+  } else if (r.reason === 'out-of-swath') {
+    playWarning();
+    spawnPopup('🔍 No Science Zone in Swath — fly over a cyan/amber target ring!');
+  } else if (r.reason === 'brownout') {
+    playWarning();
+    spawnPopup('🔋 POWER BROWNOUT! Recharge to 15% in sunlight to scan.');
+  } else if (r.reason === 'offline') {
+    playWarning();
+    spawnPopup(`🛡️ Sensors shielded offline (${r.pausedSec}s)`);
   }
 };
 const handleHazardChoice = (choiceIdx = 0) => {

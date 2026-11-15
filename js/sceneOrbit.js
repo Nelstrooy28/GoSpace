@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { generateOrbitTrack, propagateOrbit } from './missionVizPropagator.js';
+import { getMissionScienceZones, getOrbitObjectivesStatus } from './catalog.js';
 import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpaceTexture } from './solarSystem.js';
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
-import { applyHullDelta, clearActiveHazard, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=16';
+import { applyHullDelta, clearActiveHazard, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=17';
 import { isTutorialActive } from './tutorial.js';
 import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSafeMode, playSpacecraftExplosion, playWarning } from './sfx.js';
 
@@ -15,23 +16,27 @@ const DEPLOY_DURATION_SEC = 2.8;
 const STATIONS = [
   { id: 'inuvik', name: 'Arctic Polar Station', lat: 68.36, lon: -133.72 },
   { id: 'nsn', name: 'Global Near-Space Network', lat: 37.94, lon: -75.46 },
-  { id: 'dsn', name: 'Deep-Space Dish Array', lat: 35.43, lon: -116.89 }
+  { id: 'dsn', name: 'Deep-Space Dish Array', lat: 35.43, lon: -116.89 },
+  { id: 'svalbard', name: 'Svalbard Polar Relay', lat: 78.23, lon: 15.41 },
+  { id: 'canberra', name: 'Southern Cross Dish Complex', lat: -35.40, lon: 148.98 }
 ];
 
 let renderer = null, bloomComp = null, scene = null, camera = null, controls = null, resizeObserver = null, spaceEnv = null, envRT = null;
 let rafId = 0, earthGroup = null, earthMat = null, cloudMesh = null, atmoMat = null, earthshineLight = null;
 let satMesh = null, satModel = null, satFitR = 0.25, targetReticle = null, thrusterGlow = null, beamLine = null, downlinkRig = null, scanLine = null;
 let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr = null;
-let gsNodes = [], apsisSprites = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
+let gsNodes = [], apsisSprites = [], scienceZones = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
 let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false, sensorCamEnabled = false;
 let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs = 0, fitDist = 7.2, sunElapsed = 0;
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
+let onboardBuffer = 0, scienceScansCount = 0, eclipsesSurvived = 0, wasInEclipse = false;
+let activeZoneReady = null, activeZoneCooldown = null, zoneScanFxUntil = 0, zoneScanLabel = '', zoneScanPos = new THREE.Vector3();
 let downlinkPts = 0, anomalyPts = 0, scanPts = 0, decisionPts = 0;
 let brownoutLocked = false, sensorOfflineUntil = 0, solarChargePauseUntil = 0, commsPauseUntil = 0, omniReducedDownlinks = 0, dragLossKm = 0, dragHullAccum = 0;
 let isDestroyed = false, destructionReason = '', explosionRig = null, explosionElapsed = 0, shakeRemaining = 0;
-const tmpShake = new THREE.Vector3();
-let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
+const tmpShake = new THREE.Vector3(), tmpZoneWorld = new THREE.Vector3();
+let inLineOfSight = false, activeStationName = 'None', activeStationId = '', activeLosGs = null, stationPassCooldownActive = false, hazardNow = false;
 let hazardEventCb = null, hazardFx = null, dodgeT = 0, heaterGlowT = 0, repairSweepT = 0, sparkFlashUntil = 0;
 let deployActive = false, deployCompleted = false, deployElapsed = 0, deployProgress = 1, deployStageMask = 0;
 let holoSelectCb = null, holoTargets = {}, holoProxies = [], gsHoloProxies = [], earthSolidMesh = null, earthOuterProxy = null;
@@ -828,43 +833,40 @@ function createGroundStationMesh(gs, active) {
   yawGroup.add(dishPivot);
   group.add(yawGroup);
 
-  // Subtle additive uplink signal cone + ascending pulse rings for active station
-  let cone = null;
-  let pulseRings = [];
-  if (active) {
-    cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.46, 0.92, 28, 1, true),
+  // Subtle additive uplink signal cone + ascending pulse rings on every Ground Station
+  const baseConeHex = active ? 0x10b981 : 0x0d9488;
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(0.42, 0.84, 28, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: baseConeHex,
+      transparent: true,
+      opacity: active ? 0.14 : 0.08,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  cone.rotation.x = Math.PI;
+  cone.position.y = 0.062 + 0.42;
+  group.add(cone);
+
+  const pulseRings = [0, 1].map(() => {
+    const pr = new THREE.Mesh(
+      new THREE.RingGeometry(0.068, 0.084, 32),
       new THREE.MeshBasicMaterial({
-        color: 0x10b981,
+        color: active ? 0x34d399 : 0x2dd4bf,
         transparent: true,
-        opacity: 0.14,
+        opacity: active ? 0.30 : 0.18,
         side: THREE.DoubleSide,
         blending: THREE.AdditiveBlending,
         depthWrite: false
       })
     );
-    cone.rotation.x = Math.PI;
-    cone.position.y = 0.062 + 0.46;
-    group.add(cone);
-
-    pulseRings = [0, 1].map(() => {
-      const pr = new THREE.Mesh(
-        new THREE.RingGeometry(0.072, 0.088, 32),
-        new THREE.MeshBasicMaterial({
-          color: 0x34d399,
-          transparent: true,
-          opacity: 0.32,
-          side: THREE.DoubleSide,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
-        })
-      );
-      pr.rotation.x = -Math.PI / 2;
-      pr.position.y = 0.065;
-      group.add(pr);
-      return pr;
-    });
-  }
+    pr.rotation.x = -Math.PI / 2;
+    pr.position.y = 0.065;
+    group.add(pr);
+    return pr;
+  });
 
   return { group, localPos, localNorm, beaconTip, baseRing, cone, pulseRings };
 }
@@ -929,6 +931,54 @@ function createHoloReticle() {
   reticle.userData = { innerGroup, outerGroup };
   reticle.renderOrder = 12;
   return reticle;
+}
+
+function createScienceZoneMesh(zone) {
+  const isEarth = zone.host === 'earth';
+  const baseRadius = isEarth ? 0.105 : 0.34;
+  const beaconH = isEarth ? 0.28 : 0.72;
+  const colHex = zone.color || '#22d3ee';
+  const col = new THREE.Color(colHex);
+
+  const group = new THREE.Group();
+  const baseRingMat = new THREE.MeshBasicMaterial({
+    color: col,
+    transparent: true,
+    opacity: 0.72,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const baseRing = new THREE.Mesh(new THREE.RingGeometry(baseRadius * 0.74, baseRadius, 40), baseRingMat);
+  baseRing.rotation.x = -Math.PI / 2;
+  group.add(baseRing);
+
+  const pulseMat = new THREE.MeshBasicMaterial({
+    color: col,
+    transparent: true,
+    opacity: 0.55,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const pulseRing = new THREE.Mesh(new THREE.RingGeometry(baseRadius * 0.86, baseRadius * 1.12, 40), pulseMat);
+  pulseRing.rotation.x = -Math.PI / 2;
+  pulseRing.position.y = 0.008;
+  group.add(pulseRing);
+
+  const beaconMat = new THREE.MeshBasicMaterial({
+    color: col,
+    transparent: true,
+    opacity: 0.28,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(isEarth ? 0.01 : 0.025, isEarth ? 0.004 : 0.01, beaconH, 12, 1, true), beaconMat);
+  beacon.position.y = beaconH * 0.5;
+  group.add(beacon);
+
+  return { group, baseRing, baseRingMat, pulseRing, pulseMat, beacon, beaconMat, colHex };
 }
 
 function buildWorld(missionState, evaluation) {
@@ -1005,6 +1055,7 @@ function buildWorld(missionState, evaluation) {
       return {
         ...gs,
         active,
+        passUsed: false,
         mesh: stationRig.beaconTip,
         group: stationRig.group,
         cone: stationRig.cone,
@@ -1079,6 +1130,73 @@ function buildWorld(missionState, evaluation) {
   selectionRing = createHoloReticle();
   selectionRing.visible = false;
   scene.add(selectionRing);
+
+  const moonRadius = deep ? EARTH_R * 0.48 : EARTH_R * 0.40;
+  const keplerPeriodSec = track.periodSec || (2 * Math.PI * Math.sqrt(Math.pow(orbitEl.aKm || 7000, 3) / 398600.4418));
+  const earthRotPerSec = (Math.PI * 2) / 86400;
+  const rawZones = getMissionScienceZones(missionState?.scenarioId);
+  scienceZones = rawZones.map((z) => {
+    const rig = createScienceZoneMesh(z);
+    let hostParent = scene;
+    let swathRange = 0.78;
+    const localNorm = new THREE.Vector3(0, 1, 0);
+
+    if (z.host === 'earth') {
+      const sampleT = (z.orbitFrac ?? 0.15) * keplerPeriodSec;
+      const sampleProp = propagateOrbit(orbitEl, sampleT);
+      const worldDir = new THREE.Vector3(
+        sampleProp.position[0] * KM_TO_SCENE,
+        sampleProp.position[1] * KM_TO_SCENE,
+        sampleProp.position[2] * KM_TO_SCENE
+      ).normalize();
+      worldDir.applyAxisAngle(tmpUpAxis, -sampleT * earthRotPerSec);
+      localNorm.copy(worldDir);
+      rig.group.position.copy(localNorm).multiplyScalar(EARTH_R * 1.007);
+      rig.group.quaternion.setFromUnitVectors(tmpUpAxis, localNorm);
+      earthGroup.add(rig.group);
+      hostParent = earthGroup;
+      swathRange = 0.78;
+    } else if (z.host === 'moon') {
+      const dir = new THREE.Vector3(...(z.localDir || [0, -1, 0])).normalize();
+      localNorm.copy(dir);
+      rig.group.position.copy(moonPos).addScaledVector(dir, moonRadius * 1.02);
+      rig.group.quaternion.setFromUnitVectors(tmpUpAxis, dir);
+      scene.add(rig.group);
+      swathRange = Math.max(4.6, moonRadius * 6.5);
+    } else if (z.host === 'orbit') {
+      const sampleT = (z.orbitFrac ?? 0.5) * keplerPeriodSec;
+      const sampleProp = propagateOrbit(orbitEl, sampleT);
+      rig.group.position.set(
+        sampleProp.position[0] * KM_TO_SCENE,
+        sampleProp.position[1] * KM_TO_SCENE,
+        sampleProp.position[2] * KM_TO_SCENE
+      );
+      localNorm.copy(rig.group.position).normalize();
+      rig.group.quaternion.setFromUnitVectors(tmpUpAxis, localNorm);
+      scene.add(rig.group);
+      swathRange = 4.5;
+    } else {
+      const targetObj = z.host === 'comet'
+        ? spaceEnv?.comet
+        : spaceEnv?.nearAsteroids?.[z.neaIndex || 0];
+      if (targetObj?.mesh) {
+        rig.group.position.copy(targetObj.mesh.position);
+      }
+      scene.add(rig.group);
+      swathRange = 5.5;
+    }
+
+    return {
+      ...z,
+      rig,
+      group: rig.group,
+      hostParent,
+      localNorm,
+      swathRange,
+      cooldownUntilSim: 0,
+      scannedThisPass: false
+    };
+  });
 
   scene.traverse((obj) => {
     if (obj.material && obj.material.isMeshStandardMaterial) obj.material.envMapIntensity = 0.16;
@@ -1283,11 +1401,29 @@ function animate() {
     lineColorAttr.needsUpdate = true; ribbonColorAttr.needsUpdate = true;
   }
 
+  const preHazSnap = getHazardSnapshot();
+  const objStatus = (!showcaseMode && stateRef)
+    ? getOrbitObjectivesStatus(stateRef, {
+        deployProgress,
+        downlinkCount,
+        scienceScansCount,
+        eclipsesSurvived,
+        anomaliesResolved: preHazSnap.anomaliesResolved,
+        isDestroyed
+      }, {
+        scansCompleted: scienceScansCount,
+        downlinksCompleted: downlinkCount,
+        eclipsesSurvived,
+        anomaliesResolved: preHazSnap.anomaliesResolved
+      })
+    : { milestonePct: 0 };
+
   updateOrbitHazards(realDt, {
     inEclipse: prop.inEclipse,
     timeWarp,
     tutorialActive: isTutorialActive() || victoryMode || briefingPaused,
-    destroyed: isDestroyed
+    destroyed: isDestroyed,
+    milestonePct: objStatus.milestonePct || 0
   });
   const hazardSnap = getHazardSnapshot();
   const activeHaz = hazardSnap.activeHazard;
@@ -1443,43 +1579,153 @@ function animate() {
   if (brownoutLocked && !prop.inEclipse && !solarPaused && batterySoc >= 15) brownoutLocked = false;
   if (earthshineLight) earthshineLight.intensity = prop.inEclipse ? 0.24 : 0.95;
 
-  inLineOfSight = false; activeStationName = 'None';
+  if (!showcaseMode && !victoryMode && !briefingPaused && !isDestroyed) {
+    if (prop.inEclipse) wasInEclipse = true;
+    else if (wasInEclipse) {
+      wasInEclipse = false;
+      eclipsesSurvived += 1;
+    }
+  }
+
+  if (earthGroup) earthGroup.updateMatrixWorld();
+
+  activeZoneReady = null;
+  activeZoneCooldown = null;
+  let bestReadyDist = Infinity, bestCoolDist = Infinity;
+  scienceZones.forEach((zone, idx) => {
+    if (zone.host === 'earth') {
+      zone.group.getWorldPosition(tmpZoneWorld);
+    } else if (zone.host === 'nea') {
+      const neaObj = spaceEnv?.nearAsteroids?.[zone.neaIndex || 0];
+      if (neaObj?.mesh) zone.group.position.copy(neaObj.mesh.position);
+      tmpZoneWorld.copy(zone.group.position);
+    } else if (zone.host === 'comet') {
+      const comObj = spaceEnv?.comet;
+      if (comObj?.mesh) zone.group.position.copy(comObj.mesh.position);
+      tmpZoneWorld.copy(zone.group.position);
+    } else {
+      tmpZoneWorld.copy(zone.group.position);
+    }
+
+    let inSwath = false;
+    let zoneDist = tmpSat.distanceTo(tmpZoneWorld);
+    if (zone.host === 'earth') {
+      const nadirDist = tmpNorm.copy(tmpSat).normalize().multiplyScalar(EARTH_R * 1.007).distanceTo(tmpZoneWorld);
+      inSwath = !isDestroyed && (!orbitEl.deepSpace || tmpSat.length() < 6.0) && nadirDist < zone.swathRange;
+      zoneDist = nadirDist;
+    } else {
+      inSwath = !isDestroyed && zoneDist < zone.swathRange;
+    }
+
+    if (!inSwath) zone.scannedThisPass = false;
+    const onCooldown = zone.scannedThisPass || simTime < zone.cooldownUntilSim;
+
+    if (inSwath) {
+      if (!onCooldown && zoneDist < bestReadyDist) {
+        bestReadyDist = zoneDist;
+        activeZoneReady = zone;
+      } else if (onCooldown && zoneDist < bestCoolDist) {
+        bestCoolDist = zoneDist;
+        activeZoneCooldown = zone;
+      }
+    }
+
+    const camDist = camera ? camera.position.distanceTo(tmpZoneWorld) : 6.0;
+    const closeFade = camDist < 2.2 ? Math.max(0.18, (camDist - 0.7) / 1.5) : 1.0;
+    const phase = (now * (inSwath && !onCooldown ? 0.0022 : 0.0011) + idx * 0.27) % 1;
+    const rig = zone.rig;
+    if (rig) {
+      rig.pulseRing.scale.setScalar(0.95 + phase * (inSwath && !onCooldown ? 0.78 : 0.45));
+      if (onCooldown) {
+        rig.baseRingMat.color.setHex(0x64748b);
+        rig.pulseMat.color.setHex(0x94a3b8);
+        rig.beaconMat.color.setHex(0x64748b);
+        rig.baseRingMat.opacity = 0.28 * closeFade;
+        rig.pulseMat.opacity = 0.22 * (1 - phase) * closeFade;
+        rig.beaconMat.opacity = 0.1 * closeFade;
+      } else if (inSwath) {
+        rig.baseRingMat.color.setHex(0x34d399);
+        rig.pulseMat.color.setHex(0x67e8f9);
+        rig.beaconMat.color.setHex(0x34d399);
+        rig.baseRingMat.opacity = 0.96 * closeFade;
+        rig.pulseMat.opacity = 0.85 * (1 - phase) * closeFade;
+        rig.beaconMat.opacity = 0.48 * closeFade;
+      } else {
+        rig.baseRingMat.color.set(rig.colHex);
+        rig.pulseMat.color.set(rig.colHex);
+        rig.beaconMat.color.set(rig.colHex);
+        rig.baseRingMat.opacity = 0.68 * closeFade;
+        rig.pulseMat.opacity = 0.56 * (1 - phase) * closeFade;
+        rig.beaconMat.opacity = 0.26 * closeFade;
+      }
+    }
+  });
+
+  inLineOfSight = false; activeStationName = 'None'; activeStationId = ''; activeLosGs = null; stationPassCooldownActive = false;
+  let bestLosGs = null, bestLosScore = -1, fallbackLosGs = null, fallbackLosScore = -1;
   gsNodes.forEach((gs, idx) => {
     const pTip = 0.88 + 0.28 * Math.abs(Math.sin(sunElapsed * 2.6 + idx * 1.7));
     if (gs.mesh) gs.mesh.scale.setScalar(pTip);
-  });
-  const activeGs = gsNodes.find((g) => g.active) || gsNodes[0];
-  if (activeGs && beamLine) {
-    activeGs.mesh.getWorldPosition(tmpGs);
-    tmpNorm.copy(activeGs.localNorm).applyQuaternion(earthGroup.quaternion);
+    if (!gs.mesh || !earthGroup) return;
+
+    gs.mesh.getWorldPosition(tmpGs);
+    tmpNorm.copy(gs.localNorm).applyQuaternion(earthGroup.quaternion);
     const losDot = tmpSat.clone().sub(tmpGs).normalize().dot(tmpNorm);
     const rangeOk = orbitEl.deepSpace ? true : tmpSat.distanceTo(tmpGs) < 5.6;
-    const losOk = !isDestroyed && losDot > 0.08 && rangeOk && !stormActive && !gimbalJammed && !commsPaused;
+    const gsLos = !isDestroyed && losDot > 0.20 && rangeOk && !stormActive && !gimbalJammed && !commsPaused;
 
-    if (activeGs.cone) {
-      activeGs.cone.material.opacity = losOk
-        ? 0.34 + 0.08 * Math.abs(Math.sin(now * 0.008))
-        : 0.12 + 0.04 * Math.abs(Math.sin(now * 0.0035));
-      activeGs.cone.material.color.setHex(losOk ? 0x22d3ee : 0x10b981);
+    if (!gsLos) gs.passUsed = false;
+
+    if (gsLos) {
+      if (!gs.passUsed && losDot > bestLosScore) {
+        bestLosScore = losDot;
+        bestLosGs = gs;
+      } else if (losDot > fallbackLosScore) {
+        fallbackLosScore = losDot;
+        fallbackLosGs = gs;
+      }
     }
-    if (activeGs.pulseRings?.length) {
-      const speed = losOk ? 0.0014 : 0.00055;
-      activeGs.pulseRings.forEach((pr, idx) => {
-        const phase = ((now * speed) + idx * 0.5) % 1;
+
+    const baseCol = gs.active ? 0x10b981 : 0x0d9488;
+    if (gs.cone) {
+      if (gsLos && gs.passUsed) {
+        gs.cone.material.opacity = 0.14;
+        gs.cone.material.color.setHex(0xf59e0b);
+      } else if (gsLos) {
+        gs.cone.material.opacity = 0.36 + 0.08 * Math.abs(Math.sin(now * 0.008));
+        gs.cone.material.color.setHex(0x22d3ee);
+      } else {
+        gs.cone.material.opacity = (gs.active ? 0.12 : 0.08) + 0.04 * Math.abs(Math.sin(now * 0.0035 + idx));
+        gs.cone.material.color.setHex(baseCol);
+      }
+    }
+    if (gs.pulseRings?.length) {
+      const speed = gsLos && !gs.passUsed ? 0.0014 : 0.00055;
+      gs.pulseRings.forEach((pr, rIdx) => {
+        const phase = ((now * speed) + rIdx * 0.5 + idx * 0.15) % 1;
         pr.position.y = 0.065 + phase * 0.72;
         pr.scale.setScalar(0.85 + phase * 3.8);
-        pr.material.color.setHex(losOk ? 0x22d3ee : 0x34d399);
-        pr.material.opacity = (losOk ? 0.62 : 0.24) * (1 - phase);
+        pr.material.color.setHex(gsLos ? (gs.passUsed ? 0xf59e0b : 0x22d3ee) : (gs.active ? 0x34d399 : 0x14b8a6));
+        pr.material.opacity = (gsLos ? (gs.passUsed ? 0.28 : 0.66) : (gs.active ? 0.24 : 0.14)) * (1 - phase);
       });
     }
-    if (losOk) {
-      inLineOfSight = true; activeStationName = activeGs.name;
-      const boosted = now < beamBoostUntil;
-      beamLine.visible = true;
-      beamLine.material.color.setHex(boosted ? 0x34d399 : 0x38bdf8);
-      beamLine.geometry.setFromPoints([tmpSat, tmpGs]);
-      if (downlinkRig) {
-        downlinkRig.grp.visible = true;
+  });
+
+  const chosenGs = bestLosGs || fallbackLosGs;
+  if (chosenGs && beamLine) {
+    chosenGs.mesh.getWorldPosition(tmpGs);
+    inLineOfSight = true;
+    activeStationName = chosenGs.name;
+    activeStationId = chosenGs.id;
+    activeLosGs = chosenGs;
+    stationPassCooldownActive = Boolean(chosenGs.passUsed);
+    const boosted = now < beamBoostUntil;
+    beamLine.visible = true;
+    beamLine.material.color.setHex(stationPassCooldownActive ? 0xf59e0b : (boosted ? 0x34d399 : 0x38bdf8));
+    beamLine.geometry.setFromPoints([tmpSat, tmpGs]);
+    if (downlinkRig) {
+      downlinkRig.grp.visible = !stationPassCooldownActive && (onboardBuffer > 0 || boosted || isTutorialActive());
+      if (downlinkRig.grp.visible) {
         tmpBeamVec.subVectors(tmpGs, tmpSat);
         const beamLen = Math.max(0.05, tmpBeamVec.length());
         const beamDir = tmpBeamVec.divideScalar(beamLen);
@@ -1506,15 +1752,23 @@ function animate() {
           orb.material.opacity = Math.sin(t * Math.PI) * 0.98;
         });
       }
-      if (simDt > 0 && bufferGb > 0) { const xfer = Math.min(bufferGb, (simDt / 60) * 0.08); bufferGb -= xfer; downlinkedGb += xfer; }
-    } else {
-      beamLine.visible = false;
-      if (downlinkRig) downlinkRig.grp.visible = false;
     }
+    if (simDt > 0 && bufferGb > 0 && !stationPassCooldownActive) {
+      const xfer = Math.min(bufferGb, (simDt / 60) * 0.08);
+      bufferGb -= xfer; downlinkedGb += xfer;
+    }
+  } else {
+    if (beamLine) beamLine.visible = false;
+    if (downlinkRig) downlinkRig.grp.visible = false;
   }
   if (scanLine) {
-    scanLine.visible = now < scanUntil && Boolean(scanTarget);
-    if (scanLine.visible) scanLine.geometry.setFromPoints([tmpSat, scanTarget.mesh.position]);
+    if (now < zoneScanFxUntil) {
+      scanLine.visible = true;
+      scanLine.geometry.setFromPoints([tmpSat, zoneScanPos]);
+    } else {
+      scanLine.visible = now < scanUntil && Boolean(scanTarget);
+      if (scanLine.visible) scanLine.geometry.setFromPoints([tmpSat, scanTarget.mesh.position]);
+    }
   }
 
   const ry = earthGroup ? earthGroup.rotation.y : 0;
@@ -1562,7 +1816,16 @@ function animate() {
       commsPausedSec: Number(Math.max(0, (commsPauseUntil - now) / 1000).toFixed(1)),
       omniReducedDownlinks,
       batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
-      linkedStation: activeStationName, missionScore, downlinkCount, flareMitigated, asteroidsScanned,
+      linkedStation: activeStationName, activeStationId, stationPassCooldownActive,
+      missionScore, downlinkCount, flareMitigated, asteroidsScanned,
+      onboardBuffer, scienceScansCount, eclipsesSurvived,
+      swathZoneId: activeZoneReady?.id || activeZoneCooldown?.id || '',
+      swathZoneName: activeZoneReady?.name || activeZoneCooldown?.name || '',
+      swathZoneCategory: activeZoneReady?.category || '',
+      swathZonePoints: activeZoneReady?.points || 0,
+      swathReady: Boolean(activeZoneReady),
+      swathCooldownSec: activeZoneCooldown ? Math.max(1, Math.ceil(activeZoneCooldown.cooldownUntilSim - simTime)) : 0,
+      zoneScanActive: now < zoneScanFxUntil,
       downlinkPts, anomalyPts, scanPts, decisionPts,
       hullIntegrity: isDestroyed ? 0 : hazardSnap.hullIntegrity,
       isDestroyed,
@@ -1575,6 +1838,7 @@ function animate() {
       utcText: formatUtcClock(simTime),
       nearestNeaId: nearest?.target.id || '', nearestNeaDist: nearest ? Number(nearest.dist.toFixed(1)) : 99,
       timeWarp, briefingPaused, sensorCamEnabled, sensorCamMode: getSensorCamMode(stateRef).mode,
+      tutorialActive: isTutorialActive(),
       deployActive, deployProgress: Number(deployProgress.toFixed(3)),
       selectedHoloId, followHoloId, holoTargetCount: Object.keys(holoTargets).length,
       apsisVisibleCount: apsisSprites.filter((s) => s.visible).length,
@@ -1849,6 +2113,28 @@ function drawSensorCamFeed(latDeg, lonDeg, inEclipse, stormActive, tReal, tSim) 
   ctx.moveTo(w / 2, h / 2 + 4); ctx.lineTo(w / 2, h / 2 + 14);
   ctx.stroke();
 
+  const scanRemMs = zoneScanFxUntil - performance.now();
+  if (scanRemMs > 0) {
+    const p = 1 - Math.max(0, Math.min(1, scanRemMs / 1500));
+    const sweepX = p * w;
+    const grad = ctx.createLinearGradient(sweepX - 18, 0, sweepX + 18, 0);
+    grad.addColorStop(0, 'rgba(34, 211, 238, 0)');
+    grad.addColorStop(0.5, 'rgba(52, 211, 153, 0.72)');
+    grad.addColorStop(1, 'rgba(34, 211, 238, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(Math.max(0, sweepX - 18), 0, 36, h);
+    ctx.strokeStyle = 'rgba(103, 232, 249, 0.95)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sweepX, 0); ctx.lineTo(sweepX, h);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(6, 78, 59, 0.88)';
+    ctx.fillRect(8, 34, Math.min(w - 16, 226), 20);
+    ctx.fillStyle = '#6ee7b7';
+    ctx.font = '700 11px Orbitron, sans-serif';
+    ctx.fillText(`SCANNING +1 PKT · ${zoneScanLabel.slice(0, 18)}`, 14, 48);
+  }
+
   const risks = evalRef?.designRisks || {};
   if (stormActive || risks.weakCommsMargin || risks.wavelengthMismatch) {
     ctx.fillStyle = risks.wavelengthMismatch ? 'rgba(239, 68, 68, 0.22)' : 'rgba(245, 158, 11, 0.16)';
@@ -2036,6 +2322,13 @@ export function transmitScience() {
     return { ok: false, reason: 'paused', pausedSec: Number(rem.toFixed(1)), points: 0, station: activeStationName };
   }
   if (!inLineOfSight) return { ok: false, points: 0, station: 'None' };
+  const tut = isTutorialActive();
+  if (!tut && activeLosGs?.passUsed) {
+    return { ok: false, reason: 'pass-cooldown', points: 0, station: activeStationName };
+  }
+  if (!tut && onboardBuffer < 1) {
+    return { ok: false, reason: 'empty-buffer', points: 0, station: activeStationName };
+  }
   const risks = evalRef?.designRisks || {};
   let pts = 50;
   let omniReduced = false;
@@ -2048,10 +2341,23 @@ export function transmitScience() {
   if (risks.wavelengthMismatch) pts = Math.round(pts * 0.6);
   const xfer = Math.max(0.15, Math.min(bufferGb, 1.4));
   bufferGb = Math.max(0, bufferGb - xfer); downlinkedGb += xfer;
+  if (onboardBuffer > 0) onboardBuffer -= 1;
+  if (activeLosGs && !tut) {
+    activeLosGs.passUsed = true;
+    stationPassCooldownActive = true;
+  }
   downlinkCount += 1; downlinkPts += pts; missionScore += pts; beamBoostUntil = performance.now() + 900;
   lastHudMs = 0;
   playDownlinkPing();
-  return { ok: true, points: pts, station: activeStationName, omniReduced, weakComms: Boolean(risks.weakCommsMargin), wavelengthMismatch: Boolean(risks.wavelengthMismatch) };
+  return {
+    ok: true,
+    points: pts,
+    station: activeStationName,
+    onboardBuffer,
+    omniReduced,
+    weakComms: Boolean(risks.weakCommsMargin),
+    wavelengthMismatch: Boolean(risks.wavelengthMismatch)
+  };
 }
 export function activateSafeMode() {
   if (isDestroyed) return { ok: false, points: 0, hazard: false };
@@ -2061,14 +2367,49 @@ export function activateSafeMode() {
   playSafeMode(); return { ok: true, points: pts, hazard: hazardNow };
 }
 export function scanAsteroid() {
-  if (!spaceEnv || isDestroyed) return { ok: false, points: 0 };
-  const { target } = spaceEnv.findNearestTarget(tmpSat);
+  if (isDestroyed) return { ok: false, reason: 'destroyed', points: 0 };
+  const now = performance.now();
+  if (brownoutLocked) return { ok: false, reason: 'brownout', points: 0 };
+  if (now < sensorOfflineUntil) {
+    return { ok: false, reason: 'offline', pausedSec: Number(((sensorOfflineUntil - now) / 1000).toFixed(1)), points: 0 };
+  }
   const risks = evalRef?.designRisks || {};
-  const pts = risks.wavelengthMismatch ? Math.round(target.points * 0.6) : target.points;
-  scanTarget = target; scanUntil = performance.now() + 1400;
-  asteroidsScanned += 1; scanPts += pts; missionScore += pts;
-  lastHudMs = 0;
-  playDownlinkPing(); return { ok: true, points: pts, id: target.id, isComet: target.isComet };
+  if (activeZoneReady) {
+    const z = activeZoneReady;
+    z.scannedThisPass = true;
+    z.cooldownUntilSim = simTime + 60;
+    if (z.host === 'earth') z.group.getWorldPosition(zoneScanPos);
+    else zoneScanPos.copy(z.group.position);
+    zoneScanFxUntil = now + 1500;
+    zoneScanLabel = z.name;
+    const pts = risks.wavelengthMismatch ? Math.round(z.points * 0.6) : z.points;
+    onboardBuffer += 1;
+    scienceScansCount += 1;
+    asteroidsScanned += 1;
+    scanPts += pts;
+    missionScore += pts;
+    lastHudMs = 0;
+    playDownlinkPing();
+    return {
+      ok: true,
+      points: pts,
+      id: z.name,
+      category: z.category,
+      onboardBuffer,
+      scienceScansCount,
+      isComet: z.host === 'comet'
+    };
+  }
+  if (activeZoneCooldown) {
+    return {
+      ok: false,
+      reason: 'cooldown',
+      zoneName: activeZoneCooldown.name,
+      cooldownSec: Math.max(1, Math.ceil(activeZoneCooldown.cooldownUntilSim - simTime)),
+      points: 0
+    };
+  }
+  return { ok: false, reason: 'out-of-swath', points: 0 };
 }
 export function applyOrbitDecisionEffect({ scoreDelta = 0, hullDelta = 0, batteryDelta = 0, sensorOfflineSec = 0 } = {}) {
   if (scoreDelta) {
@@ -2098,6 +2439,9 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
   stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
+  onboardBuffer = 0; scienceScansCount = 0; eclipsesSurvived = 0; wasInEclipse = false;
+  activeZoneReady = null; activeZoneCooldown = null; zoneScanFxUntil = 0; zoneScanLabel = '';
+  activeStationId = ''; activeLosGs = null; stationPassCooldownActive = false;
   downlinkPts = 0; anomalyPts = 0; scanPts = 0; decisionPts = 0; lastAutoFlare = 14; lastHudMs = 0; lastCamMs = 0;
   brownoutLocked = false; sensorOfflineUntil = 0; solarChargePauseUntil = 0; commsPauseUntil = 0; omniReducedDownlinks = 0; dragLossKm = 0; dragHullAccum = 0;
   isDestroyed = false; destructionReason = ''; explosionRig = null; explosionElapsed = 0; shakeRemaining = 0;
@@ -2291,7 +2635,9 @@ export function unmountOrbit() {
   isDestroyed = false; destructionReason = ''; explosionElapsed = 0; shakeRemaining = 0;
   hazardEventCb = null;
   resetOrbitHazards();
-  gsNodes = []; apsisSprites = []; gsHoloProxies = []; holoProxies = []; holoTargets = {};
+  gsNodes = []; apsisSprites = []; scienceZones = []; gsHoloProxies = []; holoProxies = []; holoTargets = {};
+  activeZoneReady = null; activeZoneCooldown = null; zoneScanFxUntil = 0; zoneScanLabel = '';
+  activeStationId = ''; activeLosGs = null; stationPassCooldownActive = false;
   earthSolidMesh = null; earthOuterProxy = null; selectionRing = null;
   orbitPts = []; hasPrevSat = false;
 }

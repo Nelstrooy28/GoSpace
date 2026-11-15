@@ -11,8 +11,10 @@ let hullIntegrity = 100;
 let anomaliesResolved = 0;
 let anomaliesMissed = 0;
 let autoTriggeredCount = 0;
+let milestone35Done = false;
+let milestone70Done = false;
 let activeHazard = null;
-let nextScheduleSec = 14;
+let nextScheduleSec = 42;
 let cycleIdx = 0;
 let resolvedBannerUntil = 0;
 let resolvedBannerText = '';
@@ -30,7 +32,7 @@ function buildHazardSpec(kind) {
 }
 
 function scheduleNext() {
-  nextScheduleSec = stateRef?.sandboxMode ? (18 + Math.random() * 8) : 26;
+  nextScheduleSec = stateRef?.sandboxMode ? (18 + Math.random() * 8) : 45;
 }
 
 /**
@@ -51,11 +53,13 @@ export function resetOrbitHazards() {
   anomaliesResolved = 0;
   anomaliesMissed = 0;
   autoTriggeredCount = 0;
+  milestone35Done = false;
+  milestone70Done = false;
   activeHazard = null;
   resolvedBannerUntil = 0;
   resolvedBannerText = '';
   cycleIdx = 0;
-  nextScheduleSec = 14;
+  nextScheduleSec = 42;
 }
 
 /**
@@ -148,7 +152,7 @@ export function applyHullDelta(delta, minHull = 0) {
 /**
  * Advances real-time countdowns for scheduled and active hazards.
  */
-export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tutorialActive = false, destroyed = false } = {}) {
+export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tutorialActive = false, destroyed = false, milestonePct = 0 } = {}) {
   if (tutorialActive || destroyed) return;
 
   if (activeHazard) {
@@ -178,13 +182,32 @@ export function updateOrbitHazards(realDt, { inEclipse = false, timeWarp = 1, tu
   }
 
   const canAutoTrigger = stateRef?.sandboxMode || autoTriggeredCount < MAX_SIMULATION_AUTO_HAZARDS;
-  if (timeWarp > 0 && canAutoTrigger) {
-    nextScheduleSec -= realDt;
-    if (nextScheduleSec <= 0) {
+  if (!canAutoTrigger || timeWarp <= 0) return;
+
+  if (!stateRef?.sandboxMode) {
+    if (!milestone35Done && milestonePct >= 35) {
+      milestone35Done = true;
       autoTriggeredCount += 1;
-      const autoKind = inEclipse && (cycleIdx % 2 === 1) ? 'cryo' : null;
-      triggerRandomHazard(autoKind);
+      triggerRandomHazard(inEclipse ? 'cryo' : null);
+      return;
     }
+    if (!milestone70Done && milestonePct >= 70) {
+      milestone70Done = true;
+      autoTriggeredCount += 1;
+      triggerRandomHazard(inEclipse ? 'cryo' : (cycleIdx % 2 === 1 ? 'gimbal' : null));
+      return;
+    }
+  }
+
+  nextScheduleSec -= realDt;
+  if (nextScheduleSec <= 0) {
+    if (!stateRef?.sandboxMode) {
+      if (!milestone35Done) milestone35Done = true;
+      else if (!milestone70Done) milestone70Done = true;
+    }
+    autoTriggeredCount += 1;
+    const autoKind = inEclipse && (cycleIdx % 2 === 1) ? 'cryo' : null;
+    triggerRandomHazard(autoKind);
   }
 }
 

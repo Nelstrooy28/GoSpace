@@ -23,11 +23,11 @@ export const SCENARIOS = [
       headline: 'Arctic Wildfire Watch · ★☆☆',
       about: 'High-latitude boreal wildfires ignite remote forests long before ground crews spot smoke. Your thermal infrared CubeSat measures mid-infrared heat signatures from Sun-Synchronous polar orbit to alert responders within minutes.',
       tasks: [
-        { icon: '📡', title: 'Beam Down Thermal Heat Maps', text: 'Fly into a green Polar Ground Station cone and press [SPACE] to transmit thermal fire hotspot maps (+50 pts).' },
+        { icon: '🔬', title: '1. Scan Zones -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit! (3 Scans · 2 Downlinks)' },
         { icon: '🔋', title: 'Manage Nightside Eclipse Power', text: 'Keep Battery above 25% while passing through Earth’s dark eclipse shadow; trigger [Q] Safe Mode if solar power dips.' },
-        { icon: '🛡️', title: 'Survive Orbital Hazards for ★★★', text: 'Respond quickly to micrometeoroid debris or solar storm alerts ([D]/[F]/[T]/[R]) to protect Hull Integrity and win +75 bonus pts.' }
+        { icon: '🛡️', title: 'Resolve Mid-Orbit Space Events', text: 'Counter micrometeoroid or solar alerts cleanly with [1][2][3] tactical choices to protect Hull Integrity and earn bonus Science.' }
       ],
-      proTip: 'Use 25x or 100x Time Warp to glide rapidly toward the next green Polar cone, then drop to 1x to nail your [SPACE] downlink!'
+      proTip: 'Use 25x or 100x Time Warp to glide between Wildfire Plumes and Ground Dishes—each zone has a 60s orbit cooldown and each dish allows 1 downlink per pass!'
     }
   },
   {
@@ -40,13 +40,13 @@ export const SCENARIOS = [
     orbitGuide: {
       codename: 'OPERATION POLAR CURTAIN',
       headline: 'Ionosphere & Aurora Scout · ★☆☆',
-      about: 'Charged solar wind slamming into Earth’s poles sparks shimmering aurora while disrupting navigation signals and power grids. Your fluxgate magnetometer and plasma analyzer map geomagnetic storm currents straight across the polar oval.',
+      about: 'Charged solar wind slamming into Earth’s poles drives geomagnetic storm currents while disrupting navigation signals and power grids. Your fluxgate magnetometer and plasma analyzer map cusp particle surges across high-latitude orbits.',
       tasks: [
-        { icon: '🧭', title: 'Transmit Polar Storm Packets', text: 'Wait for a glowing green Polar Ground Station cone and press [SPACE] to downlink live auroral magnetic field sweeps.' },
-        { icon: '☀️', title: 'Shield Optics During Solar Storms', text: 'Polar arcs face elevated solar particle storms—tap [F] Shield Optics promptly so radiation spikes do not wipe buffered science.' },
-        { icon: '☄️', title: 'Scan Passing Space Rocks', text: 'Watch nearby near-Earth objects along your high-latitude arc and hit [E] Scan Asteroid (+60/+100 pts) for extra science!' }
+        { icon: '🔬', title: '1. Scan Cusps -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit! (3 Scans · 2 Downlinks)' },
+        { icon: '☀️', title: 'Shield Optics During Solar Storms', text: 'Polar arcs face elevated solar particle surges—choose [1][2][3] ConOps protocols promptly so radiation spikes do not breach hull.' },
+        { icon: '📡', title: 'Complete Multi-Pass Relays', text: 'Each Ground Station allows 1 downlink per flyover pass—capture multiple Magnetosphere Cusps while cruising to the next dish.' }
       ],
-      proTip: 'Keep Hull Integrity near 100% across the polar radiation belt—every clean anomaly repair awards +75 Flight Director pts!'
+      proTip: 'Keep Hull Integrity high across the polar belt—every resolved mid-flight event unlocks Checklist progress and bonus points!'
     }
   },
   {
@@ -61,11 +61,11 @@ export const SCENARIOS = [
       headline: 'Coastal Ocean & Reef Pulse · ★★☆',
       about: 'Microscopic ocean phytoplankton generate half of Earth’s oxygen while coastal coral reefs signal warming ocean waters. Your Hyperspectral + LiDAR SmallSat captures crisp turquoise chlorophyll spectra and vertical aerosol profiles.',
       tasks: [
-        { icon: '🌊', title: 'Downlink Heavy Hyperspectral Cubes', text: 'Multi-band ocean optics fill storage quickly—catch green Ground Station passes with [SPACE] before your buffer fills up.' },
-        { icon: '🔋', title: 'Balance Dual-Payload Power Draw', text: 'Monitor Battery SoC through Earth’s nightside eclipse and trigger [Q] Cycle Power if optical + laser load drains below 25%.' },
-        { icon: '🛠️', title: 'Clear Hazard Alerts Mid-Pass', text: 'A gimbal jam or solar flare blocks telemetry links until repaired—resolve alerts fast so your pass window is never wasted.' }
+        { icon: '🌊', title: '1. Scan Reef Blooms -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit! (4 Scans · 3 Downlinks)' },
+        { icon: '🌑', title: 'Survive Earth Eclipse Passage', text: 'Endure 1 full nightside Earth eclipse pass while monitoring dual-payload power draw and using [Q] Safe Mode if batteries run low.' },
+        { icon: '🛠️', title: 'Resolve 2 Mid-Flight Space Events', text: 'A gimbal jam or solar flare tests flight ops mid-mission—select [1][2][3] engineering responses to keep science on schedule.' }
       ],
-      proTip: 'Toggle between 🛰️ Chase Sat and 🌍 Full Orbit views to spot approaching coastline passes ahead of acquisition!'
+      proTip: 'Toggle Sensor Cam [C] when entering a Cyan Reef Bloom swath to watch live multi-band capture sweeps fill your buffer!'
     }
   },
   {
@@ -78,13 +78,13 @@ export const SCENARIOS = [
     orbitGuide: {
       codename: 'OPERATION CYCLONE PENETRATOR',
       headline: 'Monsoon & Cyclone All-Weather Eye · ★★☆',
-      about: 'Optical cameras go blind above thick typhoon cloud decks right before dangerous landfalls. Your high-wattage Synthetic Aperture Radar (SAR) pulses right through cyclone walls day and night to track flood surges.',
+      about: 'Optical cameras go blind above thick typhoon cloud decks right before dangerous landfalls. Your high-wattage Synthetic Aperture Radar (SAR) pulses right through cyclone eyewalls day and night to track flood surges.',
       tasks: [
-        { icon: '⚡', title: 'Power the High-Wattage SAR Wing', text: 'Active radar scanning draws heavy power—watch eclipse passages closely and trigger [T] Heaters or [Q] Safe Mode if needed.' },
-        { icon: '📡', title: 'Deliver Emergency Storm Tracks', text: 'Hit [SPACE] inside green Ground Station cones to rush all-weather storm eye telemetry down with minimal latency.' },
-        { icon: '🛡️', title: 'Dodge Orbital Debris Fields', text: 'Protect your wide SAR phased-array wing using [D] Thruster Dodge when debris warnings sound for +75 pts and 100% hull.' }
+        { icon: '🌀', title: '1. Scan Cyclone Eyes -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit! (4 Scans · 3 Downlinks)' },
+        { icon: '🌑', title: 'Endure Nightside Eclipse Power Draw', text: 'Complete 1 full eclipse transit smoothly without tripping power brownout.' },
+        { icon: '🛡️', title: 'Resolve 2 Orbital ConOps Events', text: 'Protect your wide SAR phased-array wing through 2 mid-flight hazard protocols using [1][2][3].' }
       ],
-      proTip: 'Jump to 100x Time Warp over open ocean legs, then drop to 1x as the green Polar Station pulse ring expands!'
+      proTip: 'Jump to 100x Time Warp over open ocean legs, capture Cyclone Eyes on flyover with [E], then catch Ground Dish passes with [SPACE]!'
     }
   },
   {
@@ -99,11 +99,11 @@ export const SCENARIOS = [
       headline: 'Lunar South Pole Icebreaker · ★★★',
       about: 'Sunbeams have not touched the floors of deep Lunar South Pole craters for billions of years, trapping ancient pockets of water ice. Your cryogenic IR telescope and neutron spectrometer map subsurface hydrogen reserves for future explorers.',
       tasks: [
-        { icon: '❄️', title: 'Guard Deep-Space Cryo Balance', text: 'Long elliptical transfer arcs bring extreme thermal swings—activate [T] Heaters or [F] Shielding immediately when alerts fire.' },
-        { icon: '📡', title: 'Link with the Deep-Space Dish', text: 'Your high-apogee ellipse sweeps far out before diving back—hit [SPACE] whenever the Deep-Space Dish locks in green.' },
-        { icon: '☄️', title: 'Scan Deep-Space Objects Along the Arc', text: 'Press [E] Scan Asteroid (+100 deep-space bonus) and keep anomalies resolved cleanly to earn an S-Rank Flight Director crest!' }
+        { icon: '🌑', title: '1. Scan Lunar Craters -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit! (5 Scans · 4 Downlinks)' },
+        { icon: '❄️', title: 'Guard Deep-Space Cryo Balance', text: 'Long elliptical transfer arcs bring extreme thermal swings—resolve 2 mid-flight Space Hazards cleanly with [1][2][3].' },
+        { icon: '📡', title: 'Relay Through Global Deep-Space Dishes', text: 'Transmit 1 buffered volatile dataset per Ground Station pass until all 4 archival downlinks are logged.' }
       ],
-      proTip: 'Use 100x Time Warp along the slow outer apogee arc and switch to ☄️ Asteroid & Comet cam to line up bonus scans!'
+      proTip: 'Use 100x Time Warp along outer apogee arcs while sweeping shadowed Lunar crater zones, then downlink on each station pass!'
     }
   },
   {
@@ -119,11 +119,11 @@ export const SCENARIOS = [
       headline: 'Near-Earth Asteroid Prospector · ★★★',
       about: 'Metallic near-Earth asteroids expose primordial iron-nickel planetary cores and water-bearing minerals from the birth of our solar system. Your Xenon Ion explorer pairs high-resolution optics with elemental spectrometers to prospect them up close.',
       tasks: [
-        { icon: '☄️', title: 'Run Close-Range Asteroid Scans', text: 'Hit [E] Scan Asteroid (or frame targets with ☄️ Asteroid & Comet cam) whenever NEAs and comets pass within sensor range (+60/+100 pts).' },
-        { icon: '⚙️', title: 'Keep Ion Drive & Gimbal Aligned', text: 'Counter solar flares ([F]), debris threats ([D]), and gimbal jams promptly so Xenon thrust and deep-space comms stay online.' },
-        { icon: '📡', title: 'Transmit Deep-Space Assay Archive', text: 'Catch green Deep-Space Dish link passes with [SPACE] to deliver asteroid composition maps home for an S-Rank crest.' }
+        { icon: '☄️', title: '1. Prospect Waypoints -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit! (5 Scans · 4 Downlinks)' },
+        { icon: '⚙️', title: 'Resolve 2 Deep-Space ConOps Hazards', text: 'Counter solar flares, debris swarms, and cryo/gimbal faults via [1][2][3] to keep Xenon thrust & assay archives safe.' },
+        { icon: '📡', title: 'Deliver 4 Deep-Space Downlinks', text: 'Buffer asteroid spectroscopy datasets along the ellipse, then transmit 1 per Ground Station pass with [SPACE].' }
       ],
-      proTip: 'Try 🌌 Full Solar System cam to see your deep elliptical transfer track sweeping past Venus, Earth, Mars, and the Asteroid Belt!'
+      proTip: 'Try 🌌 Full Solar System cam to watch your deep transfer ellipse sweeping past asteroids, Comet C/2026 GOSPACE, and the planets!'
     }
   }
 ];
@@ -375,9 +375,9 @@ export const SANDBOX_ORBIT_GUIDE_FALLBACK = {
   headline: 'Custom Orbital Architecture · FREEPLAY',
   about: 'Unlimited budget and rocket payload mass let you test daring satellite builds without procurement caps. Push extreme sensors, RTGs, or Xenon Ion drives into real Keplerian orbits and watch how they withstand live space hazards.',
   tasks: [
-    { icon: '📡', title: 'Test Green Ground Cones', text: 'Fly inside green Ground Station cones and press [SPACE] to transmit live science telemetry (+50 pts).' },
-    { icon: '☄️', title: 'Scan Asteroids & Comets', text: 'Hit [E] Scan Asteroid and try ☄️ Asteroid & Comet or 🌌 Full Solar System camera presets.' },
-    { icon: '⚠️', title: 'Stress-Test Orbital Hazards', text: 'Click ⚠️ Test Hazard or survive incoming debris, solar flares, and cryo freezes to verify your hardware protections.' }
+    { icon: '🔬', title: '1. Scan Zones -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit!' },
+    { icon: '📡', title: 'Test Multi-Pass Downlinks', text: 'Each Ground Station allows 1 downlink per flyover cone, and each scanned Science Zone resets on a 60s orbit cooldown.' },
+    { icon: '⚠️', title: 'Stress-Test Orbital Hazards', text: 'Click ⚠️ Trigger Hazard or survive incoming debris, solar flares, and cryo freezes via [1][2][3] ConOps protocols.' }
   ],
   proTip: 'Equip Xenon Ion, Cryo Sunshields, or RTGs in the Hangar to unlock zero-damage emergency counter-moves in Orbit!'
 };
@@ -605,6 +605,36 @@ export const CELESTIAL_DATABASE = {
     },
     scienceFact: 'Steerable 70-meter parabolic reflectors in arid desert basins detect whisper-faint attowatt radio signals arriving across millions of kilometers from lunar, Martian, and outer-planet probes. Three longitudinally spaced arrays maintain uninterrupted contact with deep-space spacecraft as Earth rotates.'
   },
+  'gs-svalbard': {
+    id: 'gs-svalbard',
+    name: 'Svalbard Polar Relay',
+    emblem: '📡',
+    accent: '#22d3ee',
+    classification: 'High-Arctic Telemetry Hub',
+    stats: {
+      gravity: '9.83 m/s² (78.2° N)',
+      dayLength: '14 polar passes / day',
+      orbitalPeriod: 'S / X / Ka-Band',
+      tempRange: '-30 °C to +10 °C',
+      distanceAU: '1.00 AU · 14m Radome'
+    },
+    scienceFact: 'Located inside the High Arctic at 78.23° N in Svalbard, Norway, this extreme-latitude dish complex tracks polar-orbiting climate, wildfire, and space-weather satellites on nearly every revolution around Earth.'
+  },
+  'gs-canberra': {
+    id: 'gs-canberra',
+    name: 'Southern Cross Dish Complex',
+    emblem: '📡',
+    accent: '#34d399',
+    classification: 'Southern Hemisphere Tracking Station',
+    stats: {
+      gravity: '9.80 m/s² (35.4° S)',
+      dayLength: 'Continuous Hemisphere Link',
+      orbitalPeriod: 'S / X / Ka / Optical',
+      tempRange: '-4 °C to +39 °C',
+      distanceAU: '1.00 AU · 70m & 34m Array'
+    },
+    scienceFact: 'Anchored in a quiet valley in southeastern Australia at 35.40° S, the Southern Cross tracking complex bridges the global ground network during southern-hemisphere passes and deep-space lunar and asteroid conjunctions.'
+  },
   comet: {
     id: 'comet',
     name: 'Comet C/2026 GOSPACE',
@@ -765,13 +795,62 @@ export function getHazardProtocol(kind, missionState, batterySoc = 84) {
   };
 }
 
+export const MISSION_SCIENCE_ZONES = {
+  'wildfiresat-l1': [
+    { id: 'wf-mackenzie', name: 'Mackenzie Wildfire Plume', category: 'Thermal Plume', host: 'earth', orbitFrac: 0.09, points: 75, color: '#f97316' },
+    { id: 'wf-taiga', name: 'Siberian Taiga Front', category: 'Thermal Plume', host: 'earth', orbitFrac: 0.28, points: 75, color: '#fbbf24' },
+    { id: 'wf-yukon', name: 'Yukon Crown Hotspot', category: 'Thermal Plume', host: 'earth', orbitFrac: 0.48, points: 80, color: '#f97316' },
+    { id: 'wf-quebec', name: 'Labrador Boreal Swath', category: 'Thermal Plume', host: 'earth', orbitFrac: 0.69, points: 75, color: '#38bdf8' },
+    { id: 'wf-alpine', name: 'Southern Ridge Bushfire', category: 'Thermal Plume', host: 'earth', orbitFrac: 0.88, points: 85, color: '#fbbf24' }
+  ],
+  'aurora-l1': [
+    { id: 'au-ncusp', name: 'Northern Polar Cusp', category: 'Magnetosphere Cusp', host: 'earth', orbitFrac: 0.12, points: 75, color: '#34d399' },
+    { id: 'au-birkeland', name: 'Birkeland Current Arc', category: 'Magnetosphere Cusp', host: 'earth', orbitFrac: 0.31, points: 80, color: '#22d3ee' },
+    { id: 'au-substorm', name: 'Substorm Oval Core', category: 'Magnetosphere Cusp', host: 'earth', orbitFrac: 0.52, points: 85, color: '#38bdf8' },
+    { id: 'au-scusp', name: 'Southern Polar Cusp', category: 'Magnetosphere Cusp', host: 'earth', orbitFrac: 0.72, points: 80, color: '#34d399' },
+    { id: 'au-jet', name: 'Auroral Electrojet Sheet', category: 'Magnetosphere Cusp', host: 'earth', orbitFrac: 0.90, points: 75, color: '#fbbf24' }
+  ],
+  'ocean-l2': [
+    { id: 'oc-barrier', name: 'Great Barrier Reef Bloom', category: 'Coastal Reef Bloom', host: 'earth', orbitFrac: 0.10, points: 85, color: '#22d3ee' },
+    { id: 'oc-belize', name: 'Mesoamerican Coral Shelf', category: 'Coastal Reef Bloom', host: 'earth', orbitFrac: 0.29, points: 85, color: '#34d399' },
+    { id: 'oc-natl', name: 'North Atlantic Plankton Swirl', category: 'Coastal Reef Bloom', host: 'earth', orbitFrac: 0.49, points: 90, color: '#38bdf8' },
+    { id: 'oc-humboldt', name: 'Humboldt Upwelling Front', category: 'Coastal Reef Bloom', host: 'earth', orbitFrac: 0.68, points: 85, color: '#22d3ee' },
+    { id: 'oc-triangle', name: 'Coral Triangle Archipelago', category: 'Coastal Reef Bloom', host: 'earth', orbitFrac: 0.87, points: 95, color: '#fbbf24' }
+  ],
+  'monsoon-l2': [
+    { id: 'mn-bengal', name: 'Bay of Bengal Eyewall', category: 'Cyclone Eye', host: 'earth', orbitFrac: 0.11, points: 90, color: '#38bdf8' },
+    { id: 'mn-wpac', name: 'West Pacific Super-Typhoon', category: 'Cyclone Eye', host: 'earth', orbitFrac: 0.30, points: 95, color: '#fbbf24' },
+    { id: 'mn-mekong', name: 'Mekong Floodplain Basin', category: 'SAR Flood Swath', host: 'earth', orbitFrac: 0.51, points: 85, color: '#22d3ee' },
+    { id: 'mn-atl', name: 'Atlantic Hurricane Vortex', category: 'Cyclone Eye', host: 'earth', orbitFrac: 0.71, points: 90, color: '#38bdf8' },
+    { id: 'mn-coral', name: 'Coral Sea Storm Core', category: 'Cyclone Eye', host: 'earth', orbitFrac: 0.89, points: 90, color: '#fbbf24' }
+  ],
+  'lunar-l3': [
+    { id: 'ln-shackleton', name: 'Shackleton Rim Shadow', category: 'Lunar Crater PSR', host: 'moon', localDir: [0.15, -0.92, 0.36], points: 110, color: '#67e8f9' },
+    { id: 'ln-cabeus', name: 'Cabeus Volatile Basin', category: 'Lunar Crater PSR', host: 'moon', localDir: [-0.42, -0.84, 0.34], points: 110, color: '#38bdf8' },
+    { id: 'ln-shoemaker', name: 'Shoemaker Ice Trap', category: 'Lunar Crater PSR', host: 'moon', localDir: [0.46, -0.78, -0.42], points: 115, color: '#a78bfa' },
+    { id: 'ln-outbound', name: 'Cislunar Cryo Arc', category: 'Transfer Swath', host: 'orbit', orbitFrac: 0.24, points: 95, color: '#22d3ee' },
+    { id: 'ln-inbound', name: 'Apogee Neutron Sweep', category: 'Lunar Corridor', host: 'orbit', orbitFrac: 0.74, points: 100, color: '#fbbf24' }
+  ],
+  'asteroid-l3': [
+    { id: 'as-nea1', name: 'Silicate NEA-2026 Waypoint', category: 'Asteroid Target', host: 'nea', neaIndex: 0, points: 105, color: '#fbbf24' },
+    { id: 'as-nea2', name: 'Metallic M-Type NEA-2027', category: 'Asteroid Target', host: 'nea', neaIndex: 1, points: 115, color: '#38bdf8' },
+    { id: 'as-nea3', name: 'Carbonaceous NEA-2028', category: 'Asteroid Target', host: 'nea', neaIndex: 2, points: 110, color: '#22d3ee' },
+    { id: 'as-comet', name: 'Comet C/2026 GOSPACE Coma', category: 'Comet Flyby', host: 'comet', points: 135, color: '#67e8f9' },
+    { id: 'as-peri', name: 'Deep-Space Spectrom Arc', category: 'Transfer Waypoint', host: 'orbit', orbitFrac: 0.19, points: 100, color: '#fbbf24' }
+  ]
+};
+
+export function getMissionScienceZones(scenarioId) {
+  return (MISSION_SCIENCE_ZONES[scenarioId] || MISSION_SCIENCE_ZONES['wildfiresat-l1']).map((z) => ({ ...z }));
+}
+
 export const ORBIT_MISSION_TARGETS = {
-  'wildfiresat-l1': { downlinks: 2, mode: 'score', scienceTarget: 100, scienceLabel: 'Thermal Science Return' },
-  'aurora-l1': { downlinks: 2, mode: 'scan', scanTarget: 1, scienceLabel: 'Target Scan [E]' },
-  'ocean-l2': { downlinks: 3, mode: 'score', scienceTarget: 150, scienceLabel: 'Ocean Spectra Return' },
-  'monsoon-l2': { downlinks: 3, mode: 'score', scienceTarget: 150, scienceLabel: 'Cyclone Radar Return' },
-  'lunar-l3': { downlinks: 3, mode: 'scan', scanTarget: 2, scienceLabel: 'Deep-Space Scans [E]' },
-  'asteroid-l3': { downlinks: 3, mode: 'scan', scanTarget: 2, scienceLabel: 'Asteroid Scans [E]' }
+  'wildfiresat-l1': { scanTarget: 3, downlinks: 2, eventTarget: 1, eclipseTarget: 0, scanLabel: 'Capture Thermal Scans ([E])' },
+  'aurora-l1': { scanTarget: 3, downlinks: 2, eventTarget: 1, eclipseTarget: 0, scanLabel: 'Scan Mag-Cusps ([E])' },
+  'ocean-l2': { scanTarget: 4, downlinks: 3, eventTarget: 2, eclipseTarget: 1, scanLabel: 'Capture Reef Scans ([E])' },
+  'monsoon-l2': { scanTarget: 4, downlinks: 3, eventTarget: 2, eclipseTarget: 1, scanLabel: 'Scan Cyclone Eyes ([E])' },
+  'lunar-l3': { scanTarget: 5, downlinks: 4, eventTarget: 2, eclipseTarget: 0, scanLabel: 'Scan Lunar Craters ([E])' },
+  'asteroid-l3': { scanTarget: 5, downlinks: 4, eventTarget: 2, eclipseTarget: 0, scanLabel: 'Prospect Waypoints ([E])' }
 };
 
 export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
@@ -782,11 +861,13 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
   const deployProgress = telemetry?.deployProgress ?? 0;
   const deployDone = Boolean(run?.deployCompleted || (telemetry && !telemetry.deployActive && deployProgress >= 0.99));
   const dl = Math.max(telemetry?.downlinkCount || 0, run?.downlinksCompleted || 0);
-  const scans = Math.max(telemetry?.asteroidsScanned || 0, run?.scansCompleted || 0);
-  const score = Math.max(telemetry?.missionScore || 0, run?.currentScore || 0);
+  const scans = Math.max(telemetry?.scienceScansCount ?? telemetry?.asteroidsScanned ?? 0, run?.scansCompleted || 0);
   const hazResolved = Math.max(telemetry?.anomaliesResolved || 0, run?.anomaliesResolved || 0);
+  const eclipsesSurvived = Math.max(telemetry?.eclipsesSurvived || 0, run?.eclipsesSurvived || 0);
+  const inEclipseNow = Boolean(telemetry?.inEclipse);
   const hull = Math.max(0, Math.round(telemetry?.hullIntegrity ?? run?.hullIntegrity ?? 100));
   const holoDone = Boolean(run?.holoInspected || telemetry?.selectedHoloId);
+  const destroyed = Boolean(telemetry?.isDestroyed || hull <= 0);
 
   if (isSandbox) {
     const tasks = [
@@ -796,6 +877,14 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
         progressText: deployDone ? '1 / 1' : `${Math.round(deployProgress * 100)}%`,
         complete: deployDone,
         badgeText: deployDone ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+        required: false
+      },
+      {
+        id: 'scans',
+        title: 'Scan Science Zone ([E])',
+        progressText: `${Math.min(scans, 1)} / 1`,
+        complete: scans >= 1,
+        badgeText: scans >= 1 ? '✅ COMPLETE' : '⬜ INCOMPLETE',
         required: false
       },
       {
@@ -816,7 +905,7 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       },
       {
         id: 'hazard',
-        title: 'Resolve 1 Space Hazard',
+        title: 'Resolve 1 Space Event',
         progressText: `${Math.min(hazResolved, 1)} / 1`,
         complete: hazResolved >= 1,
         badgeText: hazResolved >= 1 ? '✅ COMPLETE' : '⬜ INCOMPLETE',
@@ -824,7 +913,6 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       }
     ];
     const completedCount = tasks.filter((item) => item.complete).length;
-    const destroyed = Boolean(telemetry?.isDestroyed || hull <= 0);
     const canDebrief = dl >= 1 && hull > 0 && !destroyed;
     return {
       isSandbox: true,
@@ -835,18 +923,13 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       completedCount,
       totalCount: tasks.length,
       pct: Math.round((completedCount / tasks.length) * 100),
+      milestonePct: Math.round(((deployDone ? 0.5 : 0) + Math.min(1, scans) + Math.min(1, dl)) / 2.5 * 100),
       isDestroyed: destroyed,
       canDebrief
     };
   }
 
   const tgt = ORBIT_MISSION_TARGETS[scenarioId] || ORBIT_MISSION_TARGETS['wildfiresat-l1'];
-  const sciMet = tgt.mode === 'scan' ? scans >= tgt.scanTarget : score >= tgt.scienceTarget;
-  const sciProgress = tgt.mode === 'scan'
-    ? `${Math.min(scans, tgt.scanTarget)} / ${tgt.scanTarget}`
-    : `${Math.min(score, tgt.scienceTarget)} / ${tgt.scienceTarget} PTS`;
-  const destroyed = Boolean(telemetry?.isDestroyed || hull <= 0);
-
   const tasks = [
     {
       id: 'unfold',
@@ -857,19 +940,39 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       required: true
     },
     {
+      id: 'scans',
+      title: tgt.scanLabel,
+      progressText: `${Math.min(scans, tgt.scanTarget)} / ${tgt.scanTarget}`,
+      complete: scans >= tgt.scanTarget,
+      badgeText: scans >= tgt.scanTarget ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+      required: true
+    },
+    {
       id: 'downlink',
       title: 'Ground Downlinks ([SPACE])',
       progressText: `${Math.min(dl, tgt.downlinks)} / ${tgt.downlinks}`,
       complete: dl >= tgt.downlinks,
       badgeText: dl >= tgt.downlinks ? '✅ COMPLETE' : '⬜ INCOMPLETE',
       required: true
-    },
+    }
+  ];
+  if (tgt.eclipseTarget > 0) {
+    tasks.push({
+      id: 'eclipse',
+      title: 'Survive 1 Eclipse Pass',
+      progressText: eclipsesSurvived >= tgt.eclipseTarget ? '1 / 1' : (inEclipseNow ? '🌑 IN SHADOW' : '0 / 1'),
+      complete: !destroyed && eclipsesSurvived >= tgt.eclipseTarget,
+      badgeText: eclipsesSurvived >= tgt.eclipseTarget ? '✅ COMPLETE' : (inEclipseNow ? '🌑 ENDURING' : '⬜ INCOMPLETE'),
+      required: true
+    });
+  }
+  tasks.push(
     {
-      id: 'science',
-      title: tgt.scienceLabel,
-      progressText: sciProgress,
-      complete: sciMet,
-      badgeText: sciMet ? '✅ COMPLETE' : '⬜ INCOMPLETE',
+      id: 'events',
+      title: `Resolve ${tgt.eventTarget} Space Event${tgt.eventTarget > 1 ? 's' : ''}`,
+      progressText: `${Math.min(hazResolved, tgt.eventTarget)} / ${tgt.eventTarget}`,
+      complete: hazResolved >= tgt.eventTarget,
+      badgeText: hazResolved >= tgt.eventTarget ? '✅ COMPLETE' : '⬜ INCOMPLETE',
       required: true
     },
     {
@@ -881,7 +984,12 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
       badgeText: destroyed ? '💥 0% DESTROYED' : (hull >= 40 ? '✅ INTACT' : '⚠️ AT RISK'),
       required: true
     }
-  ];
+  );
+
+  const opsTotal = 0.5 + tgt.scanTarget + tgt.downlinks + (tgt.eclipseTarget || 0);
+  const opsDone = (deployDone ? 0.5 : 0) + Math.min(scans, tgt.scanTarget) + Math.min(dl, tgt.downlinks) + Math.min(eclipsesSurvived, tgt.eclipseTarget || 0);
+  const milestonePct = Math.round((opsDone / Math.max(1, opsTotal)) * 100);
+
   const completedCount = tasks.filter((item) => item.complete).length;
   const canDebrief = tasks.every((item) => item.complete) && hull > 0 && !destroyed;
   return {
@@ -893,6 +1001,7 @@ export function getOrbitObjectivesStatus(state, telemetry = null, run = null) {
     completedCount,
     totalCount: tasks.length,
     pct: Math.round((completedCount / tasks.length) * 100),
+    milestonePct,
     isDestroyed: destroyed,
     canDebrief
   };
