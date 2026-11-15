@@ -175,18 +175,28 @@ export function renderLoadoutDock(segment, subGroup, state, evaluation) {
 }
 
 function getGaugeRows(ev) {
-  const { metrics, scenario, sandboxMode, designRisks } = ev;
-  const powerOk = (metrics.powerPct ?? (100 + metrics.powerMargin)) >= 100 && metrics.powerMargin >= 0;
-  const dataOk = (metrics.dataPct ?? (100 + metrics.dataMargin)) >= 100 && metrics.dataMargin >= 0 && !designRisks?.weakCommsMargin;
-  const sciOk = !designRisks?.scienceMismatch && !designRisks?.wavelengthMismatch && metrics.scienceScore >= scenario.minScience;
-  return [
-    { key: 'BUD', label: 'Budget', val: sandboxMode ? '∞' : `$${metrics.budget.usedM}/${metrics.budget.limitM}M`, isInf: sandboxMode, tip: sandboxMode ? 'Unlimited Sandbox Budget' : '', pct: sandboxMode ? 100 : Math.min(100, metrics.budget.pct), ok: sandboxMode || metrics.budget.usedM <= metrics.budget.limitM },
-    { key: 'MASS', label: 'Mass', val: sandboxMode ? `${metrics.mass.totalKg}kg / ∞` : `${metrics.mass.totalKg}/${metrics.mass.launchLimitKg}kg`, isInf: false, tip: sandboxMode ? 'Unlimited Rocket Payload Mass' : '', pct: sandboxMode ? 100 : Math.min(100, (metrics.mass.totalKg / Math.max(metrics.mass.launchLimitKg, 1)) * 100), ok: !designRisks?.massOverrun },
-    { key: 'PWR', label: 'Power', val: `${metrics.powerMargin}%`, tip: `Supply ratio: ${metrics.powerPct ?? Math.round(100 + metrics.powerMargin)}% of demand`, pct: Math.max(0, Math.min(100, metrics.powerMargin + 30)), ok: powerOk },
-    { key: 'DATA', label: 'Data', val: `${metrics.dataMargin}%`, tip: `Downlink capacity: ${metrics.dataPct ?? Math.round(100 + metrics.dataMargin)}% of generated rate`, pct: Math.max(0, Math.min(100, metrics.dataMargin + 25)), ok: dataOk },
-    { key: 'LIFE', label: 'Life', val: `${metrics.lifetimeYears}/${scenario.minLifetimeYr}yr`, pct: Math.min(100, (metrics.lifetimeYears / scenario.minLifetimeYr) * 100), ok: metrics.lifetimeYears >= scenario.minLifetimeYr },
-    { key: 'SCI', label: 'Science', val: `${metrics.scienceScore}%`, pct: metrics.scienceScore, ok: sciOk }
+  const c = ev?.constraints;
+  if (!c) return [];
+  const entries = [
+    { key: 'BUD', c: c.budget },
+    { key: 'MASS', c: c.mass },
+    { key: 'PWR', c: c.power },
+    { key: 'DATA', c: c.data },
+    { key: 'LIFE', c: c.lifetime },
+    { key: 'SCI', c: c.science }
   ];
+  return entries.map(({ key, c: item }) => ({
+    key,
+    title: item.title,
+    val: item.displayText,
+    isInf: Boolean(item.isSandbox),
+    pct: item.fillPct,
+    ok: Boolean(item.ok),
+    warn: Boolean(item.ok && item.warnNearCap),
+    reason: item.limitReason,
+    orbitSideEffect: item.orbitSideEffect,
+    fixTab: item.fixTab
+  }));
 }
 
 export function renderHud(ev, stage, opts = {}) {
@@ -259,10 +269,21 @@ export function renderHud(ev, stage, opts = {}) {
   }
 
   document.getElementById('resource-gauges').innerHTML = getGaugeRows(ev).map((g) => {
-    const lit = Math.max(1, Math.round((g.pct / 100) * 5));
-    const cells = [0, 1, 2, 3, 4].map((i) => `<span class="seg-cell ${i < lit ? (g.ok ? 'on-ok' : 'on-bad') : ''}"></span>`).join('');
-    const tipAttr = g.tip ? ` title="${esc(g.tip)}"` : '';
-    return `<div class="gm-item"${tipAttr}><div class="gm-top"><span>${g.key}</span><b class="${g.isInf ? 'is-inf' : ''}">${esc(g.val)}</b></div><div class="seg-meter">${cells}</div></div>`;
+    const toneClass = g.ok ? (g.warn ? 'warn' : 'ok') : 'bad';
+    const itemTone = g.ok ? (g.warn ? 'is-near-cap' : 'is-nominal') : 'is-violation';
+    const valClass = [g.isInf ? 'is-inf' : '', g.ok ? 'is-ok' : 'is-bad'].filter(Boolean).join(' ');
+    const sideHtml = !g.ok
+      ? `<div class="gm-tip-debuff">${esc(g.orbitSideEffect)}</div><div class="gm-tip-fix">Fix in: ${esc(g.fixTab)}</div>`
+      : `<div class="gm-tip-ok">Nominal · Zero Orbit Debuff</div>`;
+    return `<div class="gm-item ${itemTone}" tabindex="0" data-constraint="${g.key}" aria-label="${esc(`${g.title} ${g.val}: ${g.reason}`)}">
+      <div class="gm-top"><span>${g.key}</span><b class="${valClass}">${esc(g.val)}</b></div>
+      <div class="gm-bar"><div class="gm-fill ${toneClass}" style="width:${g.pct}%"></div></div>
+      <div class="gm-tooltip" role="tooltip">
+        <div class="gm-tip-head"><span>${esc(g.title)}</span><b>${esc(g.val)}</b></div>
+        <div class="gm-tip-reason">${esc(g.reason)}</div>
+        ${sideHtml}
+      </div>
+    </div>`;
   }).join('');
 
   const autoBtn = document.getElementById('autobuild-btn');
@@ -702,7 +723,7 @@ export function updateOrbitOverlay(t, objStatus = null) {
       tx.classList.add('is-status-pill');
     } else if (readyToTx) {
       let pts = 50;
-      const weakComms = Boolean(t?.activeDebuffs?.dataBottleneck?.active || t?.designRisks?.weakCommsMargin);
+      const weakComms = Boolean(t?.activeDebuffs?.dataBottleneck?.active);
       if (weakComms) pts = Math.round(pts * 0.5);
       if ((t?.omniReducedDownlinks || 0) > 0) pts = Math.round(pts * 0.7);
       const omniTag = (t?.omniReducedDownlinks || 0) > 0 ? ' · OMNI 70%' : '';
@@ -724,7 +745,7 @@ export function updateOrbitOverlay(t, objStatus = null) {
     } else if (t?.swathReady) {
       scanBtn.hidden = false;
       const basePts = t.swathZonePoints || 60;
-      const sciBad = Boolean(t?.activeDebuffs?.scienceMismatch?.active || t?.designRisks?.wavelengthMismatch);
+      const sciBad = Boolean(t?.activeDebuffs?.scienceMismatch?.active);
       const scanPts = sciBad ? Math.round(basePts * 0.6) : basePts;
       scanBtn.textContent = `🔬 IN SCAN GATE — PRESS [E] TO CAPTURE SCIENCE (+${scanPts})`;
       scanBtn.classList.add('is-swath-ready');
