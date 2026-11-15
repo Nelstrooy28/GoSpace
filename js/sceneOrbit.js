@@ -7,7 +7,8 @@ import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpace
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
 import { applyHullDelta, clearActiveHazard, getHazardSnapshot, initOrbitHazards, recordOrbitPlayerAction, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=18';
 import { isTutorialActive } from './tutorial.js';
-import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSpacecraftExplosion, playWarning } from './sfx.js';
+import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHazardResolveCue, playHazardStartCue, playHoloScanPing, playSpacecraftExplosion, playWarning } from './sfx.js';
+import { createHazardFxController } from './hazardFx.js';
 
 const EARTH_R = 2.0, KM_TO_SCENE = EARTH_R / 6371;
 const EPOCH_UTC_MS = Date.UTC(2026, 10, 15, 14, 0, 0);
@@ -40,9 +41,9 @@ let downlinkPts = 0, anomalyPts = 0, scanPts = 0, decisionPts = 0;
 let downlinkCooldownUntilReal = 0, downlinkCooldownUntilRev = 0, downlinkCooldownSec = 0;
 let brownoutLocked = false, sensorOfflineUntil = 0, solarChargePauseUntil = 0, commsPauseUntil = 0, omniReducedDownlinks = 0, dragLossKm = 0, dragHullAccum = 0;
 let isDestroyed = false, destructionReason = '', explosionRig = null, explosionElapsed = 0, shakeRemaining = 0;
-const tmpShake = new THREE.Vector3(), tmpZoneWorld = new THREE.Vector3();
+const tmpShake = new THREE.Vector3(), tmpZoneWorld = new THREE.Vector3(), tmpVelDir = new THREE.Vector3(), sunWorldPos = SUN_DIR.clone().multiplyScalar(120);
 let inLineOfSight = false, activeStationName = 'None', activeStationId = '', activeLosGs = null, stationPassCooldownActive = false, hazardNow = false;
-let hazardEventCb = null, hazardFx = null, dodgeT = 0, heaterGlowT = 0, repairSweepT = 0, sparkFlashUntil = 0;
+let hazardEventCb = null, hazardFx = null;
 let deployActive = false, deployCompleted = false, deployElapsed = 0, deployProgress = 1, deployStageMask = 0;
 let holoSelectCb = null, holoTargets = {}, holoProxies = [], gsHoloProxies = [], earthSolidMesh = null, earthOuterProxy = null;
 let selectedHoloId = null, followHoloId = null, hasPrevFollow = false, selectionRing = null;
@@ -337,9 +338,6 @@ function triggerSpacecraftExplosion(reason = 'Unmitigated Orbital Hazard') {
   destructionReason = reason;
   clearActiveHazard();
   stormUntil = 0;
-  sparkFlashUntil = 0;
-  heaterGlowT = 0;
-  dodgeT = 0;
   deployActive = false;
 
   if (satMesh) satMesh.visible = false;
@@ -348,7 +346,7 @@ function triggerSpacecraftExplosion(reason = 'Unmitigated Orbital Hazard') {
   if (beamLine) beamLine.visible = false;
   if (downlinkRig) downlinkRig.grp.visible = false;
   if (scanLine) scanLine.visible = false;
-  if (hazardFx?.worldFx) hazardFx.worldFx.visible = false;
+  hazardFx?.clear(satModel);
 
   if (camera && controls) {
     followHoloId = null;
@@ -533,114 +531,6 @@ function makeReticleSprite() {
   }));
 }
 
-function buildHazardFxRig(satContainer, worldParent, scaleRadius) {
-  const s = Math.max(0.14, scaleRadius * 1.45);
-  const localFx = new THREE.Group();
-  localFx.scale.setScalar(s);
-  satContainer.add(localFx);
-
-  const worldFx = new THREE.Group();
-  worldFx.scale.setScalar(s);
-  worldParent.add(worldFx);
-
-  // 1. Debris Swarm: streaks + warning vector ring + thruster dodge puffs
-  const debrisGroup = new THREE.Group();
-  debrisGroup.visible = false;
-  const warnRing = new THREE.Mesh(
-    new THREE.TorusGeometry(1.18, 0.032, 10, 48),
-    new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.88 })
-  );
-  debrisGroup.add(warnRing);
-  const debrisStreaks = [];
-  for (let i = 0; i < 14; i += 1) {
-    const streak = new THREE.Mesh(
-      new THREE.BoxGeometry(0.035, 0.035, 0.58),
-      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xff4500 : 0xfbbf24, transparent: true, opacity: 0.92 })
-    );
-    const angle = (i / 14) * Math.PI * 2;
-    const rad = 0.45 + (i % 4) * 0.28;
-    streak.position.set(Math.cos(angle) * rad, Math.sin(angle) * rad, -4 + (i * 0.6));
-    debrisGroup.add(streak);
-    debrisStreaks.push({ mesh: streak, speed: 9.5 + (i % 5) * 2.1, rad, angle });
-  }
-  localFx.add(debrisGroup);
-
-  const puffGroup = new THREE.Group();
-  puffGroup.visible = false;
-  for (let i = 0; i < 6; i += 1) {
-    const puff = new THREE.Mesh(
-      new THREE.ConeGeometry(0.11 + i * 0.025, 0.36, 10),
-      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x67e8f9 : 0xe0f2fe, transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending })
-    );
-    puff.rotation.z = Math.PI / 2;
-    puff.position.set(-0.65 - i * 0.16, 0, (i - 2.5) * 0.05);
-    puffGroup.add(puff);
-  }
-  localFx.add(puffGroup);
-
-  // 2. Solar Storm / CME: amber wind streaks from Sun + electric hull sparks
-  const cmeGroup = new THREE.Group();
-  cmeGroup.visible = false;
-  const windStreaks = [];
-  for (let i = 0; i < 22; i += 1) {
-    const w = new THREE.Mesh(
-      new THREE.BoxGeometry(0.85, 0.028, 0.028),
-      new THREE.MeshBasicMaterial({ color: i % 3 === 0 ? 0xfbbf24 : 0xf97316, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending })
-    );
-    w.position.set(3 - (i * 0.28), ((i % 7) - 3) * 0.38, (((i * 3) % 7) - 3) * 0.38);
-    cmeGroup.add(w);
-    windStreaks.push({ mesh: w, speed: 7.5 + (i % 4) * 1.8 });
-  }
-  const sparks = [];
-  for (let i = 0; i < 10; i += 1) {
-    const sp = new THREE.Mesh(
-      new THREE.BoxGeometry(0.032, 0.032, 0.09),
-      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x38bdf8 : 0xfde047, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending })
-    );
-    cmeGroup.add(sp);
-    sparks.push(sp);
-  }
-  worldFx.add(cmeGroup);
-
-  // 3. Cryo-Freeze rim + warm survival heater internal pulse
-  const iceRim = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(1.02, 1),
-    new THREE.MeshBasicMaterial({ color: 0x67e8f9, wireframe: true, transparent: true, opacity: 0.52, blending: THREE.AdditiveBlending })
-  );
-  iceRim.visible = false;
-  const heaterGlow = new THREE.Mesh(
-    new THREE.SphereGeometry(0.74, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.48, blending: THREE.AdditiveBlending, depthWrite: false })
-  );
-  heaterGlow.visible = false;
-  const heaterLight = new THREE.PointLight(0xff7b22, 0, 4.5);
-  localFx.add(iceRim, heaterGlow, heaterLight);
-
-  // 4. Gimbal Drift misaligned beacon arc
-  const gimbalRing = new THREE.Mesh(
-    new THREE.TorusGeometry(0.72, 0.03, 8, 32, Math.PI * 1.4),
-    new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.9 })
-  );
-  gimbalRing.position.set(0, 0.45, 0);
-  gimbalRing.visible = false;
-  localFx.add(gimbalRing);
-
-  // 5. Emerald Repair Complete Scan-Ring Sweep
-  const repairRing = new THREE.Mesh(
-    new THREE.TorusGeometry(1.06, 0.045, 12, 48),
-    new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending })
-  );
-  repairRing.rotation.x = Math.PI / 2;
-  repairRing.visible = false;
-  localFx.add(repairRing);
-
-  return {
-    localFx, worldFx, debrisGroup, debrisStreaks, warnRing, puffGroup,
-    cmeGroup, windStreaks, sparks, iceRim, heaterGlow, heaterLight,
-    gimbalRing, repairRing
-  };
-}
-
 function buildOrbitSpacecraft(missionState, orbitScale, envInt = 0.55) {
   const initDeploy = showcaseMode || victoryMode ? 1 : 0;
   satModel = buildSpacecraftModel(missionState, { showWarnings: false, deployProgress: initDeploy, envMapIntensity: envInt, castShadow: false, receiveShadow: false });
@@ -662,7 +552,7 @@ function buildOrbitSpacecraft(missionState, orbitScale, envInt = 0.55) {
     targetReticle = makeReticleSprite();
     targetReticle.renderOrder = 10;
     scene.add(targetReticle);
-    hazardFx = buildHazardFxRig(grp, scene, satFitR);
+    hazardFx = createHazardFxController(scene);
   }
   return grp;
 }
@@ -1491,73 +1381,22 @@ function animate() {
     satModel.update?.(realDt, sunElapsed);
     if (victoryMode) satModel.group.rotation.y += realDt * 0.28;
     else satModel.group.rotation.y = 0;
-    if (dodgeT > 0) {
-      dodgeT = Math.max(0, dodgeT - realDt * 0.9);
-      satModel.group.position.x = Math.sin(dodgeT * Math.PI) * satFitR * 2.2;
-    } else {
-      satModel.group.position.x = 0;
-    }
   }
 
-  if (hazardFx) {
-    hazardFx.worldFx.position.copy(tmpSat);
-    hazardFx.debrisGroup.visible = activeKind === 'debris';
-    if (hazardFx.debrisGroup.visible) {
-      hazardFx.warnRing.rotation.z += realDt * 2.4;
-      hazardFx.warnRing.scale.setScalar(1 + 0.08 * Math.sin(now * 0.014));
-      hazardFx.debrisStreaks.forEach((d) => {
-        d.mesh.position.z += d.speed * realDt;
-        if (d.mesh.position.z > 4.2) d.mesh.position.z = -4.5;
-      });
-    }
-    hazardFx.puffGroup.visible = dodgeT > 0.05;
-    if (hazardFx.puffGroup.visible) {
-      hazardFx.puffGroup.scale.setScalar(0.8 + 0.4 * Math.sin(dodgeT * Math.PI));
-    }
-
-    const showCme = activeKind === 'cme' || now < sparkFlashUntil;
-    hazardFx.cmeGroup.visible = showCme;
-    if (showCme) {
-      hazardFx.windStreaks.forEach((w) => {
-        w.mesh.position.x -= w.speed * realDt;
-        if (w.mesh.position.x < -3.5) w.mesh.position.x = 3.5;
-      });
-      hazardFx.sparks.forEach((sp, i) => {
-        const a = sunElapsed * 9 + i * 1.9;
-        sp.position.set(Math.cos(a) * 0.72, Math.sin(a * 1.4) * 0.58, Math.sin(a) * 0.72);
-        sp.visible = ((Math.floor(now * 0.028) + i) % 3) === 0;
-      });
-    }
-
-    hazardFx.iceRim.visible = activeKind === 'cryo';
-    if (hazardFx.iceRim.visible) {
-      hazardFx.iceRim.rotation.y += realDt * 0.55;
-      hazardFx.iceRim.material.opacity = 0.28 + 0.24 * Math.abs(Math.sin(now * 0.008));
-    }
-    if (heaterGlowT > 0) {
-      heaterGlowT = Math.max(0, heaterGlowT - realDt * 0.7);
-      hazardFx.heaterGlow.visible = true;
-      hazardFx.heaterGlow.material.opacity = 0.55 * Math.sin(heaterGlowT * Math.PI);
-      hazardFx.heaterLight.intensity = 4.2 * Math.sin(heaterGlowT * Math.PI);
-    } else {
-      hazardFx.heaterGlow.visible = false;
-      hazardFx.heaterLight.intensity = 0;
-    }
-
-    hazardFx.gimbalRing.visible = activeKind === 'gimbal';
-    if (hazardFx.gimbalRing.visible) {
-      hazardFx.gimbalRing.rotation.z += realDt * 4.5;
-      hazardFx.gimbalRing.rotation.x = Math.sin(now * 0.012) * 0.4;
-    }
-
-    if (repairSweepT > 0) {
-      repairSweepT = Math.max(0, repairSweepT - realDt * 1.05);
-      hazardFx.repairRing.visible = true;
-      hazardFx.repairRing.position.y = (repairSweepT * 2 - 1) * 0.95;
-      hazardFx.repairRing.material.opacity = Math.min(1, repairSweepT * 1.6);
-    } else {
-      hazardFx.repairRing.visible = false;
-    }
+  if (hazardFx && satMesh && !isDestroyed) {
+    tmpVelDir.copy(tmpNext).sub(tmpSat);
+    if (tmpVelDir.lengthSq() > 1e-8) tmpVelDir.normalize();
+    else tmpVelDir.copy(tmpZ);
+    hazardFx.update(realDt, {
+      satGroup: satMesh,
+      satModel,
+      satWorldPos: tmpSat,
+      satQuaternion: satMesh.quaternion,
+      velocityDir: tmpVelDir,
+      sunWorldPos,
+      cameraPos: camera?.position,
+      spacecraftScale: satFitR
+    });
   }
 
   const stormActive = now < stormUntil || activeKind === 'cme';
@@ -1878,6 +1717,7 @@ function animate() {
       deployActive, deployProgress: Number(deployProgress.toFixed(3)),
       selectedHoloId, followHoloId, holoTargetCount: Object.keys(holoTargets).length,
       apsisVisibleCount: apsisSprites.filter((s) => s.visible).length,
+      rendererMemory: renderer?.info?.memory ? { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures } : null,
       simTime: Number(simTime.toFixed(1)), cameraMode, fitDist: Number(fitDist.toFixed(1))
     });
   }
@@ -2498,7 +2338,6 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   brownoutLocked = false; sensorOfflineUntil = 0; solarChargePauseUntil = 0; commsPauseUntil = 0; omniReducedDownlinks = 0; dragLossKm = 0; dragHullAccum = 0;
   isDestroyed = false; destructionReason = ''; explosionRig = null; explosionElapsed = 0; shakeRemaining = 0;
   sensorCamEnabled = Boolean(options.sensorCam);
-  dodgeT = 0; heaterGlowT = 0; repairSweepT = 0; sparkFlashUntil = 0;
   holoTargets = {}; holoProxies = []; gsHoloProxies = []; earthSolidMesh = null; earthOuterProxy = null;
   selectedHoloId = null; followHoloId = null; hasPrevFollow = false; selectionRing = null; pointerDownPos = null;
   if (victoryMode) {
@@ -2513,10 +2352,28 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   parallaxTarget.set(0, 0); parallaxCur.set(0, 0);
 
   if (!showcaseMode) {
+    const buildHazardCtx = () => {
+      tmpVelDir.copy(tmpNext).sub(tmpSat);
+      if (tmpVelDir.lengthSq() > 1e-8) tmpVelDir.normalize();
+      else tmpVelDir.copy(tmpZ);
+      return {
+        satGroup: satMesh,
+        satModel,
+        satWorldPos: tmpSat,
+        satQuaternion: satMesh?.quaternion,
+        velocityDir: tmpVelDir,
+        sunWorldPos,
+        cameraPos: camera?.position,
+        spacecraftScale: satFitR
+      };
+    };
+
     initOrbitHazards(missionState, evaluation, {
       getBatterySoc: () => batterySoc,
       onTrigger: (hazard) => {
         if (hazard.kind === 'cme') stormUntil = performance.now() + hazard.durationSec * 1000;
+        hazardFx?.startHazardFx(hazard.kind, buildHazardCtx());
+        playHazardStartCue(hazard.kind);
         lastHudMs = 0;
         hazardEventCb?.({ type: 'trigger', timeWarp, ...hazard });
       },
@@ -2535,10 +2392,11 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
         if (res.commsPauseSec > 0) commsPauseUntil = nowMs + res.commsPauseSec * 1000;
         if (res.omniReducedCount > 0) omniReducedDownlinks += res.omniReducedCount;
         if (res.kind === 'cme') stormUntil = 0;
-        repairSweepT = 1.0;
-        if (res.kind === 'debris' && (res.hullDelta || 0) >= 0) dodgeT = 1.0;
-        if (res.kind === 'cryo' && (res.batteryDelta || 0) <= -20) heaterGlowT = 1.0;
-        if ((res.hullDelta || 0) <= -10) sparkFlashUntil = nowMs + 950;
+        hazardFx?.resolveHazardFx(res.choiceIndex ?? 0, res, buildHazardCtx());
+        playHazardResolveCue(res.kind, res.choiceIndex ?? 0, res);
+        if ((res.hullDelta || 0) < 0 && res.hullIntegrity > 0) {
+          shakeRemaining = Math.max(shakeRemaining, 0.25);
+        }
         lastHudMs = 0;
         if (res.hullIntegrity <= 0) {
           triggerSpacecraftExplosion(`High-Risk ConOps (${res.title})`);
@@ -2550,7 +2408,10 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
         if (batterySoc <= 0.1) { brownoutLocked = true; batterySoc = 0; }
         if (exp.dataLossRatio > 0) bufferGb = Math.max(0, bufferGb * (1 - exp.dataLossRatio));
         if (exp.kind === 'cme') stormUntil = 0;
-        sparkFlashUntil = performance.now() + 1200;
+        const hullDelta = -(exp.hullLoss || 15);
+        hazardFx?.resolveHazardFx('timeout', { ...exp, hullDelta }, buildHazardCtx());
+        playHazardResolveCue(exp.kind, 'timeout', { hullDelta });
+        if (exp.hullIntegrity > 0) shakeRemaining = Math.max(shakeRemaining, 0.25);
         lastHudMs = 0;
         if (exp.hullIntegrity <= 0) {
           triggerSpacecraftExplosion(`Unmitigated Orbital Hazard (${exp.title})`);
@@ -2664,6 +2525,7 @@ export function unmountOrbit() {
   if (controls) { controls.dispose(); controls = null; }
   if (bloomComp) { bloomComp.dispose(); bloomComp = null; }
   if (envRT) { envRT.dispose(); envRT = null; }
+  if (hazardFx) { hazardFx.dispose(); hazardFx = null; }
   if (satModel) { satModel.dispose(); satModel = null; }
   spaceEnv?.dispose(); spaceEnv = null;
   if (scene) {

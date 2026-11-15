@@ -203,3 +203,79 @@ export function playSpacecraftExplosion() {
     tone(920 - idx * 120, 190, 0.085, 'square', 0.045, delay);
   });
 }
+
+function normalizeHazardKind(kind) {
+  if (kind === 'cme' || kind === 'solar') return 'solar';
+  if (kind === 'cryo' || kind === 'eclipse') return 'eclipse';
+  if (kind === 'gimbal' || kind === 'antenna') return 'antenna';
+  return 'debris';
+}
+
+function playNoiseBurst(durSec = 0.28, filterType = 'bandpass', freqStart = 1200, freqEnd = 420, vol = 0.05, delay = 0) {
+  const c = ensureCtx(); if (!c) return;
+  const now = c.currentTime + delay;
+  const len = Math.max(256, Math.floor(c.sampleRate * durSec));
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i += 1) {
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 0.7);
+  }
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const flt = c.createBiquadFilter();
+  flt.type = filterType;
+  flt.frequency.setValueAtTime(freqStart, now);
+  flt.frequency.exponentialRampToValueAtTime(Math.max(40, freqEnd), now + durSec);
+  const gain = c.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(vol, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
+  src.connect(flt); flt.connect(gain); gain.connect(c.destination);
+  src.start(now); src.stop(now + durSec + 0.02);
+}
+
+export function playHazardStartCue(hazardType) {
+  const kind = normalizeHazardKind(hazardType);
+  if (kind === 'debris') {
+    tone(1320, 980, 0.09, 'triangle', 0.038, 0.04);
+    playNoiseBurst(0.24, 'bandpass', 2200, 750, 0.042, 0.02);
+  } else if (kind === 'solar') {
+    playNoiseBurst(0.42, 'highpass', 1800, 650, 0.036, 0.02);
+    tone(780, 1480, 0.14, 'sawtooth', 0.026, 0.06);
+  } else if (kind === 'eclipse') {
+    tone(1760, 1318, 0.22, 'sine', 0.036, 0.02);
+    tone(2093, 1567, 0.26, 'triangle', 0.026, 0.09);
+  } else {
+    tone(420, 290, 0.07, 'square', 0.028, 0.02);
+    tone(310, 440, 0.07, 'square', 0.028, 0.11);
+    playNoiseBurst(0.16, 'bandpass', 2600, 1400, 0.03, 0.05);
+  }
+}
+
+export function playHazardResolveCue(hazardType, choiceIndex = 0, outcome = {}) {
+  const kind = normalizeHazardKind(hazardType);
+  const damaged = choiceIndex === 'timeout' || (outcome?.hullDelta || 0) < 0;
+  if (damaged) {
+    playNoiseBurst(0.22, 'bandpass', 1600, 320, 0.05, 0.0);
+    tone(240, 110, 0.16, 'sawtooth', 0.045, 0.02);
+    return;
+  }
+  if (kind === 'debris' && choiceIndex === 0) {
+    playNoiseBurst(0.32, 'highpass', 950, 2100, 0.048, 0.0);
+    tone(340, 520, 0.16, 'triangle', 0.032, 0.03);
+  } else if (kind === 'solar' && choiceIndex === 0) {
+    tone(440, 880, 0.26, 'sine', 0.045, 0.0);
+    tone(660, 1320, 0.28, 'triangle', 0.035, 0.05);
+  } else if (kind === 'solar' && choiceIndex === 1) {
+    tone(320, 740, 0.24, 'triangle', 0.042, 0.0);
+    tone(640, 960, 0.22, 'sine', 0.035, 0.06);
+  } else if (kind === 'eclipse' && choiceIndex === 0) {
+    tone(180, 390, 0.34, 'sine', 0.05, 0.0);
+    playNoiseBurst(0.30, 'lowpass', 700, 260, 0.038, 0.02);
+  } else if (kind === 'antenna' && choiceIndex === 1) {
+    tone(290, 620, 0.28, 'triangle', 0.042, 0.0);
+    tone(880, 1320, 0.12, 'sine', 0.038, 0.24);
+  } else {
+    tone(520, 1040, 0.18, 'triangle', 0.036, 0.0);
+  }
+}
