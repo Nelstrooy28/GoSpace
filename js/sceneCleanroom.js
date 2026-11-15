@@ -7,6 +7,14 @@ let renderer = null, scene = null, camera = null, controls = null, resizeObserve
 let rafId = 0, craftRoot = null, craftModel = null, autoRotate = true, exploded = false, meshCount = 0;
 let popTarget = null, popProg = 1, camGoal = null;
 const clock = new THREE.Clock();
+
+// Display stand that rises from the floor to meet the craft's underside,
+// plus camera framing sized to the craft's bounding sphere.
+const FLOOR_Y = -1.95;
+const STAND_RADIUS = 1.45;
+const CAM_DIR = new THREE.Vector3(4.6, 2.7, 5.1).normalize();
+const framing = { target: new THREE.Vector3(0, 0.2, 0), dist: 7.45 };
+let stand = null, nadirLightRef = null, lastBusId = null;
 const cleanTexCache = { floorMap: null, bgMap: null };
 
 function getCleanroomMaps() {
@@ -74,6 +82,41 @@ export function focusSubsystem(tag) {
   camGoal = { pos: new THREE.Vector3(...p), target: new THREE.Vector3(...t) };
 }
 
+function framedCameraPos() {
+  return framing.target.clone().addScaledVector(CAM_DIR, framing.dist);
+}
+
+// Measure the craft, raise the stand so its top sits just under the craft,
+// shrink the stand for tiny buses, and size the camera distance to fit.
+function fitStandAndFraming() {
+  if (!craftModel || !stand) return;
+  craftModel.group.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(craftModel.group);
+  if (box.isEmpty()) return;
+
+  const topY = Math.max(FLOOR_Y + 0.14, box.min.y - 0.03);
+  const colH = topY - FLOOR_Y;
+  const halfW = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.5;
+  const radial = THREE.MathUtils.clamp(halfW * 1.15, 0.7, STAND_RADIUS) / STAND_RADIUS;
+  stand.column.scale.set(radial, colH, radial);
+  stand.column.position.y = FLOOR_Y + colH * 0.5;
+  stand.top.scale.set(radial, radial, 1);
+  stand.top.position.y = topY;
+  stand.ring.scale.set(radial, radial, 1);
+  stand.ring.position.y = topY + 0.005;
+  if (nadirLightRef) nadirLightRef.position.y = topY + 0.02;
+
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const r = Math.max(0.5, sphere.radius);
+  const fovHalf = THREE.MathUtils.degToRad((camera?.fov || 42) * 0.5);
+  const minD = (controls?.minDistance ?? 2.2) + 0.3;
+  const maxD = (controls?.maxDistance ?? 12) - 0.5;
+  // ~2x the "just fits" distance: craft fills roughly half the view height.
+  framing.dist = THREE.MathUtils.clamp((r / Math.sin(fovHalf)) * 2.05, minD, maxD);
+  // Aim a little below centre so the glowing stand ring stays in frame.
+  framing.target.set(0, sphere.center.y - r * 0.18, 0);
+}
+
 export function updateSpacecraft(missionState, focusTag = null) {
   if (!scene || !craftRoot) return meshCount;
   if (craftModel) {
@@ -85,6 +128,12 @@ export function updateSpacecraft(missionState, focusTag = null) {
   craftModel.setExploded(exploded, !focusTag);
   craftRoot.add(craftModel.group);
   meshCount = craftModel.meshCount;
+
+  // Measure before any pop-in scaling so the stand matches the final size.
+  fitStandAndFraming();
+  const busChanged = lastBusId !== null && lastBusId !== missionState.busId;
+  lastBusId = missionState.busId;
+  if (busChanged && !focusTag) camGoal = { pos: framedCameraPos(), target: framing.target.clone() };
 
   if (focusTag) {
     popTarget = craftModel.parts[focusTag] || craftModel.group;
@@ -98,10 +147,8 @@ export function updateSpacecraft(missionState, focusTag = null) {
 function animate() {
   rafId = requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-  if (craftRoot) {
-    if (autoRotate) craftRoot.rotation.y += dt * 0.3;
-    craftRoot.position.y = Math.sin(t * 1.4) * 0.04;
-  }
+  // Craft rests on its stand (turntable spin only, no floating bob).
+  if (craftRoot && autoRotate) craftRoot.rotation.y += dt * 0.3;
   if (popTarget && popProg < 1) {
     popProg = Math.min(1, popProg + dt * 4.2);
     popTarget.scale.setScalar(popProg >= 1 ? 1 : 0.2 + 0.8 * popProg + Math.sin(popProg * Math.PI) * 0.1);
@@ -117,13 +164,13 @@ function animate() {
 }
 
 export const setAutoRotate = (v) => { autoRotate = Boolean(v); };
-export const setExploded = (v) => { exploded = Boolean(v); craftModel?.setExploded(exploded); };
+export const setExploded = (v) => { exploded = Boolean(v); craftModel?.setExploded(exploded); fitStandAndFraming(); };
 export const getMeshCount = () => meshCount;
 export function resetCamera() {
   if (!camera || !controls) return;
   camGoal = null;
-  camera.position.set(4.6, 2.9, 5.1);
-  controls.target.set(0, 0.2, 0);
+  camera.position.copy(framedCameraPos());
+  controls.target.copy(framing.target);
   controls.update();
 }
 
@@ -183,6 +230,7 @@ export function mountCleanroom(container, missionState) {
   const nadirLight = new THREE.PointLight(0xdbeeff, 1.2, 12);
   nadirLight.position.set(0, -1.35, 0);
   scene.add(nadirLight);
+  nadirLightRef = nadirLight;
 
   // Cleanroom bay ribs & matte dark-slate floor + illuminated open-bottom turntable pedestal
   const ribMat = new THREE.MeshStandardMaterial({ color: 0x162238, metalness: 0.55, roughness: 0.5, envMapIntensity: 0.7 });
@@ -204,22 +252,27 @@ export function mountCleanroom(container, missionState) {
   grid.position.y = -1.938;
   scene.add(grid);
 
-  const pedMat = new THREE.MeshStandardMaterial({ color: 0x131d31, metalness: 0.55, roughness: 0.42, envMapIntensity: 0.9 });
-  const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.72, 0.12, 48, 1, true), pedMat);
-  ped.position.y = -1.87; ped.receiveShadow = true; scene.add(ped);
+  // Display stand: unit-height tapered column scaled in Y to reach the craft,
+  // capped by a lit top disc and the cyan halo ring (see fitStandAndFraming).
+  const pedMat = new THREE.MeshStandardMaterial({ color: 0x1e2b45, metalness: 0.5, roughness: 0.4, envMapIntensity: 1.1 });
+  const ped = new THREE.Mesh(new THREE.CylinderGeometry(STAND_RADIUS, STAND_RADIUS * 1.12, 1, 48, 1, true), pedMat);
+  ped.position.y = -1.87; ped.receiveShadow = true; ped.castShadow = true; scene.add(ped);
 
-  const pedTop = new THREE.Mesh(new THREE.CircleGeometry(1.45, 48), pedMat);
+  const pedTop = new THREE.Mesh(new THREE.CircleGeometry(STAND_RADIUS, 48), pedMat);
   pedTop.rotation.x = -Math.PI / 2; pedTop.position.y = -1.81; pedTop.receiveShadow = true; scene.add(pedTop);
 
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(1.52, 0.026, 12, 64),
+    new THREE.TorusGeometry(STAND_RADIUS + 0.07, 0.026, 12, 64),
     new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0ea5e9, emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.45 })
   );
   ring.rotation.x = Math.PI / 2; ring.position.y = -1.805; scene.add(ring);
+  stand = { column: ped, top: pedTop, ring };
 
   craftRoot = new THREE.Group();
   scene.add(craftRoot);
+  lastBusId = null;
   updateSpacecraft(missionState);
+  resetCamera();
 
   resizeObserver = new ResizeObserver(() => {
     if (!renderer || !camera || !container) return;
@@ -242,4 +295,5 @@ export function unmountCleanroom() {
   if (scene) { disposeSceneGroup(scene); scene = null; }
   if (renderer) { renderer.domElement?.remove(); renderer.dispose(); renderer = null; }
   craftRoot = null; popTarget = null; camGoal = null; meshCount = 0;
+  stand = null; nadirLightRef = null; lastBusId = null;
 }

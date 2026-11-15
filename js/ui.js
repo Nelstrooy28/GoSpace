@@ -35,17 +35,35 @@ export const SUB_TABS = {
 
 const instMatchesBand = (i, bId) => i.band === bId || (i.extraBands || []).includes(bId);
 
-const cardHtml = ({ field, id, name, pills, selected, ok = true, multi = false, tip = '' }) => `
-  <button class="equip-card ${selected ? 'selected' : ''} ${ok ? '' : 'compat-bad'}" type="button"
+// Card states:
+//  - target: the contract's intended pick (green TARGET tag)
+//  - soft:   a valid choice that just isn't this contract's target. It stays
+//            neutral unless equipped, so the list isn't a wall of red "!".
+//  - ok=false (hard): a real compatibility error (red rim + "!").
+const cardHtml = ({ field, id, name, pills, selected, ok = true, soft = false, target = false, multi = false, tip = '' }) => {
+  const hardBad = !ok && !soft;
+  const softOff = !ok && soft;
+  const stateClass = [
+    selected ? 'selected' : '',
+    hardBad || (softOff && selected) ? 'compat-bad' : '',
+    target ? 'is-target' : '',
+    softOff && !selected ? 'is-off-target' : ''
+  ].filter(Boolean).join(' ');
+  let badge;
+  if (selected) badge = `<span class="equip-check-badge" title="Equipped" aria-label="Equipped">${svgIcon('check')}</span>`;
+  else if (target) badge = '<span class="spill ok equip-target-tag" title="Best pick for this contract">TARGET</span>';
+  else if (hardBad) badge = '<span class="spill bad" title="Not compatible with your current build">!</span>';
+  else badge = `<span class="spill ${softOff ? '' : 'ok'}">+</span>`;
+  return `
+  <button class="equip-card ${stateClass}" type="button"
     data-field="${field}" data-id="${id}" data-multi="${multi ? '1' : '0'}" data-tip="${esc(tip)}">
     <div class="equip-head equip-row-top">
       <span class="equip-name" title="${esc(name)}">${esc(name)}</span>
-      ${selected
-        ? `<span class="equip-check-badge" title="Equipped" aria-label="Equipped">${svgIcon('check')}</span>`
-        : `<span class="spill ${ok ? 'ok' : 'bad'}">${ok ? '+' : '!'}</span>`}
+      ${badge}
     </div>
     <div class="stat-pills equip-row-stats">${pills.slice(0, 3).map((p) => `<span class="spill">${esc(p)}</span>`).join('')}</div>
   </button>`;
+};
 
 const CONTRACT_ART = {
   'wildfiresat-l1': `<svg viewBox="0 0 110 100" aria-hidden="true">
@@ -154,16 +172,16 @@ export function renderLoadoutDock(segment, subGroup, state, evaluation) {
   }).join('');
 
   let cards = [];
-  if (activeSub === 'obj') cards = CATALOG.user.objectives.map((o) => cardHtml({ field: 'userObjective', id: o.id, name: o.name, selected: state.userObjective === o.id, ok: o.id === sc.targetObjective, pills: [o.band.toUpperCase()], tip: o.tip }));
-  else if (activeSub === 'band') cards = CATALOG.user.wavelengths.map((w) => cardHtml({ field: 'wavelengthBand', id: w.id, name: w.name, selected: state.wavelengthBand === w.id, ok: w.id === sc.targetBand, pills: [w.id === sc.targetBand ? 'TARGET' : 'ALT'], tip: w.tip }));
-  else if (activeSub === 'lat') cards = CATALOG.user.latencies.map((l) => cardHtml({ field: 'latencyTier', id: l.id, name: l.name, selected: state.latencyTier === l.id, ok: l.id === sc.targetLatency, pills: [l.id === sc.targetLatency ? 'OPTIMAL' : 'TRADE'], tip: l.tip }));
+  if (activeSub === 'obj') cards = CATALOG.user.objectives.map((o) => cardHtml({ field: 'userObjective', id: o.id, name: o.name, selected: state.userObjective === o.id, ok: o.id === sc.targetObjective, soft: true, target: o.id === sc.targetObjective, pills: [o.band.toUpperCase()], tip: o.tip }));
+  else if (activeSub === 'band') cards = CATALOG.user.wavelengths.map((w) => cardHtml({ field: 'wavelengthBand', id: w.id, name: w.name, selected: state.wavelengthBand === w.id, ok: w.id === sc.targetBand, soft: true, target: w.id === sc.targetBand, pills: [w.id === sc.targetBand ? 'TARGET' : 'ALT'], tip: w.tip }));
+  else if (activeSub === 'lat') cards = CATALOG.user.latencies.map((l) => cardHtml({ field: 'latencyTier', id: l.id, name: l.name, selected: state.latencyTier === l.id, ok: l.id === sc.targetLatency, soft: true, target: l.id === sc.targetLatency, pills: [l.id === sc.targetLatency ? 'OPTIMAL' : 'TRADE'], tip: l.tip }));
   else if (activeSub === 'bus') cards = CATALOG.space.buses.map((b) => cardHtml({ field: 'busId', id: b.id, name: b.name, selected: state.busId === b.id, ok: true, pills: [`$${b.costM}M`, `${b.payloadSlots} SLOT`, `${b.payloadCapKg}kg`], tip: b.tip }));
   else if (activeSub === 'inst') cards = CATALOG.space.instruments.map((i) => cardHtml({ field: 'instrumentIds', id: i.id, name: i.name, multi: true, selected: state.instrumentIds.includes(i.id), ok: instMatchesBand(i, state.wavelengthBand) && (!bus || i.classes.includes(bus.busClass)), pills: [`$${i.costM}M`, `${i.massKg}kg`, `${i.powerW}W`], tip: `${i.tip} (+${i.sci} Sci)` }));
   else if (activeSub === 'solar') cards = CATALOG.space.solarArrays.map((s) => cardHtml({ field: 'solarId', id: s.id, name: s.name, selected: state.solarId === s.id, ok: true, pills: [`$${s.costM}M`, `+${s.genW}W`, s.zeroEclipseLoss ? 'RTG' : `${s.massKg}kg`], tip: s.tip }));
   else if (activeSub === 'therm') cards = CATALOG.space.thermalAdcs.map((t) => cardHtml({ field: 'thermalId', id: t.id, name: t.name, selected: state.thermalId === t.id, ok: (state.wavelengthBand !== 'cryo-ir' || t.cryoCapable) && (!sc.requiresIon || t.ionDrive), pills: [`$${t.costM}M`, `${t.powerW}W`, t.ionDrive ? 'ION' : (t.cryoCapable ? 'CRYO' : `+${t.lifeBonus}yr`)], tip: t.tip }));
   else if (activeSub === 'skin') cards = CATALOG.space.hullSkins.map((k) => cardHtml({ field: 'hullSkinId', id: k.id, name: k.name, selected: (state.hullSkinId || 'gold-kapton') === k.id, ok: true, pills: ['FREE', k.colorHex.toUpperCase()], tip: k.tip }));
   else if (activeSub === 'veh') cards = CATALOG.launch.vehicles.map((v) => cardHtml({ field: 'vehicleId', id: v.id, name: v.name, selected: state.vehicleId === v.id, ok: true, pills: [`$${v.costM}M`, `${v.maxPayloadKg}kg`, v.deepSpaceCapable ? 'DEEP' : 'LEO'], tip: v.tip }));
-  else if (activeSub === 'orbit') cards = CATALOG.launch.orbits.map((o) => cardHtml({ field: 'orbitId', id: o.id, name: o.name, selected: state.orbitId === o.id, ok: o.id === sc.targetOrbit, pills: [`e=${o.e}`, `${o.iDeg}°`, o.deepSpace ? 'DEEP' : 'LEO'], tip: o.tip }));
+  else if (activeSub === 'orbit') cards = CATALOG.launch.orbits.map((o) => cardHtml({ field: 'orbitId', id: o.id, name: o.name, selected: state.orbitId === o.id, ok: o.id === sc.targetOrbit, soft: true, target: o.id === sc.targetOrbit, pills: [`e=${o.e}`, `${o.iDeg}°`, o.deepSpace ? 'DEEP' : 'LEO'], tip: o.tip }));
   else if (activeSub === 'tx') cards = CATALOG.ground.transceivers.map((t) => cardHtml({ field: 'transceiverId', id: t.id, name: t.name, selected: state.transceiverId === t.id, ok: true, pills: [`$${t.costM}M`, `${t.mbps}Mb`, t.deepSpace ? 'DEEP' : `${t.massKg}kg`], tip: t.tip }));
   else cards = CATALOG.ground.stations.map((g) => cardHtml({ field: 'stationId', id: g.id, name: g.name, selected: state.stationId === g.id, ok: true, pills: [`$${g.costM}M`, `${g.passMinDay}m/d`, g.deepSpace ? 'DSN' : 'POLAR'], tip: g.tip }));
 
@@ -192,8 +210,20 @@ function getGaugeRows(ev) {
     warn: Boolean(item.ok && item.warnNearCap),
     reason: item.limitReason,
     orbitSideEffect: item.orbitSideEffect,
-    fixTab: item.fixTab
+    fixTab: item.fixTab,
+    fixSeg: item.fixSeg,
+    fixSub: item.fixSub
   }));
+}
+
+// Short names for launch-button risk summary, keyed by warning segment.
+const RISK_SEGMENT_LABEL = { Cost: 'Budget', Space: 'Craft', Launch: 'Launch', Ground: 'Comms', User: 'Goal', System: 'Parts' };
+
+function summarizeRisks(ev) {
+  const failing = getGaugeRows(ev).filter((g) => !g.ok).map((g) => g.key);
+  if (failing.length) return failing;
+  // No red gauge, but rule warnings remain (band, orbit, cryo, ...): name their tabs.
+  return [...new Set((ev.warnings || []).map((w) => RISK_SEGMENT_LABEL[w.segment] || w.segment))];
 }
 
 export function renderHud(ev, stage, opts = {}) {
@@ -251,10 +281,12 @@ export function renderHud(ev, stage, opts = {}) {
     const toneClass = g.ok ? (g.warn ? 'warn' : 'ok') : 'bad';
     const itemTone = g.ok ? (g.warn ? 'is-near-cap' : 'is-nominal') : 'is-violation';
     const valClass = [g.isInf ? 'is-inf' : '', g.ok ? 'is-ok' : 'is-bad'].filter(Boolean).join(' ');
+    const canJump = !g.ok && stage === 'hangar' && g.fixSeg;
     const sideHtml = !g.ok
-      ? `<div class="gm-tip-debuff">${esc(g.orbitSideEffect)}</div><div class="gm-tip-fix">Fix: ${esc(g.fixTab)}</div>`
+      ? `<div class="gm-tip-debuff">${esc(g.orbitSideEffect)}</div><div class="gm-tip-fix">Fix: ${esc(g.fixTab)}</div>${canJump ? '<div class="gm-tip-jump">Click to open that tab</div>' : ''}`
       : `<div class="gm-tip-ok">Nominal</div>`;
-    return `<div class="gm-item ${itemTone}" tabindex="0" data-constraint="${g.key}" aria-label="${esc(`${g.title} ${g.val}: ${g.reason}`)}">
+    const jumpAttrs = canJump ? ` data-fix-seg="${esc(g.fixSeg)}" data-fix-sub="${esc(g.fixSub || '')}" role="button"` : '';
+    return `<div class="gm-item ${itemTone}${canJump ? ' is-jump' : ''}" tabindex="0" data-constraint="${g.key}"${jumpAttrs} aria-label="${esc(`${g.title} ${g.val}: ${g.reason}${canJump ? `. Fix: ${g.fixTab}` : ''}`)}">
       <div class="gm-top"><span>${svgIcon(g.icon)}${g.key}</span><b class="${valClass}">${esc(g.val)}</b></div>
       <div class="gm-bar"><div class="gm-fill ${toneClass}" style="width:${g.pct}%"></div></div>
       <div class="gm-tooltip" role="tooltip">
@@ -276,7 +308,15 @@ export function renderHud(ev, stage, opts = {}) {
   cta.classList.toggle('is-risk', stage === 'hangar' && hasRisks);
   if (stage === 'hangar') {
     cta.disabled = !allPopulated;
-    cta.innerHTML = !allPopulated ? `${svgIcon('lock')}Equip Parts` : (hasRisks ? `${svgIcon('warning')}Launch Risks` : `${svgIcon('rocket')}Roll Out`);
+    if (!allPopulated) {
+      cta.innerHTML = `${svgIcon('lock')}Equip Parts`;
+    } else if (hasRisks) {
+      const risks = summarizeRisks(ev);
+      const n = risks.length;
+      cta.innerHTML = `${svgIcon('warning')}<span class="cta-stack"><span class="cta-main">Launch Anyway</span><span class="cta-sub">${n} issue${n === 1 ? '' : 's'}: ${esc(risks.slice(0, 3).join(' · '))}${n > 3 ? ' …' : ''}</span></span>`;
+    } else {
+      cta.innerHTML = `${svgIcon('rocket')}Roll Out`;
+    }
     cta.title = !allPopulated ? 'Equip all 4 mission segments' : (hasRisks ? warnings.map((w) => w.text).join(' | ') : 'Roll out to launchpad');
   } else if (stage === 'launch') {
     const readyOrbit = Boolean(unlocked.orbit);

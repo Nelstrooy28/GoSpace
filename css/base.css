@@ -4,7 +4,7 @@
    and grows on 1440p / 4K monitors like a native PC game HUD. */
 
 html {
-  font-size: clamp(10.5px, calc(0.48vw + 0.52vh), 20px);
+  font-size: clamp(13px, calc(0.48vw + 0.52vh), 20px);
 }
 
 :root {
@@ -56,11 +56,12 @@ html {
   --red: #ef4444;
   --status-bad: #ef4444;
 
-  /* Fluid rem type scale */
-  --fs-xs: 0.72rem;
-  --fs-sm: 0.82rem;
-  --fs-md: 0.92rem;
-  --fs-lg: 1.15rem;
+  /* Fluid rem type scale — every HUD/modal text token floors at 14px
+     so small laptop windows stay readable while 1440p/4K still scale up. */
+  --fs-xs: max(14px, 0.86rem);
+  --fs-sm: max(14.5px, 0.95rem);
+  --fs-md: max(15.5px, 1.04rem);
+  --fs-lg: max(17px, 1.24rem);
   --fs-hero: clamp(1.8rem, 3.2vmin, 2.8rem);
   --fs-title: var(--fs-hero);
 

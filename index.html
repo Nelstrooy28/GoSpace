@@ -8,12 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%230c0e12' stroke='%23f59e0b' stroke-width='2'/><text x='16' y='21' font-size='13' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%23fbbf24'>GS</text></svg>" />
-  <link rel="stylesheet" href="./css/base.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/hud.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/menu-tutorial.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/hangar-launch.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/orbit.css?v=20261115_rem_chamfer" />
-  <link rel="stylesheet" href="./css/modals-debrief.css?v=20261115_rem_chamfer" />
+  <link rel="stylesheet" href="./css/base.css?v=20261115_ui_polish" />
+  <link rel="stylesheet" href="./css/hud.css?v=20261115_ui_polish" />
+  <link rel="stylesheet" href="./css/menu-tutorial.css?v=20261115_ui_polish" />
+  <link rel="stylesheet" href="./css/hangar-launch.css?v=20261115_ui_polish" />
+  <link rel="stylesheet" href="./css/orbit.css?v=20261115_ui_polish" />
+  <link rel="stylesheet" href="./css/modals-debrief.css?v=20261115_ui_polish" />
   <script type="importmap">
     {
       "imports": {
@@ -120,16 +120,16 @@
       </div>
 
       <div class="topbar-utils">
-        <button id="music-toggle-btn" class="btn-sci icon-toggle audio-toggle-btn" type="button" title="Toggle Music" aria-label="Toggle Music">
-          <i data-gi="music-on" class="when-on"></i><i data-gi="music-off" class="when-off"></i>
+        <button id="music-toggle-btn" class="btn-sci icon-toggle has-lbl audio-toggle-btn" type="button" title="Toggle Music" aria-label="Toggle Music">
+          <i data-gi="music-on" class="when-on"></i><i data-gi="music-off" class="when-off"></i><span class="util-lbl">Music</span>
         </button>
-        <button id="mute-btn" class="btn-sci icon-toggle audio-toggle-btn" type="button" title="Toggle Sound" aria-label="Toggle Sound">
-          <i data-gi="sfx-on" class="when-on"></i><i data-gi="sfx-off" class="when-off"></i>
+        <button id="mute-btn" class="btn-sci icon-toggle has-lbl audio-toggle-btn" type="button" title="Toggle Sound" aria-label="Toggle Sound">
+          <i data-gi="sfx-on" class="when-on"></i><i data-gi="sfx-off" class="when-off"></i><span class="util-lbl">Sound</span>
         </button>
-        <button id="menu-btn" class="btn-sci icon-toggle" type="button" aria-expanded="false" title="Tools &amp; Help" aria-label="Tools and Help">
-          <i data-gi="help"></i>
+        <button id="menu-btn" class="btn-sci icon-toggle has-lbl" type="button" aria-expanded="false" title="Tools &amp; Help" aria-label="Tools and Help">
+          <i data-gi="help"></i><span class="util-lbl">Tools</span>
         </button>
-        <button id="toggle-hud-btn" class="btn-sci icon-toggle" type="button" title="Hide HUD [H]" aria-label="Hide HUD"><i data-gi="hud"></i></button>
+        <button id="toggle-hud-btn" class="btn-sci icon-toggle has-lbl" type="button" title="Hide HUD [H]" aria-label="Hide HUD"><i data-gi="hud"></i><span class="util-lbl">Hide HUD</span></button>
         <button id="quit-mission-btn" class="btn-sci btn-quit-mission" type="button" title="Quit Mission [Esc]"><i data-gi="quit"></i><span>Quit</span></button>
       </div>
     </header>
@@ -241,6 +241,6 @@
     <div id="compare-box" class="compare-box"></div>
   </dialog>
 
-  <script type="module" src="./js/main.js?v=20261115_rem_chamfer"></script>
+  <script type="module" src="./js/main.js?v=20261115_ui_polish"></script>
 </body>
 </html>

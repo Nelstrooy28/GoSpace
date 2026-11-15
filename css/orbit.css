@@ -1,8 +1,8 @@
 /* GoSpace — Stage 03 Orbit Operations, Collapsible Objectives, Sensor Cam & Hazard HUD (fluid rem) */
 
 .orbit-objectives-sidebar {
-  width: 16rem;
-  max-width: 16.5rem;
+  width: max(20rem, 300px);
+  max-width: min(22rem, 30vw);
   max-height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
@@ -309,7 +309,7 @@
    RIGHT COLUMN UNIFIED ORBIT OPS CARD
    ------------------------------------------------------------------ */
 .orbit-ops-card {
-  width: 15.2rem;
+  width: max(19.5rem, 290px);
   padding: 0.58rem 0.65rem;
   display: flex;
   flex-direction: column;
