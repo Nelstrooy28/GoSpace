@@ -349,6 +349,14 @@ export function evaluateMissionDesign(state) {
   if (orbit.deepSpace && (!gs?.deepSpace || !veh?.deepSpaceCapable)) warn('deepspace', 'Launch', `${orbit.name} requires a heavy launcher and Deep-Space Dish Array.`);
   if (lat?.id === 'realtime' && gs && !gs.realtimeCapable) warn('latency', 'Ground', `${gs.name} cannot support <30 min real-time alerts.`);
 
+  const designRisks = {
+    massOverrun: !state.sandboxMode && Boolean((veh && totalMassKg > veh.maxPayloadKg) || (bus && payloadMassKg > bus.payloadCapKg)),
+    lowPowerMargin: powerMargin < 5,
+    weakCommsMargin: dataMargin < 5 || Boolean(lat?.id === 'realtime' && gs && !gs.realtimeCapable) || Boolean(orbit.deepSpace && !tx?.deepSpace),
+    wavelengthMismatch: Boolean(band && band.id !== sc.targetBand) || insts.some((i) => (band && !instMatchesBand(i, band.id)) || !instMatchesBand(i, sc.targetBand)),
+    budgetOverrun: !state.sandboxMode && usedM > sc.budgetLimitM
+  };
+
   const cmlLevel = !allPopulated ? 1 : (warnings.length === 0 ? 4 : (warnings.length <= 2 ? 3 : 2));
   return {
     scenario: sc, allPopulated, cmlLevel, cmlLabel: CML_LABELS[cmlLevel],
@@ -357,7 +365,7 @@ export function evaluateMissionDesign(state) {
       mass: { totalKg: totalMassKg, payloadKg: Number(payloadMassKg.toFixed(1)), busLimitKg: bus?.payloadCapKg || 0, launchLimitKg: veh?.maxPayloadKg || 0 },
       powerMargin, dataMargin, lifetimeYears, scienceScore
     },
-    mel, warnings, orbitElements: orbit, orbitStats, missionMatch: sc.realMatch, sandboxMode: Boolean(state.sandboxMode)
+    mel, warnings, designRisks, orbitElements: orbit, orbitStats, missionMatch: sc.realMatch, sandboxMode: Boolean(state.sandboxMode)
   };
 }
 

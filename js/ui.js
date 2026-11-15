@@ -29,7 +29,9 @@ const instMatchesBand = (i, bId) => i.band === bId || (i.extraBands || []).inclu
 const cardHtml = ({ field, id, icon, name, pills, selected, ok = true, multi = false, tip = '' }) => `
   <button class="equip-card ${selected ? 'selected' : ''} ${ok ? '' : 'compat-bad'}" type="button"
     data-field="${field}" data-id="${id}" data-multi="${multi ? '1' : '0'}" data-tip="${esc(tip)}">
-    <div class="equip-head"><span>${icon} ${esc(name)}</span><span class="spill ${ok ? 'ok' : 'bad'}">${selected ? '✓ EQUIPPED' : (ok ? 'FIT' : '!')}</span></div>
+    <div class="equip-head"><span class="equip-name" title="${esc(name)}">${icon} ${esc(name)}</span>${selected
+      ? '<span class="equip-check-badge" title="Equipped" aria-label="Equipped">✓</span>'
+      : `<span class="spill ${ok ? 'ok' : 'bad'}">${ok ? 'FIT' : '!'}</span>`}</div>
     <div class="stat-pills">${pills.map((p) => `<span class="spill">${esc(p)}</span>`).join('')}</div>
   </button>`;
 
@@ -103,31 +105,40 @@ const CONTRACT_META = {
   'asteroid-l3': { title: 'Near-Earth Asteroid Prospector', wave: 'ION + PROSPECT', lv: '5200kg LV', obj: 'Rendezvous with metallic NEAs via Xenon Ion + Spectroscopy.' },
 };
 
-export function renderTitleOverlay(sandboxMode, activeScenarioId) {
+export function renderTitleOverlay(sandboxMode, activeScenarioId, progressMap = {}) {
   document.getElementById('mode-campaign-btn').classList.toggle('active', !sandboxMode);
   document.getElementById('mode-sandbox-btn').classList.toggle('active', sandboxMode);
   const pill = document.getElementById('title-mode-pill');
   if (pill) {
-    pill.textContent = sandboxMode ? 'SANDBOX FREEPLAY · ALL SYSTEMS UNLOCKED' : 'CAMPAIGN MODE · ENGINEERED CONTRACTS';
+    pill.textContent = sandboxMode ? 'SANDBOX FREEPLAY · ALL SYSTEMS UNLOCKED' : 'SIMULATION MODE · ENGINEERED CONTRACTS';
     pill.classList.toggle('sandbox', sandboxMode);
   }
   document.getElementById('contract-grid').innerHTML = SCENARIOS.map((s) => {
     const m = CONTRACT_META[s.id] || { title: s.name, wave: s.orbitIcon, lv: 'LV READY', obj: s.summary };
     const selected = s.id === activeScenarioId;
+    const prog = progressMap[s.id];
+    const statusBadge = prog?.status === 'completed'
+      ? `<span class="contract-status-badge is-done">Completed ${'★'.repeat(Math.max(1, Math.min(3, prog.stars || 1)))}</span>`
+      : (prog?.status === 'in_progress'
+        ? '<span class="contract-status-badge is-progress">In Progress</span>'
+        : '<span class="contract-status-badge">Not Started</span>');
+    const budBadge = sandboxMode
+      ? '<span class="spill ok"><span class="inf-sym">∞</span> UNLIMITED</span>'
+      : `<span class="spill ok">$${s.budgetLimitM}M</span>`;
     return `
     <div class="contract-card ${selected ? 'selected' : ''}" data-start-scenario="${s.id}" role="button" tabindex="0">
       <div class="contract-art">${CONTRACT_ART[s.id] || ''}</div>
       <div class="contract-body">
         <div class="contract-top">
           <span class="contract-stars">${s.stars}</span>
-          <span class="badge-tag">${esc(m.wave)}</span>
+          ${statusBadge}
         </div>
         <h3 class="contract-title">${esc(m.title)}</h3>
         <p class="contract-obj">${esc(m.obj)}</p>
         <div class="contract-footer">
           <div class="stat-pills">
-            <span class="spill">${esc(m.lv)}</span>
-            <span class="spill ok">$${s.budgetLimitM}M</span>
+            <span class="spill">${esc(m.wave)}</span>
+            ${budBadge}
             <span class="spill">${s.minLifetimeYr}YR</span>
           </div>
           <span class="btn-sci contract-cta ${selected ? 'active' : ''}">DEPLOY ›</span>
@@ -166,8 +177,8 @@ export function renderLoadoutDock(segment, subGroup, state, evaluation) {
 function getGaugeRows(ev) {
   const { metrics, scenario, sandboxMode } = ev;
   return [
-    { key: 'BUD', label: 'Budget', val: `$${metrics.budget.usedM}/${metrics.budget.limitM}M`, pct: Math.min(100, metrics.budget.pct), ok: sandboxMode || metrics.budget.usedM <= metrics.budget.limitM },
-    { key: 'MASS', label: 'Mass', val: `${metrics.mass.totalKg}/${metrics.mass.launchLimitKg}kg`, pct: Math.min(100, (metrics.mass.totalKg / Math.max(metrics.mass.launchLimitKg, 1)) * 100), ok: sandboxMode || metrics.mass.totalKg <= metrics.mass.launchLimitKg },
+    { key: 'BUD', label: 'Budget', val: sandboxMode ? '∞ UNLIMITED' : `$${metrics.budget.usedM}/${metrics.budget.limitM}M`, pct: sandboxMode ? 100 : Math.min(100, metrics.budget.pct), ok: sandboxMode || metrics.budget.usedM <= metrics.budget.limitM },
+    { key: 'MASS', label: 'Mass', val: sandboxMode ? `${metrics.mass.totalKg}kg / ∞` : `${metrics.mass.totalKg}/${metrics.mass.launchLimitKg}kg`, pct: sandboxMode ? 100 : Math.min(100, (metrics.mass.totalKg / Math.max(metrics.mass.launchLimitKg, 1)) * 100), ok: sandboxMode || metrics.mass.totalKg <= metrics.mass.launchLimitKg },
     { key: 'PWR', label: 'Power', val: `${metrics.powerMargin}%`, pct: Math.max(0, Math.min(100, metrics.powerMargin + 30)), ok: metrics.powerMargin >= 5 },
     { key: 'DATA', label: 'Data', val: `${metrics.dataMargin}%`, pct: Math.max(0, Math.min(100, metrics.dataMargin + 25)), ok: metrics.dataMargin >= 5 },
     { key: 'LIFE', label: 'Life', val: `${metrics.lifetimeYears}/${scenario.minLifetimeYr}yr`, pct: Math.min(100, (metrics.lifetimeYears / scenario.minLifetimeYr) * 100), ok: metrics.lifetimeYears >= scenario.minLifetimeYr },
@@ -175,8 +186,27 @@ function getGaugeRows(ev) {
   ];
 }
 
-export function renderHud(ev, stage) {
-  const { metrics, mel, cmlLevel, warnings, scenario, sandboxMode } = ev;
+export function renderHud(ev, stage, opts = {}) {
+  const { metrics, mel, cmlLevel, warnings, scenario, sandboxMode, allPopulated } = ev;
+  const run = opts.runSession || {};
+  const unlocked = opts.unlockedStages || { hangar: true, launch: Boolean(allPopulated), orbit: false, review: false };
+  const stageLabels = { hangar: '1. HANGAR', launch: '2. PAD', orbit: '3. ORBIT', review: '4. DEBRIEF' };
+  const lockReasons = {
+    hangar: 'Mission Hangar assembly',
+    launch: unlocked.launch ? 'Roll out to launchpad' : 'Locked: Equip all 4 core mission segments first',
+    orbit: unlocked.orbit ? 'Orbital operations' : 'Locked: Complete rocket launch sequence first',
+    review: unlocked.review ? 'Mission Debrief' : 'Locked: Complete at least 1 Science Downlink in Orbit first'
+  };
+  document.querySelectorAll('#stage-switcher .stage-btn').forEach((b) => {
+    const s = b.dataset.stage;
+    const ok = Boolean(unlocked[s]);
+    b.disabled = !ok;
+    b.classList.toggle('is-locked', !ok);
+    b.classList.toggle('active', s === stage);
+    b.title = lockReasons[s] || '';
+    b.textContent = ok ? stageLabels[s] : `🔒 ${stageLabels[s]}`;
+  });
+
   document.querySelectorAll('#cml-dots .cnode').forEach((el, idx) => {
     el.className = `cnode ${idx < cmlLevel ? (cmlLevel === 4 ? 'lit-max' : 'lit') : ''}`;
   });
@@ -186,6 +216,27 @@ export function renderHud(ev, stage) {
   const banner = document.getElementById('comms-banner');
   banner.classList.toggle('ok', warnings.length === 0);
   document.getElementById('comms-text').textContent = warnings.length ? `CHIEF ENG: ${warnings[0].text}` : 'CHIEF ENG: All 4 segments green — cleared for pad rollout!';
+
+  const mProg = document.getElementById('mission-progress-bar');
+  if (mProg) {
+    mProg.hidden = stage === 'review';
+    if (stage !== 'review') {
+      const s1 = Boolean(allPopulated);
+      const s2 = Boolean(run.launchCompleted);
+      const dl = run.downlinksCompleted || 0;
+      const s3 = dl >= 1;
+      const s4 = Boolean(run.orbitObjectivesMet);
+      const pct = (s1 ? 25 : 0) + (s2 ? 25 : 0) + (s3 ? 25 : 0) + (s4 ? 25 : 0);
+      mProg.innerHTML = `<div class="mprog-head"><span>MISSION PROGRESS · ${esc(scenario.name)}</span><span class="mprog-pct">${pct}%</span></div>
+        <div class="mprog-track"><div class="mprog-fill" style="width:${pct}%"></div></div>
+        <div class="mprog-steps">
+          <span class="mprog-step ${s1 ? 'is-done' : 'is-active'}">${s1 ? '✓' : '○'} Parts Equipped</span>
+          <span class="mprog-step ${s2 ? 'is-done' : (stage === 'launch' ? 'is-active' : '')}">${s2 ? '✓' : '○'} Launched</span>
+          <span class="mprog-step ${s3 ? 'is-done' : (stage === 'orbit' ? 'is-active' : '')}">${s3 ? '✓' : '○'} Downlinks ${Math.min(dl, 1)}/1</span>
+          <span class="mprog-step ${s4 ? 'is-done' : ''}">${s4 ? '✓' : '🔒'} Ready for Debrief</span>
+        </div>`;
+    }
+  }
 
   document.getElementById('resource-gauges').innerHTML = getGaugeRows(ev).map((g) => {
     const lit = Math.max(1, Math.round((g.pct / 100) * 5));
@@ -199,10 +250,33 @@ export function renderHud(ev, stage) {
     autoBtn.classList.toggle('is-complete', cmlLevel === 4);
   }
   const cta = document.getElementById('launch-cta-btn');
-  cta.classList.toggle('is-ready', stage === 'hangar' && (cmlLevel === 4 || sandboxMode));
-  cta.textContent = stage === 'hangar' ? '🚀 ROLL OUT TO PAD' : (stage === 'launch' ? 'SKIP TO ORBIT >>' : (stage === 'orbit' ? '🏁 COMPLETE MISSION' : '🔄 HANGAR'));
+  const hasRisks = !sandboxMode && allPopulated && warnings.length > 0;
+  cta.classList.toggle('is-ready', stage === 'hangar' && allPopulated && !hasRisks);
+  cta.classList.toggle('is-risk', stage === 'hangar' && hasRisks);
+  if (stage === 'hangar') {
+    cta.disabled = !allPopulated;
+    cta.textContent = !allPopulated ? '🔒 EQUIP ALL 4 SEGMENTS' : (hasRisks ? '⚠️ LAUNCH WITH DESIGN RISKS' : '🚀 ROLL OUT TO PAD');
+    cta.title = !allPopulated ? 'Populate User, Space, Launch & Ground segments' : (hasRisks ? warnings.map((w) => w.text).join(' | ') : 'Roll out spacecraft to Launchpad 39G');
+  } else if (stage === 'launch') {
+    const readyOrbit = Boolean(unlocked.orbit);
+    cta.disabled = !readyOrbit;
+    cta.textContent = readyOrbit ? '🛰️ ENTER ORBIT >>' : '🚀 ASCENT IN PROGRESS...';
+    cta.title = readyOrbit ? 'Enter Orbit Stage' : 'Ignite rocket and complete ascent to unlock Orbit';
+  } else if (stage === 'orbit') {
+    const canFinish = Boolean(run.orbitObjectivesMet);
+    cta.disabled = !canFinish;
+    cta.classList.toggle('is-ready', canFinish);
+    cta.textContent = canFinish ? '🏁 COMPLETE MISSION' : '🔒 COMPLETE 1 DOWNLINK FIRST';
+    cta.title = canFinish ? 'Open Mission Debrief' : 'Fly into a green Ground Station cone and press [SPACE] first';
+  } else {
+    cta.disabled = false;
+    cta.textContent = '🔄 HANGAR';
+    cta.title = 'Return to Hangar';
+  }
 
-  document.getElementById('mel-summary-meta').textContent = `${mel.length} · ${metrics.mass.totalKg}kg · $${metrics.budget.usedM}M`;
+  document.getElementById('mel-summary-meta').textContent = sandboxMode
+    ? `${mel.length} · ${metrics.mass.totalKg}kg · ∞ UNLIMITED`
+    : `${mel.length} · ${metrics.mass.totalKg}kg · $${metrics.budget.usedM}M`;
   document.getElementById('mel-body').innerHTML = `<table class="mel-table"><thead><tr><th>Seg</th><th>Item</th><th>Mass</th><th>Pwr</th><th>Cost</th></tr></thead><tbody>`
     + mel.map((r) => `<tr><td>${esc(r.segment)}</td><td>${esc(r.item)}</td><td>${r.massKg}kg</td><td>${r.powerW}W</td><td>$${r.costM}M</td></tr>`).join('') + '</tbody></table>';
 }
@@ -232,6 +306,8 @@ export function renderStageHud(stage, state, ev, opts) {
       </div></div>`;
     actions.innerHTML = ''; return;
   }
+  const decBox = document.getElementById('decision-alert-hud');
+  if (decBox && stage !== 'orbit') { decBox.hidden = true; decBox.innerHTML = ''; }
   if (stage === 'launch') {
     hud.innerHTML = `<div class="stage-card plate">
       <div class="card-head"><span>ASCENT TELEMETRY</span><span id="launch-phase-pill" class="badge-tag">ARMED ON PAD</span></div>
@@ -244,14 +320,30 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.launchCam === 'track' ? 'is-on' : ''}" data-lcam="track" type="button">🎥 Tower Track</button>
         <button class="btn-sci ${opts.launchCam === 'hull' ? 'is-on' : ''}" data-lcam="hull" type="button">🎥 Rocket Hull Cam</button>
         <button class="btn-sci ${opts.launchCam === 'free' ? 'is-on' : ''}" data-lcam="free" type="button">🎥 Free Cam</button>
-        <button id="lch-skip-btn" class="btn-sci active" type="button">Skip &gt;&gt;</button>
+        <button id="lch-skip-btn" class="btn-sci active" type="button" ${opts.launchInserted ? '' : 'disabled title="Complete rocket ascent first to unlock Orbit"'}>Skip &gt;&gt;</button>
       </div></div>`;
     actions.innerHTML = `<button id="lch-ignite-btn" class="action-prompt" type="button">🔥 PRESS [SPACE] OR CLICK TO IGNITE</button>`;
     return;
   }
   if (stage === 'orbit') {
+    const risks = ev.designRisks || {};
+    const riskMsgs = [];
+    if (risks.massOverrun) riskMsgs.push('Drag Decay (-0.5%/s Hull)');
+    if (risks.lowPowerMargin) riskMsgs.push('Eclipse Brownout Risk (2.5x drain)');
+    if (risks.weakCommsMargin) riskMsgs.push('Packet Bottleneck (-50% downlink pts)');
+    if (risks.wavelengthMismatch) riskMsgs.push('Wavelength Mismatch (-40% science)');
+    const testHazBtn = state.sandboxMode
+      ? '<button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Test Hazard</button>'
+      : '';
+    const debOk = Boolean(opts.orbitObjectivesMet);
     hud.innerHTML = `<div class="stage-card plate">
       <div class="card-head"><span>ORBITAL OPS</span><span id="orb-score-pill" class="badge-tag">SCORE ${opts.orbitScore || 0}</span></div>
+      <div class="orbit-clock-row">
+        <div class="orbit-clock-cell"><span class="orbit-clock-lbl">MET</span><span id="orb-met-val" class="orbit-clock-val">T+ 00:00:00</span></div>
+        <div class="orbit-clock-cell"><span class="orbit-clock-lbl">UTC</span><span id="orb-utc-val" class="orbit-clock-val">2026-11-15 14:00:00</span></div>
+      </div>
+      <div id="orb-eclipse-badge" class="eclipse-badge" hidden>🌑 ECLIPSE SHADOW · SOLAR ARRAY OUTPUT DROPPED</div>
+      ${riskMsgs.length ? `<div class="design-risk-banner">⚠️ ACTIVE RISKS: ${esc(riskMsgs.join(' · '))}</div>` : ''}
       <div class="btn-row">
         <button class="btn-sci ${opts.orbitCam === 'chase' ? 'is-on' : ''}" data-cam="chase" type="button">🛰️ Chase Sat</button>
         <button class="btn-sci ${opts.orbitCam === 'full' ? 'is-on' : ''}" data-cam="full" type="button">🌍 Full Orbit</button>
@@ -263,11 +355,11 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.orbitWarp === 25 ? 'is-on' : ''}" data-warp="25" type="button">25x</button>
         <button class="btn-sci ${opts.orbitWarp === 100 ? 'is-on' : ''}" data-warp="100" type="button">100x</button>
         <button class="btn-sci ${opts.orbitWarp === 0 ? 'is-on' : ''}" data-warp="0" type="button">Pause</button>
-        <button id="orb-test-hazard-btn" class="btn-sci" type="button">⚠️ Test Hazard</button>
+        ${testHazBtn}
         <button id="orb-replay-unfold-btn" class="btn-sci" type="button" title="Replay Zero-G Satellite Unfolding [U]">🛰️ Replay Unfold [U]</button>
         <button id="orb-sensorcam-btn" class="btn-sci ${opts.sensorCamOpen ? 'is-on' : ''}" type="button">📷 Sensor Cam [C]</button>
         <button id="hud-mission-guide-btn" class="btn-sci guide-pill" type="button">📋 Mission Guide</button>
-        <button id="orb-debrief-btn" class="btn-sci active" type="button">🏆 View Debrief</button>
+        <button id="orb-debrief-btn" class="btn-sci ${debOk ? 'active' : ''}" type="button" ${debOk ? '' : 'disabled title="Complete at least 1 Science Downlink in Orbit to unlock Debrief"'}>${debOk ? '🏆 View Debrief' : '🔒 Debrief (0/1 Downlink)'}</button>
       </div>
       <div class="hull-meter-row">
         <div class="hull-meter-head"><span>HULL INTEGRITY</span><span id="orb-hull-pct">${opts.hullIntegrity ?? 100}%</span></div>
@@ -280,7 +372,7 @@ export function renderStageHud(stage, state, ev, opts) {
     return;
   }
   hud.innerHTML = ''; actions.innerHTML = '';
-  const { scenario, orbitElements, metrics, missionMatch, cmlLevel, sandboxMode } = ev;
+  const { scenario, orbitElements, metrics, missionMatch, cmlLevel, sandboxMode, designRisks } = ev;
   const oScore = opts.orbitScore || 0;
   const resolvedCount = opts.anomaliesResolved || 0;
   const hullFinal = opts.hullIntegrity ?? 100;
@@ -288,22 +380,26 @@ export function renderStageHud(stage, state, ev, opts) {
   const asteroidsScanned = opts.asteroidsScanned || 0;
   const downlinkPts = opts.downlinkPts ?? downlinkCount * 50;
   const anomalyPts = opts.anomalyPts ?? resolvedCount * 75;
-  const scanPts = opts.scanPts ?? Math.max(0, oScore - downlinkPts - anomalyPts);
+  const decisionPts = opts.decisionPts ?? 0;
+  const scanPts = opts.scanPts ?? Math.max(0, oScore - downlinkPts - anomalyPts - decisionPts);
+  const budgetOverrun = Boolean(!sandboxMode && designRisks?.budgetOverrun);
   const budgetEfficiency = !sandboxMode && metrics.budget.usedM <= metrics.budget.limitM
     ? Math.round((metrics.budget.limitM - metrics.budget.usedM) * 4)
     : 0;
-  const engPts = metrics.scienceScore * 10 + (cmlLevel === 4 ? 250 : 0) + budgetEfficiency;
-  const totalScore = downlinkPts + anomalyPts + scanPts + engPts;
+  const budgetPenalty = budgetOverrun ? 200 : 0;
+  const engPts = metrics.scienceScore * 10 + (cmlLevel === 4 ? 250 : 0) + budgetEfficiency - budgetPenalty;
+  const totalScore = Math.max(0, downlinkPts + anomalyPts + scanPts + decisionPts + engPts);
 
-  const starCount = (cmlLevel === 4 || sandboxMode) && metrics.scienceScore >= 85 && (oScore >= 50 || resolvedCount > 0)
+  let starCount = (cmlLevel === 4 || sandboxMode) && metrics.scienceScore >= 85 && (oScore >= 50 || resolvedCount > 0)
     ? 3
     : (cmlLevel >= 3 ? 2 : 1);
+  if (budgetOverrun) starCount = Math.min(2, starCount);
   const rankMeta = starCount === 3 && totalScore >= 1350
     ? { label: 'S-RANK // FLIGHT DIRECTOR', cls: 'rank-s', tip: '' }
     : starCount === 3
       ? { label: 'A-RANK // MISSION COMMANDER', cls: 'rank-a', tip: '' }
       : starCount === 2
-        ? { label: 'B-RANK // SYSTEMS ENGINEER', cls: 'rank-b', tip: 'Reach CML 4 with >=85% Science and >=50 Orbit Ops pts for 3 stars.' }
+        ? { label: 'B-RANK // SYSTEMS ENGINEER', cls: 'rank-b', tip: budgetOverrun ? 'Budget Overrun capped max rating at 2 ★ (-200 pts). Keep cost within mission cap for 3 ★!' : 'Reach CML 4 with >=85% Science and >=50 Orbit Ops pts for 3 stars.' }
         : { label: 'MISSION AT RISK', cls: 'rank-risk', tip: 'Fix yellow warnings in Hangar (CML 4) and downlink science in Orbit to hit 3 stars!' };
 
   const busObj = CATALOG.space.buses.find((b) => b.id === state.busId);
@@ -366,7 +462,9 @@ export function renderStageHud(stage, state, ev, opts) {
           <div class="score-row"><span>📡 Science Data Downlinked</span><strong>+${downlinkPts} PTS</strong></div>
           <div class="score-row"><span>🛠️ Space Anomalies Repaired</span><strong>+${anomalyPts} PTS</strong></div>
           <div class="score-row"><span>☄️ Asteroid &amp; Deep-Space Scans</span><strong>+${scanPts} PTS</strong></div>
-          <div class="score-row"><span>💰 Engineering &amp; Budget Efficiency</span><strong>+${engPts} PTS</strong></div>
+          ${decisionPts ? `<div class="score-row"><span>⚡ Tactical Command Decisions</span><strong>${decisionPts >= 0 ? `+${decisionPts}` : decisionPts} PTS</strong></div>` : ''}
+          <div class="score-row"><span>💰 Engineering &amp; Budget Efficiency</span><strong>+${metrics.scienceScore * 10 + (cmlLevel === 4 ? 250 : 0) + budgetEfficiency} PTS</strong></div>
+          ${budgetPenalty ? `<div class="score-row" style="color:#fda4af"><span>💸 Budget Overrun Penalty (Max 2 ★)</span><strong>-${budgetPenalty} PTS</strong></div>` : ''}
         </div>
         <div class="debrief-sec-head" style="margin-top:10px">EARNED MISSION RIBBONS</div>
         <div class="ribbons-shelf">${ribbons.map((r) => `<span class="medal-chip">${r.icon} ${esc(r.label)}</span>`).join('')}</div>
@@ -383,7 +481,7 @@ export function renderStageHud(stage, state, ev, opts) {
           <span class="holo-pill">🧰 Bus: ${esc(busObj?.name || state.busId)}</span>
         </div>
         <div class="holo-telemetry-mini">
-          <span>Budget $${metrics.budget.usedM}M</span>
+          <span>Budget ${sandboxMode ? '∞ UNLIMITED' : `$${metrics.budget.usedM}M`}</span>
           <span>Power ${metrics.powerMargin}%</span>
           <span>Science ${metrics.scienceScore}%</span>
         </div>
@@ -495,7 +593,30 @@ export function updateOrbitOverlay(t) {
       hazBox.dataset.renderKind = '';
     }
   }
-  const tx = document.getElementById('orb-transmit-btn'); if (tx) tx.hidden = !t?.inLineOfSight;
+  document.getElementById('orb-met-val')?.replaceChildren(document.createTextNode(t?.metText || 'T+ 00:00:00'));
+  document.getElementById('orb-utc-val')?.replaceChildren(document.createTextNode(t?.utcText || '2026-11-15 14:00:00'));
+  const eclBadge = document.getElementById('orb-eclipse-badge');
+  if (eclBadge) eclBadge.hidden = !t?.inEclipse;
+  const tx = document.getElementById('orb-transmit-btn');
+  if (tx) {
+    tx.hidden = !t?.inLineOfSight;
+    tx.disabled = Boolean(t?.brownoutLocked);
+    if (t?.brownoutLocked) {
+      tx.textContent = '🔋 BROWNOUT: RECHARGE TO 15% IN SUNLIGHT';
+    } else {
+      let pts = 50;
+      if (t?.designRisks?.weakCommsMargin) pts = Math.round(pts * 0.5);
+      if (t?.designRisks?.wavelengthMismatch) pts = Math.round(pts * 0.6);
+      tx.textContent = `📡 [SPACE] TRANSMIT SCIENCE (+${pts})`;
+    }
+  }
+  const debBtn = document.getElementById('orb-debrief-btn');
+  const dlDone = (t?.downlinkCount || 0) >= 1;
+  if (debBtn) {
+    debBtn.disabled = !dlDone;
+    debBtn.classList.toggle('active', dlDone);
+    debBtn.textContent = dlDone ? '🏆 View Debrief' : `🔒 Debrief (${Math.min(t?.downlinkCount || 0, 1)}/1 Downlink)`;
+  }
   const sm = document.getElementById('orb-safemode-btn'); if (sm) sm.hidden = !(t?.inEclipse || t?.stormActive) || Boolean(t?.safeModeActive);
   const db = document.getElementById('orbit-deploy-banner');
   if (db) {
@@ -621,4 +742,60 @@ export function renderHoloScannerCard(holoId, focusedHoloId = null) {
     <button id="holo-zoom-btn" class="btn-sci ${focusedHoloId === data.id ? 'is-on' : ''}" type="button">🎥 Zoom to Body</button>
     <button id="holo-return-btn" class="btn-sci" type="button">🛰️ Back to My Satellite</button>
   </div>`;
+}
+
+export function computeMissionDebriefSummary(ev, opts = {}) {
+  const { metrics, cmlLevel, sandboxMode, designRisks } = ev;
+  const oScore = opts.orbitScore || 0;
+  const resolvedCount = opts.anomaliesResolved || 0;
+  const downlinkCount = opts.downlinkCount || 0;
+  const downlinkPts = opts.downlinkPts ?? downlinkCount * 50;
+  const anomalyPts = opts.anomalyPts ?? resolvedCount * 75;
+  const decisionPts = opts.decisionPts ?? 0;
+  const scanPts = opts.scanPts ?? Math.max(0, oScore - downlinkPts - anomalyPts - decisionPts);
+  const budgetOverrun = Boolean(!sandboxMode && designRisks?.budgetOverrun);
+  const budgetEfficiency = !sandboxMode && metrics.budget.usedM <= metrics.budget.limitM
+    ? Math.round((metrics.budget.limitM - metrics.budget.usedM) * 4)
+    : 0;
+  const budgetPenalty = budgetOverrun ? 200 : 0;
+  const engPts = metrics.scienceScore * 10 + (cmlLevel === 4 ? 250 : 0) + budgetEfficiency - budgetPenalty;
+  const totalScore = Math.max(0, downlinkPts + anomalyPts + scanPts + decisionPts + engPts);
+  let starCount = (cmlLevel === 4 || sandboxMode) && metrics.scienceScore >= 85 && (oScore >= 50 || resolvedCount > 0)
+    ? 3
+    : (cmlLevel >= 3 ? 2 : 1);
+  if (budgetOverrun) starCount = Math.min(2, starCount);
+  return { totalScore, starCount, budgetOverrun, budgetPenalty };
+}
+
+export function renderDecisionCard(decision) {
+  const el = document.getElementById('decision-alert-hud');
+  if (!el) return;
+  if (!decision) {
+    el.hidden = true;
+    el.innerHTML = '';
+    el.dataset.decisionId = '';
+    return;
+  }
+  el.hidden = false;
+  if (el.dataset.decisionId !== decision.id) {
+    el.dataset.decisionId = decision.id;
+    el.innerHTML = `<div class="decision-head">
+        <span>⚡ MISSION CONTROL DECISION · ${esc(decision.title)}</span>
+        <span id="decision-timer-pill" class="decision-timer">${decision.remainingSec.toFixed(1)}s</span>
+      </div>
+      <div class="decision-desc">${esc(decision.prompt)}</div>
+      <div class="decision-actions">
+        <button id="dec-opt-risky" class="btn-sci decision-btn is-risky" type="button">
+          <span>${esc(decision.risky.label)}</span>
+          <small>${esc(decision.risky.deltaText)}</small>
+        </button>
+        <button id="dec-opt-safe" class="btn-sci decision-btn is-safe" type="button">
+          <span>${esc(decision.safe.label)}</span>
+          <small>${esc(decision.safe.deltaText)} (Default)</small>
+        </button>
+      </div>`;
+  } else {
+    const tp = document.getElementById('decision-timer-pill');
+    if (tp) tp.textContent = `${decision.remainingSec.toFixed(1)}s`;
+  }
 }

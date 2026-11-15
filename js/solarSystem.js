@@ -555,15 +555,51 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
   addHoloProxy(sunGroup, 16 * 2.8, 'sun', 17.5, () => sunPos.clone(), new THREE.Vector3(34, 15, 44));
   scene.add(sunGroup);
 
-  // 3. Cratered Moon & Earth heliocentric orbit arc
+  // 3. Cratered Moon, Lunar Orbit Ring around Earth & Earth heliocentric orbit arc
   const moonMaps = getPlanetMaps('moon');
+  const moonGroup = new THREE.Group();
+  moonGroup.position.copy(moonPos);
   const moon = new THREE.Mesh(
     track(new THREE.SphereGeometry(moonScale, 36, 24)),
-    track(new THREE.MeshStandardMaterial({ map: moonMaps.map, bumpMap: moonMaps.bumpMap, bumpScale: 0.038, roughness: 0.92 }))
+    track(new THREE.MeshStandardMaterial({
+      map: moonMaps.map,
+      bumpMap: moonMaps.bumpMap,
+      bumpScale: 0.038,
+      roughness: 0.88,
+      emissive: new THREE.Color(0x334155),
+      emissiveIntensity: 0.24
+    }))
   );
-  moon.position.copy(moonPos);
-  addHoloProxy(moon, Math.max(moonScale * 2.8, 3.0), 'moon', moonScale, () => moon.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(Math.max(1.8, moonScale * 3.1), Math.max(0.9, moonScale * 1.5), Math.max(2.3, moonScale * 3.8)));
-  scene.add(moon);
+  const moonGlow = makeGlowSprite('rgba(241,245,249,0.52)', 'rgba(148,163,184,0.16)', Math.max(moonScale * 3.1, 2.2));
+  track(moonGlow.tex); track(moonGlow.mat);
+  const moonBeacon = new THREE.Mesh(
+    track(new THREE.RingGeometry(1.0, 1.35, 32)),
+    track(new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }))
+  );
+  moonGroup.add(moon, moonGlow.sprite, moonBeacon);
+  addHoloProxy(moonGroup, Math.max(moonScale * 3.2, 3.2), 'moon', moonScale, () => moonGroup.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(Math.max(1.8, moonScale * 3.1), Math.max(0.9, moonScale * 1.5), Math.max(2.3, moonScale * 3.8)));
+  scene.add(moonGroup);
+
+  const moonDist = moonPos.length();
+  const moonPts = [];
+  const moonAxis = new THREE.Vector3().crossVectors(moonPos.clone().normalize(), new THREE.Vector3(0, 1, 0));
+  if (moonAxis.lengthSq() < 1e-4) moonAxis.set(1, 0, 0);
+  moonAxis.normalize();
+  const moonBasisU = moonPos.clone().normalize();
+  const moonBasisV = new THREE.Vector3().crossVectors(moonAxis, moonBasisU).normalize();
+  for (let i = 0; i <= 96; i += 1) {
+    const a = (i / 96) * Math.PI * 2;
+    moonPts.push(
+      new THREE.Vector3()
+        .addScaledVector(moonBasisU, Math.cos(a) * moonDist)
+        .addScaledVector(moonBasisV, Math.sin(a) * moonDist)
+    );
+  }
+  const lunarOrbitRing = new THREE.Line(
+    track(new THREE.BufferGeometry().setFromPoints(moonPts)),
+    track(new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.36 }))
+  );
+  scene.add(lunarOrbitRing);
 
   const earthGuide = new THREE.Mesh(
     track(new THREE.RingGeometry(259.84, 260.16, 128)),
@@ -726,7 +762,7 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
   const cometTarget = { id: 'C/2026 GOSPACE', isComet: true, points: 100, mesh: cometGroup, phase: 0.45 };
   const antiSun = new THREE.Vector3(), velDir = new THREE.Vector3(), dustDir = new THREE.Vector3();
 
-  function update(dt, elapsed) {
+  function update(dt, elapsed, camPos = null, camQuat = null) {
     stars.mat.uniforms.uTime.value = elapsed;
     sunMat.uniforms.uTime.value = elapsed;
     sunCoronaMat.uniforms.uTime.value = elapsed;
@@ -734,6 +770,15 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
     c1.mat.rotation = elapsed * 0.05;
     c2.mat.rotation = -elapsed * 0.035;
     moon.rotation.y += dt * 0.05;
+    if (camPos) {
+      const mCamDist = camPos.distanceTo(moonGroup.position);
+      const farFade = THREE.MathUtils.clamp((mCamDist - 42) / 140, 0, 1);
+      moonBeacon.material.opacity = farFade * 0.78;
+      moonBeacon.scale.setScalar(Math.max(moonScale * 1.5, mCamDist * 0.014));
+      if (camQuat) moonBeacon.quaternion.copy(camQuat);
+      moonGlow.sprite.scale.setScalar(Math.max(moonScale * 3.1, farFade * mCamDist * 0.042));
+      lunarOrbitRing.material.opacity = 0.28 + farFade * 0.34;
+    }
     planets.forEach((p) => { p.sphere.rotation.y += dt * p.spin; });
 
     beltBatches.forEach(({ mesh, items }) => {
@@ -801,7 +846,7 @@ export function createSpaceEnvironment(scene, { moonPos = new THREE.Vector3(-15,
   }
 
   return {
-    sunPos, moon, nearAsteroids, comet: cometTarget, holoProxies, holoTargets, update, findNearestTarget, findNearestNea: (p) => { const r = findNearestTarget(p); return { nea: r.target, dist: r.dist }; },
+    sunPos, moon: moonGroup, nearAsteroids, comet: cometTarget, holoProxies, holoTargets, update, findNearestTarget, findNearestNea: (p) => { const r = findNearestTarget(p); return { nea: r.target, dist: r.dist }; },
     dispose() { disposables.forEach((d) => d.dispose?.()); }
   };
 }

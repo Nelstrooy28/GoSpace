@@ -787,18 +787,27 @@ dialog button:hover {
 }
 
 /* Chief Engineer Comms Banner (Sized so it NEVER touches #stage-hud on right!) */
-#comms-banner,
-.comms-banner {
+.left-hud-stack {
   position: fixed;
   top: 58px;
   left: 14px;
-  max-width: min(740px, calc(100vw - 365px));
-  padding: 9px 14px;
+  width: min(670px, calc(100vw - 375px));
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  pointer-events: none;
+  z-index: 26;
+}
+
+#comms-banner,
+.comms-banner {
+  position: relative;
+  width: 100%;
+  padding: 8px 13px;
   display: flex;
   align-items: center;
   gap: 10px;
   pointer-events: auto;
-  z-index: 24;
   border-left: 4px solid var(--cyan);
 }
 
@@ -1203,12 +1212,14 @@ dialog button:hover {
 .eq-card {
   flex: 1 0 245px;
   max-width: 340px;
+  min-width: 0;
   min-height: 68px;
-  max-height: 110px;
+  max-height: 112px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
   padding: 8px 11px;
   border-radius: 8px;
   background: rgba(12, 24, 48, 0.9);
@@ -1239,7 +1250,8 @@ dialog button:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
   font-family: var(--font-hud);
   font-size: 14.5px;
   font-weight: 700;
@@ -1254,6 +1266,28 @@ dialog button:hover {
   font-weight: 700;
   color: #ffffff;
   line-height: 1.2;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.equip-check-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  color: #052e16;
+  background: #34d399;
+  border: 1px solid #a7f3d0;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.55);
 }
 
 .equip-cost {
@@ -1413,7 +1447,10 @@ dialog button:hover {
 /* ================================================================
    DEBRIEF / REVIEW OVERLAY & 3D CALLOUT TAGS
    ================================================================ */
+#hud-layer:has(#review-overlay:not([hidden])) .left-hud-stack,
 #hud-layer:has(#review-overlay:not([hidden])) #comms-banner,
+#hud-layer:has(#review-overlay:not([hidden])) #mission-progress-bar,
+#hud-layer:has(#review-overlay:not([hidden])) #decision-alert-hud,
 #hud-layer:has(#review-overlay:not([hidden])) #stage-hud,
 #hud-layer:has(#review-overlay:not([hidden])) #center-action-hud,
 #hud-layer:has(#review-overlay:not([hidden])) #hazard-alert-hud,
@@ -2828,6 +2865,289 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
   border-color: #fde68a;
 }
 
+/* ================================================================
+   STAGE LOCKS, PROGRESS TRACKER, DESIGN RISKS & DECISION CARDS
+   ================================================================ */
+#stage-switcher .stage-btn.is-locked,
+#stage-switcher .stage-btn:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+  background: rgba(10, 18, 36, 0.65) !important;
+  color: #94a3b8 !important;
+  box-shadow: none !important;
+}
+
+.btn-rollout.is-risk {
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.92), rgba(217, 119, 6, 0.9));
+  border-color: #fbbf24;
+  color: #fffbeb;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.38);
+}
+
+.btn-rollout.is-risk:hover {
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.58);
+}
+
+.contract-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-hud);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 29, 58, 0.85);
+  color: #cbd5e1;
+}
+
+.contract-status-badge.is-progress {
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.52);
+  border-color: rgba(251, 191, 36, 0.55);
+}
+
+.contract-status-badge.is-done {
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.62);
+  border-color: rgba(52, 211, 153, 0.65);
+}
+
+.inf-sym {
+  font-family: var(--font-hud);
+  font-size: 16px;
+  font-weight: 800;
+  color: #e9d5ff;
+  line-height: 1;
+}
+
+.mission-progress-bar {
+  pointer-events: auto;
+  width: 100%;
+  padding: 6px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-left: 4px solid #34d399;
+}
+
+.mission-progress-bar[hidden] {
+  display: none !important;
+}
+
+.mprog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #e0f2fe;
+}
+
+.mprog-pct {
+  color: #34d399;
+}
+
+.mprog-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  overflow: hidden;
+}
+
+.mprog-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #34d399);
+  transition: width 0.25s ease;
+}
+
+.mprog-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.mprog-step {
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #94a3b8;
+}
+
+.mprog-step.is-done {
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.52);
+  border-color: rgba(52, 211, 153, 0.55);
+}
+
+.mprog-step.is-active {
+  color: #e0f2fe;
+  background: rgba(14, 116, 144, 0.45);
+  border-color: rgba(56, 189, 248, 0.65);
+}
+
+#decision-alert-hud,
+.decision-alert-hud {
+  pointer-events: auto;
+  width: min(460px, 100%);
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(16, 28, 58, 0.94), rgba(8, 16, 36, 0.95));
+  border: 1.5px solid #38bdf8;
+  box-shadow: 0 0 26px rgba(56, 189, 248, 0.34), 0 10px 26px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.decision-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-hud);
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #7dd3fc;
+}
+
+.decision-timer {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.35);
+  border: 1px solid #38bdf8;
+  color: #e0f2fe;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.decision-desc {
+  font-size: 14.5px;
+  line-height: 1.35;
+  color: #f8fafc;
+}
+
+.decision-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.decision-btn {
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 7px 10px;
+  border-radius: 7px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.decision-btn.is-risky {
+  background: rgba(120, 53, 15, 0.72);
+  border: 1px solid #f59e0b;
+  color: #fef3c7;
+}
+
+.decision-btn.is-safe {
+  background: rgba(6, 78, 59, 0.72);
+  border: 1px solid #34d399;
+  color: #ecfdf5;
+}
+
+.orbit-clock-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(9, 20, 44, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.36);
+}
+
+.orbit-clock-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.orbit-clock-lbl {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.orbit-clock-val {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: #67e8f9;
+}
+
+.eclipse-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  color: #e0e7ff;
+  background: linear-gradient(135deg, rgba(49, 46, 129, 0.85), rgba(30, 27, 75, 0.9));
+  border: 1px solid rgba(165, 180, 252, 0.7);
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.42);
+}
+
+.design-risk-banner {
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.56);
+  border: 1px solid rgba(245, 158, 11, 0.58);
+}
+
+.sensor-cam-pip.is-brownout #sensor-cam-canvas,
+.sensor-cam-pip.is-offline #sensor-cam-canvas {
+  filter: brightness(0.26) blur(4px);
+}
+
+.sensor-pip-canvas-wrap {
+  position: relative;
+}
+
+.sensor-pip-overlay-msg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 10px;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fecaca;
+  background: rgba(15, 12, 28, 0.65);
+  border-radius: 6px;
+}
+
 /* Always honor HTML [hidden] above all ID display rules */
 [hidden],
 #hangar-loadout[hidden],
@@ -2838,6 +3158,8 @@ body:has(#tutorial-root:not([hidden])) #game-tooltip {
 #orbit-deploy-banner[hidden],
 #holo-scanner-card[hidden],
 #autobuild-btn[hidden],
+#decision-alert-hud[hidden],
+#mission-progress-bar[hidden],
 #codex-menu[hidden],
 #hud-restore-btn[hidden],
 #center-action-hud [hidden],

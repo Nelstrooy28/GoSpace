@@ -59,7 +59,7 @@
         <div class="hero-actions">
           <button id="mode-campaign-btn" class="menu-btn is-primary active" type="button">
             <span class="menu-ico">▶</span>
-            <span class="menu-copy"><strong>PLAY CAMPAIGN</strong><small>Launch active contract with real mass &amp; budget</small></span>
+            <span class="menu-copy"><strong>PLAY SIMULATION</strong><small>Launch active contract with real mass &amp; budget</small></span>
           </button>
           <button id="mode-sandbox-btn" class="menu-btn is-sandbox" type="button">
             <span class="menu-ico">🛠️</span>
@@ -75,7 +75,7 @@
       <div class="contract-col">
         <div class="contract-col-head">
           <span class="contract-col-title">MISSION CONTRACTS</span>
-          <span id="title-mode-pill" class="badge-tag">CAMPAIGN MODE</span>
+          <span id="title-mode-pill" class="badge-tag">SIMULATION MODE</span>
         </div>
         <div id="contract-grid" class="contract-grid"></div>
       </div>
@@ -90,7 +90,6 @@
   <div id="hud-layer" class="hud-layer">
     <header id="hud-top" class="hud-top plate">
       <div class="brand-cluster">
-        <span class="brand-mark" aria-hidden="true">GS</span>
         <button id="active-mission-pill" class="btn-sci mission-chip" type="button" title="Switch Mission Contract">
           <span class="brand-name">GOSPACE</span>
           <span id="scenario-badge" class="badge-tag">L1</span>
@@ -129,9 +128,13 @@
     </aside>
 
     <div class="hud-mid">
-      <div id="comms-banner" class="comms-banner plate">
-        <span class="eng-avatar" aria-hidden="true">👩‍🚀</span>
-        <span id="comms-text" class="comms-text">CHIEF ENG: Initializing telemetry...</span>
+      <div class="left-hud-stack">
+        <div id="comms-banner" class="comms-banner plate">
+          <span class="eng-avatar" aria-hidden="true">👩‍🚀</span>
+          <span id="comms-text" class="comms-text">CHIEF ENG: Initializing telemetry...</span>
+        </div>
+        <div id="mission-progress-bar" class="mission-progress-bar plate" aria-label="Mission Progress Tracker"></div>
+        <section id="decision-alert-hud" class="decision-alert-hud plate" aria-label="Mission Control Decision" hidden></section>
       </div>
       <section id="hazard-alert-hud" class="hazard-alert-hud plate" hidden></section>
       <div id="orbit-deploy-banner" class="orbit-deploy-banner plate" hidden>🛰️ DEPLOYING SOLAR ARRAYS &amp; HIGH-GAIN ANTENNA...</div>
@@ -148,7 +151,10 @@
             <button id="sensor-cam-close-btn" class="sensor-pip-close" type="button" aria-label="Close Sensor Cam">✕</button>
           </span>
         </div>
-        <canvas id="sensor-cam-canvas" width="296" height="168"></canvas>
+        <div class="sensor-pip-canvas-wrap">
+          <canvas id="sensor-cam-canvas" width="296" height="168"></canvas>
+          <div id="sensor-pip-overlay-msg" class="sensor-pip-overlay-msg" hidden></div>
+        </div>
         <div id="sensor-pip-telem" class="sensor-pip-telem">0.0°N 0.0°E · NOMINAL</div>
       </aside>
       <section id="mel-drawer" class="mel-drawer plate" hidden>

@@ -4,11 +4,12 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { generateOrbitTrack, propagateOrbit } from './missionVizPropagator.js';
 import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpaceTexture } from './solarSystem.js';
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
-import { getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js';
+import { applyHullDelta, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=14';
 import { isTutorialActive } from './tutorial.js';
 import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSafeMode, playWarning } from './sfx.js';
 
 const EARTH_R = 2.0, KM_TO_SCENE = EARTH_R / 6371;
+const EPOCH_UTC_MS = Date.UTC(2026, 10, 15, 14, 0, 0);
 const SUN_DIR = new THREE.Vector3(1, 0, 0);
 const DEPLOY_DURATION_SEC = 2.8;
 const STATIONS = [
@@ -26,7 +27,8 @@ let simTime = 0, timeWarp = 25, cameraMode = 'full', watchCometNext = false, has
 let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs = 0, fitDist = 7.2, sunElapsed = 0;
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
-let downlinkPts = 0, anomalyPts = 0, scanPts = 0;
+let downlinkPts = 0, anomalyPts = 0, scanPts = 0, decisionPts = 0;
+let brownoutLocked = false, sensorOfflineUntil = 0, dragLossKm = 0, dragHullAccum = 0;
 let inLineOfSight = false, activeStationName = 'None', hazardNow = false;
 let hazardEventCb = null, hazardFx = null, dodgeT = 0, heaterGlowT = 0, repairSweepT = 0, sparkFlashUntil = 0;
 let deployActive = false, deployCompleted = false, deployElapsed = 0, deployProgress = 1, deployStageMask = 0;
@@ -312,8 +314,8 @@ function createPolarAuroraGroup() {
         vec3 violet = vec3(0.72, 0.36, 1.0);
         vec3 col = mix(emerald, violet, smoothstep(0.18, 0.82, vUv.y));
 
-        float intensity = altFade * (0.28 + raysA * 0.72 + raysB * 0.38) * (0.48 + 0.52 * arcEnv) * nightWeight;
-        intensity = clamp(intensity * 1.18, 0.0, 0.92);
+        float intensity = altFade * (0.34 + raysA * 0.78 + raysB * 0.42) * (0.52 + 0.56 * arcEnv) * nightWeight;
+        intensity = clamp(intensity * 1.32, 0.0, 0.96);
         gl_FragColor = vec4(col * intensity, intensity);
       }
     `,
@@ -1027,8 +1029,8 @@ function buildWorld(missionState, evaluation) {
   const apTag = makeTagSprite('Ap', `${apAlt} km`, '#fbbf24'); apTag.position.copy(apPt).add(new THREE.Vector3(0, 0.48, 0));
   scene.add(peGem, apGem, peRing, apRing, peTag, apTag);
 
-  const moonPos = orbitEl.id === 'lunar-transfer' ? apPt.clone().multiplyScalar(1.04) : new THREE.Vector3(-15, 3.4, -16);
-  spaceEnv = createSpaceEnvironment(scene, { moonPos, moonScale: deep ? EARTH_R * 0.44 : EARTH_R * 0.3 });
+  const moonPos = orbitEl.id === 'lunar-transfer' ? apPt.clone().multiplyScalar(1.04) : new THREE.Vector3(-7.8, 2.8, -5.2);
+  spaceEnv = createSpaceEnvironment(scene, { moonPos, moonScale: deep ? EARTH_R * 0.48 : EARTH_R * 0.40 });
   Object.assign(holoTargets, spaceEnv.holoTargets || {});
   holoTargets.earth = {
     id: 'earth',
@@ -1082,7 +1084,7 @@ function animate() {
     if (earthGroup) earthGroup.rotation.y += realDt * 0.018;
     if (cloudMesh) cloudMesh.rotation.y += realDt * 0.024;
     if (auroraMat) auroraMat.uniforms.uTime.value = sunElapsed;
-    spaceEnv?.update(realDt, sunElapsed);
+    spaceEnv?.update(realDt, sunElapsed, camera?.position, camera?.quaternion);
     if (satMesh) {
       satMesh.position.set(1.55, 1.32 + Math.sin(sunElapsed * 0.85) * 0.045, 2.05);
       satMesh.rotation.y += realDt * 0.24;
@@ -1110,7 +1112,7 @@ function animate() {
   if (earthGroup) earthGroup.rotation.y += simDt * ((Math.PI * 2) / 86400);
   if (cloudMesh) cloudMesh.rotation.y += realDt * 0.015;
   if (auroraMat) auroraMat.uniforms.uTime.value = sunElapsed;
-  spaceEnv?.update(realDt, sunElapsed);
+  spaceEnv?.update(realDt, sunElapsed, camera?.position, camera?.quaternion);
 
   const prop = propagateOrbit(orbitEl, simTime), nextP = propagateOrbit(orbitEl, simTime + 5);
   tmpSat.set(prop.position[0] * KM_TO_SCENE, prop.position[1] * KM_TO_SCENE, prop.position[2] * KM_TO_SCENE);
@@ -1337,13 +1339,29 @@ function animate() {
   const stormActive = now < stormUntil || activeKind === 'cme';
   const safeModeActive = now < safeModeUntil;
   const gimbalJammed = activeKind === 'gimbal';
+  const risks = evalRef?.designRisks || {};
+  const canDegrade = !showcaseMode && !victoryMode && !briefingPaused && !isTutorialActive();
+  if (canDegrade && risks.massOverrun) {
+    dragHullAccum += realDt * 0.5;
+    dragLossKm += realDt * 0.85;
+    if (dragHullAccum >= 0.5) {
+      applyHullDelta(-dragHullAccum, 10);
+      dragHullAccum = 0;
+    }
+  }
   hazardNow = prop.inEclipse || stormActive || Boolean(activeHaz);
   const cryoDrain = activeKind === 'cryo' ? -0.65 * (activeHaz?.drainMult ?? 1) : 0;
-  const pwrRate = safeModeActive ? 0.35 : (cryoDrain || (hazardNow ? -0.45 : Math.max(0.15, (evalRef.metrics.powerMargin + 25) * 0.012)));
+  let pwrRate = safeModeActive ? 0.35 : (cryoDrain || (hazardNow ? -0.45 : Math.max(0.15, (evalRef.metrics.powerMargin + 25) * 0.012)));
+  if (prop.inEclipse && risks.lowPowerMargin) pwrRate = Math.min(pwrRate * 2.5, -1.65);
   if (simDt > 0 && !briefingPaused) {
-    batterySoc = Math.max(5, Math.min(100, batterySoc + pwrRate * (simDt / 60)));
+    const minSoc = risks.lowPowerMargin ? 0 : 5;
+    const stepSoc = (prop.inEclipse && risks.lowPowerMargin) ? pwrRate * realDt * 3.5 : pwrRate * (simDt / 60);
+    batterySoc = Math.max(minSoc, Math.min(100, batterySoc + stepSoc));
     bufferGb = Math.min(32, bufferGb + (simDt / 86400) * 1.6);
   }
+  if (risks.lowPowerMargin && batterySoc <= 0.1) brownoutLocked = true;
+  if (brownoutLocked && !prop.inEclipse && batterySoc >= 15) brownoutLocked = false;
+  if (earthshineLight) earthshineLight.intensity = prop.inEclipse ? 0.24 : 0.95;
 
   inLineOfSight = false; activeStationName = 'None';
   gsNodes.forEach((gs, idx) => {
@@ -1427,6 +1445,25 @@ function animate() {
   const latDeg = (Math.asin(Math.max(-1, Math.min(1, tmpSat.y / rLen))) * 180) / Math.PI;
   const lonDeg = (Math.atan2(lx, lz) * 180) / Math.PI;
 
+  const pipEl = document.getElementById('sensor-cam-pip');
+  const overlayEl = document.getElementById('sensor-pip-overlay-msg');
+  const offlineRem = Math.max(0, (sensorOfflineUntil - now) / 1000);
+  if (pipEl) {
+    pipEl.classList.toggle('is-brownout', brownoutLocked);
+    pipEl.classList.toggle('is-offline', offlineRem > 0 && !brownoutLocked);
+  }
+  if (overlayEl) {
+    if (brownoutLocked) {
+      overlayEl.textContent = `🔋 POWER BROWNOUT (${Math.round(batterySoc)}%) — RECHARGING TO 15% IN SUNLIGHT`;
+      overlayEl.hidden = false;
+    } else if (offlineRem > 0) {
+      overlayEl.textContent = `🛡️ SENSORS SHIELDED — OFFLINE (${offlineRem.toFixed(1)}s)`;
+      overlayEl.hidden = false;
+    } else {
+      overlayEl.hidden = true;
+    }
+  }
+
   if (sensorCamEnabled && now - lastCamMs > 30) {
     lastCamMs = now;
     drawSensorCamFeed(latDeg, lonDeg, prop.inEclipse, stormActive, sunElapsed, simTime);
@@ -1436,16 +1473,21 @@ function animate() {
     lastHudMs = now;
     const nearest = spaceEnv?.findNearestTarget(tmpSat);
     telemetryCb({
-      altitudeKm: Math.round(prop.altitudeKm), speedKms: Number(prop.speedKms.toFixed(2)),
+      altitudeKm: Math.max(120, Math.round(prop.altitudeKm - dragLossKm)), speedKms: Number(prop.speedKms.toFixed(2)),
+      dragLossKm: Number(dragLossKm.toFixed(1)),
       latDeg: Number(latDeg.toFixed(1)), lonDeg: Number(lonDeg.toFixed(1)),
       inEclipse: prop.inEclipse, stormActive, safeModeActive, inLineOfSight,
+      brownoutLocked, sensorOfflineSec: Number(offlineRem.toFixed(1)),
       batterySoc: Math.round(batterySoc), bufferGb: Number(bufferGb.toFixed(2)), downlinkedGb: Number(downlinkedGb.toFixed(2)),
       linkedStation: activeStationName, missionScore, downlinkCount, flareMitigated, asteroidsScanned,
-      downlinkPts, anomalyPts, scanPts,
+      downlinkPts, anomalyPts, scanPts, decisionPts,
       hullIntegrity: hazardSnap.hullIntegrity,
       anomaliesResolved: hazardSnap.anomaliesResolved,
       anomaliesMissed: hazardSnap.anomaliesMissed,
       hazardState: hazardSnap,
+      designRisks: risks,
+      metText: formatMetClock(simTime),
+      utcText: formatUtcClock(simTime),
       nearestNeaId: nearest?.target.id || '', nearestNeaDist: nearest ? Number(nearest.dist.toFixed(1)) : 99,
       timeWarp, briefingPaused, sensorCamEnabled, sensorCamMode: getSensorCamMode(stateRef).mode,
       deployActive, deployProgress: Number(deployProgress.toFixed(3)),
@@ -1473,6 +1515,25 @@ export function getSensorCamMode(missionState = stateRef) {
     return { mode: 'flux', label: has('neutron-spec') ? 'NEUTRON FLUX' : 'MAG-AURORA' };
   }
   return { mode: 'hyperspec', label: 'OPTICAL CAM' };
+}
+
+function formatMetClock(sec) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `T+ ${hh}:${mm}:${ss}`;
+}
+
+function formatUtcClock(sec) {
+  const d = new Date(EPOCH_UTC_MS + Math.max(0, sec || 0) * 1000);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  const ss = String(d.getUTCSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
 }
 
 function formatLatLon(latDeg, lonDeg) {
@@ -1689,15 +1750,24 @@ function drawSensorCamFeed(latDeg, lonDeg, inEclipse, stormActive, tReal, tSim) 
   ctx.moveTo(w / 2, h / 2 + 4); ctx.lineTo(w / 2, h / 2 + 14);
   ctx.stroke();
 
-  if (stormActive) {
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.16)';
-    for (let i = 0; i < 16; i += 1) {
-      ctx.fillRect((Math.sin(tReal * 41 + i * 7) * 0.5 + 0.5) * w, (i * 11) % h, 18, 2);
+  const risks = evalRef?.designRisks || {};
+  if (stormActive || risks.weakCommsMargin || risks.wavelengthMismatch) {
+    ctx.fillStyle = risks.wavelengthMismatch ? 'rgba(239, 68, 68, 0.22)' : 'rgba(245, 158, 11, 0.16)';
+    const bars = risks.wavelengthMismatch ? 28 : 16;
+    for (let i = 0; i < bars; i += 1) {
+      ctx.fillRect((Math.sin(tReal * 41 + i * 7) * 0.5 + 0.5) * w, (i * 9) % h, risks.wavelengthMismatch ? 44 : 18, 2);
     }
+  }
+  if (risks.wavelengthMismatch) {
+    ctx.fillStyle = 'rgba(127, 29, 29, 0.85)';
+    ctx.fillRect(8, h - 26, w - 16, 20);
+    ctx.fillStyle = '#fecaca';
+    ctx.font = '700 11px Orbitron, sans-serif';
+    ctx.fillText('⚠ WAVELENGTH MISMATCH · -40% SCI', 14, h - 12);
   }
 
   const telemEl = document.getElementById('sensor-pip-telem');
-  if (telemEl) telemEl.textContent = telemText;
+  if (telemEl) telemEl.textContent = risks.weakCommsMargin ? `${telemText} · RF STATIC` : telemText;
 }
 
 export const setOrbitTimeWarp = (w) => { timeWarp = Number(w); };
@@ -1853,11 +1923,18 @@ export function repairActiveHazard(key = null) {
   return resolveActiveHazard(key);
 }
 export function transmitScience() {
+  if (brownoutLocked) return { ok: false, reason: 'brownout', points: 0, station: activeStationName };
   if (!inLineOfSight) return { ok: false, points: 0, station: 'None' };
+  const risks = evalRef?.designRisks || {};
+  let pts = 50;
+  if (risks.weakCommsMargin) pts = Math.round(pts * 0.5);
+  if (risks.wavelengthMismatch) pts = Math.round(pts * 0.6);
   const xfer = Math.max(0.15, Math.min(bufferGb, 1.4));
   bufferGb = Math.max(0, bufferGb - xfer); downlinkedGb += xfer;
-  downlinkCount += 1; downlinkPts += 50; missionScore += 50; beamBoostUntil = performance.now() + 900;
-  playDownlinkPing(); return { ok: true, points: 50, station: activeStationName };
+  downlinkCount += 1; downlinkPts += pts; missionScore += pts; beamBoostUntil = performance.now() + 900;
+  lastHudMs = 0;
+  playDownlinkPing();
+  return { ok: true, points: pts, station: activeStationName, weakComms: Boolean(risks.weakCommsMargin), wavelengthMismatch: Boolean(risks.wavelengthMismatch) };
 }
 export function activateSafeMode() {
   safeModeUntil = performance.now() + 6500; batterySoc = Math.min(100, batterySoc + 8);
@@ -1868,9 +1945,26 @@ export function activateSafeMode() {
 export function scanAsteroid() {
   if (!spaceEnv) return { ok: false, points: 0 };
   const { target } = spaceEnv.findNearestTarget(tmpSat);
+  const risks = evalRef?.designRisks || {};
+  const pts = risks.wavelengthMismatch ? Math.round(target.points * 0.6) : target.points;
   scanTarget = target; scanUntil = performance.now() + 1400;
-  asteroidsScanned += 1; scanPts += target.points; missionScore += target.points;
-  playDownlinkPing(); return { ok: true, points: target.points, id: target.id, isComet: target.isComet };
+  asteroidsScanned += 1; scanPts += pts; missionScore += pts;
+  lastHudMs = 0;
+  playDownlinkPing(); return { ok: true, points: pts, id: target.id, isComet: target.isComet };
+}
+export function applyOrbitDecisionEffect({ scoreDelta = 0, hullDelta = 0, batteryDelta = 0, sensorOfflineSec = 0 } = {}) {
+  if (scoreDelta) {
+    decisionPts += scoreDelta;
+    missionScore += scoreDelta;
+  }
+  if (hullDelta) applyHullDelta(hullDelta, 5);
+  if (batteryDelta) {
+    batterySoc = Math.max(0, Math.min(100, batterySoc + batteryDelta));
+    if (batterySoc <= 0.1 && evalRef?.designRisks?.lowPowerMargin) brownoutLocked = true;
+  }
+  if (sensorOfflineSec > 0) sensorOfflineUntil = performance.now() + sensorOfflineSec * 1000;
+  lastHudMs = 0;
+  return { missionScore, batterySoc: Math.round(batterySoc), hullIntegrity: getHazardSnapshot().hullIntegrity };
 }
 
 export function mountOrbit(container, missionState, evaluation, onTelemetry, options = {}) {
@@ -1883,7 +1977,8 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   simTime = 0; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
   stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
-  downlinkPts = 0; anomalyPts = 0; scanPts = 0; lastAutoFlare = 14; lastHudMs = 0; lastCamMs = 0;
+  downlinkPts = 0; anomalyPts = 0; scanPts = 0; decisionPts = 0; lastAutoFlare = 14; lastHudMs = 0; lastCamMs = 0;
+  brownoutLocked = false; sensorOfflineUntil = 0; dragLossKm = 0; dragHullAccum = 0;
   sensorCamEnabled = Boolean(options.sensorCam);
   dodgeT = 0; heaterGlowT = 0; repairSweepT = 0; sparkFlashUntil = 0;
   holoTargets = {}; holoProxies = []; gsHoloProxies = []; earthSolidMesh = null; earthOuterProxy = null;
@@ -1902,7 +1997,6 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   if (!showcaseMode) {
     initOrbitHazards(missionState, evaluation, {
       onTrigger: (hazard) => {
-        if (timeWarp > 1) timeWarp = 1;
         if (hazard.kind === 'cme') stormUntil = performance.now() + hazard.durationSec * 1000;
         lastHudMs = 0;
         hazardEventCb?.({ type: 'trigger', timeWarp, ...hazard });

@@ -187,6 +187,11 @@ export function resolveActiveHazard(key = null) {
   return payload;
 }
 
+export function applyHullDelta(delta, minHull = 5) {
+  hullIntegrity = Math.max(minHull, Math.min(100, hullIntegrity + Number(delta || 0)));
+  return Math.round(hullIntegrity);
+}
+
 /**
  * Advances real-time countdowns for scheduled and active hazards.
  */
