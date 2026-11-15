@@ -1,0 +1,196 @@
+/* GoSpace — High-Contrast AAA Aerospace HUD & Live-Space Title Screen */
+:root {
+  --bg: #040814;
+  --panel: rgba(9, 17, 34, 0.84);
+  --panel-strong: rgba(7, 13, 27, 0.94);
+  --line: rgba(56, 189, 248, 0.3);
+  --line-bright: rgba(56, 189, 248, 0.72);
+  --cyan: #38bdf8;
+  --cyan-soft: #7dd3fc;
+  --amber: #f59e0b;
+  --amber-soft: #fcd34d;
+  --green: #10b981;
+  --red: #f43f5e;
+  --text: #eef6ff;
+  --muted: #b6cbe2;
+  --font-hud: 'Orbitron', 'Segoe UI', sans-serif;
+  --font-ui: 'Chakra Petch', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* 3D WebGL Canvas Layer */
+#viewport-container {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: radial-gradient(circle at 60% 45%, #0c1732 0%, #03060f 75%);
+}
+
+#viewport-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Hyperspace Warp Flash Transition */
+#warp-flash, .warp-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.96) 0%, rgba(56, 189, 248, 0.65) 36%, rgba(4, 8, 20, 0) 78%);
+}
+
+#warp-flash.active, .warp-flash.active {
+  animation: warpFlashAnim 0.68s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes warpFlashAnim {
+  0% { opacity: 0; transform: scale(0.82); }
+  22% { opacity: 0.95; transform: scale(1.06); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
+/* Shared Glassmorphism Plates & Interactive Controls */
+.plate {
+  background: linear-gradient(155deg, rgba(11, 21, 42, 0.88), rgba(6, 12, 26, 0.82));
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(125, 211, 252, 0.14);
+}
+
+.btn-sci,
+#hud-top button,
+#stage-hud button,
+#center-action-hud button,
+#review-overlay button,
+#hangar-loadout button,
+dialog button {
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(15, 29, 56, 0.82);
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  border-radius: 6px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-sci:hover,
+#hud-top button:hover,
+#stage-hud button:hover,
+#hangar-loadout button:hover,
+dialog button:hover {
+  border-color: var(--cyan);
+  background: rgba(24, 48, 92, 0.92);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.28);
+  transform: translateY(-1px);
+}
+
+.btn-sci.active,
+.btn-sci.is-on,
+.stage-btn.active,
+.seg-tab.active,
+.sub-pill.active,
+.sub-chip.active {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.72), rgba(29, 78, 216, 0.68)) !important;
+  border-color: var(--cyan-soft) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+}
+
+.btn-sci.danger {
+  border-color: rgba(244, 63, 94, 0.58);
+  background: rgba(127, 29, 49, 0.58);
+}
+
+.btn-sci.danger:hover {
+  border-color: #fb7185;
+  background: rgba(159, 18, 57, 0.78);
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.badge-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cyan-soft);
+  background: rgba(14, 116, 144, 0.26);
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  border-radius: 5px;
+  padding: 2px 9px;
+}
+
+.stat-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.spill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(30, 48, 84, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 5px;
+  padding: 2px 8px;
+}
+
+.spill.ok {
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.55);
+  border-color: rgba(16, 185, 129, 0.52);
+}
+
+.spill.warn {
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.55);
+  border-color: rgba(245, 158, 11, 0.52);
+}
+
+.spill.bad {
+  color: #fecdd3;
+  background: rgba(136, 19, 55, 0.6);
+  border-color: rgba(244, 63, 94, 0.58);
+}
+

@@ -36,7 +36,7 @@
 
 | File | Responsibility |
 | --- | --- |
-| `index.html`, `styles.css`, `.nojekyll` | Static shell, Three.js import map (`0.160.0`), responsive glassmorphic HUD styles, and GitHub Pages bypass marker |
+| `index.html`, `./css/base.css`, `./css/hud.css`, `./css/menu-tutorial.css`, `./css/hangar-launch.css`, `./css/orbit.css`, `./css/modals-debrief.css`, `.nojekyll` | Static shell, Three.js import map (`0.160.0`), 6 ordered glassmorphic CSS modules (base tokens, HUD, menu/tutorial, hangar/launch, orbit, modals/debrief & responsive rules), and GitHub Pages bypass marker |
 | `js/main.js` | Application state, stage router, keyboard shortcuts, persistence (`localStorage`), and `window.__MISSION_DEBUG__` |
 | `js/catalog.js` | Contracts, 45+ parts catalog, CML-4 rules, `getOptimalLoadoutForMission()`, mission `orbitGuide`, and `CELESTIAL_DATABASE` |
 | `js/ui.js` | HUD cards, loadout dock, MEL drawer, Mission Briefing modal, 3-button Debrief, and Holo-Scanner Cards |

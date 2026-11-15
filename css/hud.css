@@ -1,0 +1,484 @@
+/* ================================================================
+   IN-GAME HUD LAYER (Hangar, Launch, Orbit, Debrief)
+   ================================================================ */
+#hud-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+#hud-layer.is-hidden > *:not(#hud-restore-btn) {
+  display: none !important;
+}
+
+#hud-top {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 50px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: linear-gradient(180deg, rgba(5, 11, 24, 0.94), rgba(7, 15, 32, 0.84));
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  z-index: 30;
+}
+
+#hud-top > div,
+.hud-left,
+.hud-center,
+.hud-right,
+#stage-switcher,
+#cml-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#active-mission-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#scenario-badge {
+  font-size: 13.5px;
+}
+
+#stage-switcher .stage-btn {
+  padding: 6px 10px;
+  font-size: 13.5px;
+}
+
+#hud-top .topbar-utils .audio-toggle-btn {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 5px 11px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#hud-top .topbar-utils #music-toggle-btn:not(.is-muted) {
+  border-color: rgba(167, 139, 250, 0.65);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.25);
+}
+
+.cnode {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(15, 29, 58, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.cnode.done {
+  color: #ffffff;
+  background: rgba(6, 95, 70, 0.85);
+  border-color: var(--green);
+}
+
+.cnode.active {
+  color: #ffffff;
+  background: rgba(14, 116, 144, 0.9);
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+#cml-badge,
+.cml-text {
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  color: var(--cyan-soft);
+  padding: 2px 6px;
+}
+
+/* Codex Dropdown Popover */
+#codex-menu,
+.codex-menu {
+  position: fixed;
+  top: 56px;
+  right: 12px;
+  width: 268px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+  z-index: 35;
+}
+
+#codex-menu label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(15, 29, 58, 0.6);
+  cursor: pointer;
+}
+
+#hud-restore-btn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 36;
+  pointer-events: auto;
+  font-size: 14px;
+}
+
+/* Chief Engineer Comms Banner (Sized so it NEVER touches #stage-hud on right!) */
+.left-hud-stack {
+  position: fixed;
+  top: 58px;
+  left: 14px;
+  width: min(670px, calc(100vw - 375px));
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  pointer-events: none;
+  z-index: 26;
+}
+
+#comms-banner,
+.comms-banner {
+  position: relative;
+  width: 100%;
+  padding: 8px 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  border-left: 4px solid var(--cyan);
+}
+
+#comms-banner[hidden] {
+  display: none !important;
+}
+
+.comms-head,
+#comms-banner strong,
+.comms-title {
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  color: var(--cyan-soft);
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+#comms-text,
+.comms-text {
+  font-size: 15px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.35;
+}
+
+
+.score-popups {
+  position: fixed;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.score-pop {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.95), rgba(14, 116, 144, 0.92));
+  border: 1px solid #34d399;
+  color: #ecfdf5;
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 22px rgba(16, 185, 129, 0.45);
+}
+
+/* ================================================================
+   BOTTOM HUD DOCK (#hud-bottom -> #hangar-loadout + #status-cta-bar)
+   ================================================================ */
+#hud-bottom,
+.hud-bottom {
+  position: fixed;
+  bottom: 8px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 25;
+}
+
+
+/* Bottom Status & Rollout CTA Strip (#status-cta-bar) */
+#status-cta-bar,
+.status-cta-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  pointer-events: auto;
+}
+
+#resource-gauges,
+.gauges-mini {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.gauge-meter,
+.gm-item,
+#resource-gauges > * {
+  background: rgba(12, 23, 46, 0.86);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 7px;
+  padding: 5px 9px;
+}
+
+.gm-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  min-height: 19px;
+  line-height: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.gm-top b {
+  white-space: nowrap;
+}
+
+.gm-top b.is-inf {
+  font-family: var(--font-hud);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 800;
+  color: #e9d5ff;
+}
+
+.gm-val {
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.gm-bar {
+  margin-top: 4px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.9);
+  overflow: hidden;
+}
+
+.gm-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cyan);
+  transition: width 0.25s ease;
+}
+
+.gm-fill.ok { background: var(--green); }
+.gm-fill.warn { background: var(--amber); }
+.gm-fill.bad { background: var(--red); }
+
+.seg-meter {
+  margin-top: 5px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.seg-cell {
+  height: 5px;
+  border-radius: 2px;
+  background: rgba(56, 189, 248, 0.16);
+}
+
+.seg-cell.on-ok {
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.45);
+}
+
+.seg-cell.on-bad {
+  background: var(--red);
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.45);
+}
+
+
+/* ================================================================
+   STAGE LOCKS, PROGRESS TRACKER, DESIGN RISKS & DECISION CARDS
+   ================================================================ */
+#stage-switcher .stage-btn.is-breadcrumb {
+  pointer-events: none;
+  cursor: default;
+}
+
+#stage-switcher .stage-btn.is-locked,
+#stage-switcher .stage-btn:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+  background: rgba(10, 18, 36, 0.65) !important;
+  color: #94a3b8 !important;
+  box-shadow: none !important;
+}
+
+#stage-switcher .stage-btn.is-breadcrumb.active {
+  opacity: 1 !important;
+  color: #fffbeb !important;
+  border-color: var(--amber) !important;
+  background: rgba(245, 158, 11, 0.24) !important;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.28) !important;
+}
+
+
+.contract-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-hud);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 29, 58, 0.85);
+  color: #cbd5e1;
+}
+
+.contract-status-badge.is-progress {
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.52);
+  border-color: rgba(251, 191, 36, 0.55);
+}
+
+.contract-status-badge.is-done {
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.62);
+  border-color: rgba(52, 211, 153, 0.65);
+}
+
+.inf-sym {
+  font-family: var(--font-hud);
+  font-size: 16px;
+  font-weight: 800;
+  color: #e9d5ff;
+  line-height: 1;
+}
+
+.mission-progress-bar {
+  pointer-events: auto;
+  width: 100%;
+  padding: 6px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-left: 4px solid #34d399;
+}
+
+.mission-progress-bar[hidden] {
+  display: none !important;
+}
+
+.mprog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #e0f2fe;
+}
+
+.mprog-pct {
+  color: #34d399;
+}
+
+.mprog-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  overflow: hidden;
+}
+
+.mprog-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #34d399);
+  transition: width 0.25s ease;
+}
+
+.mprog-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.mprog-step {
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #94a3b8;
+}
+
+.mprog-step.is-done {
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.52);
+  border-color: rgba(52, 211, 153, 0.55);
+}
+
+.mprog-step.is-active {
+  color: #e0f2fe;
+  background: rgba(14, 116, 144, 0.45);
+  border-color: rgba(56, 189, 248, 0.65);
+}
+
