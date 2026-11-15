@@ -7,7 +7,7 @@ import { createBloomComposer, createSpaceEnvironment, fbm2, hash2, isCachedSpace
 import { buildSpacecraftModel, isCachedCraftTexture } from './spacecraftModel.js';
 import { applyHullDelta, clearActiveHazard, getHazardSnapshot, initOrbitHazards, resetOrbitHazards, resolveActiveHazard, resolveActiveHazardChoice, triggerRandomHazard, updateOrbitHazards } from './orbitHazards.js?v=17';
 import { isTutorialActive } from './tutorial.js';
-import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSafeMode, playSpacecraftExplosion, playWarning } from './sfx.js';
+import { playDeployLatchLock, playDeployServoWhir, playDownlinkPing, playHoloScanPing, playSpacecraftExplosion, playWarning } from './sfx.js';
 
 const EARTH_R = 2.0, KM_TO_SCENE = EARTH_R / 6371;
 const EPOCH_UTC_MS = Date.UTC(2026, 10, 15, 14, 0, 0);
@@ -30,7 +30,7 @@ let orbitLine = null, ribbonMesh = null, lineColorAttr = null, ribbonColorAttr =
 let gsNodes = [], apsisSprites = [], scienceZones = [], orbitPts = [], velArrow = null, orbitEl = null, stateRef = null, evalRef = null, telemetryCb = null;
 let orbitPeriodSec = 5800, orbitPhase = 0, totalRevs = 0, orbitHasShadow = true;
 let simTime = 0, timeWarp = 1, cameraMode = 'full', watchCometNext = false, hasPrevSat = false, showcaseMode = false, victoryMode = false, briefingPaused = false, sensorCamEnabled = false;
-let stormUntil = 0, safeModeUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
+let stormUntil = 0, beamBoostUntil = 0, scanUntil = 0, scanTarget = null, parallaxHandler = null;
 let batterySoc = 84, bufferGb = 0.25, downlinkedGb = 0, lastHudMs = 0, lastCamMs = 0, fitDist = 7.2, sunElapsed = 0;
 let missionScore = 0, downlinkCount = 0, flareMitigated = 0, asteroidsScanned = 0, lastAutoFlare = 14;
 let onboardBuffer = 0, scienceScansCount = 0, eclipsesSurvived = 0, wasInEclipse = false;
@@ -1558,7 +1558,6 @@ function animate() {
   }
 
   const stormActive = now < stormUntil || activeKind === 'cme';
-  const safeModeActive = now < safeModeUntil;
   const gimbalJammed = activeKind === 'gimbal';
   const solarPaused = now < solarChargePauseUntil;
   const commsPaused = now < commsPauseUntil || now < sensorOfflineUntil;
@@ -1577,7 +1576,7 @@ function animate() {
   }
   hazardNow = prop.inEclipse || stormActive || Boolean(activeHaz);
   const cryoDrain = activeKind === 'cryo' ? -0.65 * (activeHaz?.drainMult ?? 1) : 0;
-  let pwrRate = safeModeActive ? 0.35 : (cryoDrain || (hazardNow ? -0.45 : Math.max(0.15, (evalRef.metrics.powerMargin + 25) * 0.012)));
+  let pwrRate = cryoDrain || (hazardNow ? -0.45 : Math.max(0.15, (evalRef.metrics.powerMargin + 25) * 0.012));
   if (solarPaused && pwrRate > 0) pwrRate = 0;
   if (prop.inEclipse && risks.lowPowerMargin) pwrRate = Math.min(pwrRate * 2.5, -1.65);
   if (sysSimDt > 0 && !briefingPaused) {
@@ -1838,7 +1837,7 @@ function animate() {
       altitudeKm: Math.max(120, Math.round(prop.altitudeKm - dragLossKm)), speedKms: Number(prop.speedKms.toFixed(2)),
       dragLossKm: Number(dragLossKm.toFixed(1)),
       latDeg: Number(latDeg.toFixed(1)), lonDeg: Number(lonDeg.toFixed(1)),
-      inEclipse: prop.inEclipse, stormActive, safeModeActive, inLineOfSight,
+      inEclipse: prop.inEclipse, stormActive, inLineOfSight,
       brownoutLocked, sensorOfflineSec: Number(offlineRem.toFixed(1)),
       solarPausedSec: Number(Math.max(0, (solarChargePauseUntil - now) / 1000).toFixed(1)),
       commsPausedSec: Number(Math.max(0, (commsPauseUntil - now) / 1000).toFixed(1)),
@@ -2406,13 +2405,6 @@ export function transmitScience() {
     wavelengthMismatch: Boolean(risks.wavelengthMismatch)
   };
 }
-export function activateSafeMode() {
-  if (isDestroyed) return { ok: false, points: 0, hazard: false };
-  safeModeUntil = performance.now() + 6500; batterySoc = Math.min(100, batterySoc + 8);
-  const pts = hazardNow ? 75 : 25; anomalyPts += pts; missionScore += pts;
-  if (hazardNow) flareMitigated += 1;
-  playSafeMode(); return { ok: true, points: pts, hazard: hazardNow };
-}
 export function scanAsteroid() {
   if (isDestroyed) return { ok: false, reason: 'destroyed', points: 0 };
   const now = performance.now();
@@ -2486,7 +2478,7 @@ export function mountOrbit(container, missionState, evaluation, onTelemetry, opt
   const elA = Math.max(evaluation?.orbitElements?.aKm || 7000, 6531);
   orbitPeriodSec = 2 * Math.PI * Math.sqrt((elA ** 3) / 398600.4418);
   simTime = 0; orbitPhase = 0; totalRevs = 0; orbitHasShadow = true; sunElapsed = 0; batterySoc = 84; bufferGb = 0.25; downlinkedGb = 0;
-  stormUntil = 0; safeModeUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
+  stormUntil = 0; beamBoostUntil = 0; scanUntil = 0; scanTarget = null;
   missionScore = 0; downlinkCount = 0; flareMitigated = 0; asteroidsScanned = 0;
   onboardBuffer = 0; scienceScansCount = 0; eclipsesSurvived = 0; wasInEclipse = false;
   activeZoneReady = null; activeZoneCooldown = null; zoneScanFxUntil = 0; zoneScanLabel = '';

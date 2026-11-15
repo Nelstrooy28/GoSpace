@@ -24,7 +24,7 @@ export const SCENARIOS = [
       about: 'High-latitude boreal wildfires ignite remote forests long before ground crews spot smoke. Your thermal infrared CubeSat measures mid-infrared heat signatures from Sun-Synchronous polar orbit to alert responders within minutes.',
       tasks: [
         { icon: '🔬', title: '1. Scan Zones -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit! (3 Scans · 2 Downlinks)' },
-        { icon: '🔋', title: 'Manage Nightside Eclipse Power', text: 'Keep Battery above 25% while passing through Earth’s dark eclipse shadow; trigger [Q] Safe Mode if solar power dips.' },
+        { icon: '🔋', title: 'Manage Nightside Eclipse Power', text: 'Keep Battery above 25% while passing through Earth’s dark eclipse shadow via your equipped Solar & Battery power margin.' },
         { icon: '🛡️', title: 'Resolve Mid-Orbit Space Events', text: 'Counter micrometeoroid or solar alerts cleanly with [1][2][3] tactical choices to protect Hull Integrity and earn bonus Science.' }
       ],
       proTip: 'Use 5x or 20x Time Warp to glide between Wildfire Plumes and Ground Dishes—each zone resets after 0.45 orbits and downlinks recharge every 10s!'
@@ -62,7 +62,7 @@ export const SCENARIOS = [
       about: 'Microscopic ocean phytoplankton generate half of Earth’s oxygen while coastal coral reefs signal warming ocean waters. Your Hyperspectral + LiDAR SmallSat captures crisp turquoise chlorophyll spectra and vertical aerosol profiles.',
       tasks: [
         { icon: '🌊', title: '1. Scan Reef Blooms -> 2. Buffer -> 3. Downlink', text: '1. Press [E] over Science Zones to fill your Data Buffer -> 2. Press [SPACE] over Ground Dishes to transmit! (4 Scans · 3 Downlinks)' },
-        { icon: '🌑', title: 'Survive Earth Eclipse Passage', text: 'Endure 1 full nightside Earth eclipse pass while monitoring dual-payload power draw and using [Q] Safe Mode if batteries run low.' },
+        { icon: '🌑', title: 'Survive Earth Eclipse Passage', text: 'Endure 1 full nightside Earth eclipse pass while monitoring dual-payload power draw and maintaining positive battery margin.' },
         { icon: '🛠️', title: 'Resolve 2 Mid-Flight Space Events', text: 'A gimbal jam or solar flare tests flight ops mid-mission—select [1][2][3] engineering responses to keep science on schedule.' }
       ],
       proTip: 'Toggle Sensor Cam [C] when entering a Cyan Reef Bloom swath to watch live multi-band capture sweeps fill your buffer!'

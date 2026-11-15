@@ -79,10 +79,6 @@ export function playDownlinkPing() {
   tone(1120, 1520, 0.14, 'triangle', 0.06, 0.07);
 }
 
-export function playSafeMode() {
-  tone(320, 880, 0.2, 'triangle', 0.07, 0);
-}
-
 export function playAlertKlaxon() {
   tone(820, 520, 0.14, 'sawtooth', 0.08, 0);
   tone(880, 560, 0.16, 'sawtooth', 0.08, 0.17);

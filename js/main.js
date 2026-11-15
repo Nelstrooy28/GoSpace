@@ -2,7 +2,7 @@ import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign, getOptim
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
 import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
-import { activateSafeMode, clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, mountOrbit, mountShowcase, replayOrbitDeployment, resolveOrbitHazardChoice, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
+import { clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, mountOrbit, mountShowcase, replayOrbitDeployment, resolveOrbitHazardChoice, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
 import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
 import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
@@ -488,12 +488,6 @@ const handleTransmit = () => {
     spawnPopup(`⏸️ Downlink paused (${r.pausedSec}s)`);
   }
 };
-const handleSafeMode = () => {
-  if (orbitTelemetry?.isDestroyed) return;
-  const r = activateSafeMode();
-  if (r.points > 0) orbitScore += r.points;
-  spawnPopup(r.hazard ? `+${r.points} FLARE SHIELDED!` : `+${r.points} POWER CYCLED!`);
-};
 const handleScanAsteroid = () => {
   if (orbitTelemetry?.isDestroyed) return;
   const r = scanAsteroid();
@@ -799,7 +793,6 @@ function init() {
     if (e.target.closest('#lch-ignite-btn')) triggerIgnition();
     else if (e.target.closest('#orb-transmit-btn')) handleTransmit();
     else if (e.target.closest('#orb-scan-btn')) handleScanAsteroid();
-    else if (e.target.closest('#orb-safemode-btn')) handleSafeMode();
   });
   document.getElementById('review-overlay').addEventListener('click', (e) => {
     if (e.target.closest('#rev-close-btn')) {
@@ -847,7 +840,6 @@ function init() {
     } else if (k === 'e' && stage === 'orbit' && !titleOpen) handleScanAsteroid();
     else if (k === 'u' && stage === 'orbit' && !titleOpen && !briefingOpen) handleReplayUnfold();
     else if (k === 'c' && stage === 'orbit' && !titleOpen) toggleSensorCam();
-    else if (k === 'q' && stage === 'orbit' && !titleOpen) handleSafeMode();
     else if (['1', '2', '3'].includes(k) && stage === 'orbit' && !titleOpen && !briefingOpen) handleHazardChoice(Number(k) - 1);
   });
 

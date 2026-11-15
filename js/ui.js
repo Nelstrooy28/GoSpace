@@ -376,8 +376,7 @@ export function renderStageHud(stage, state, ev, opts) {
       </div>
       <div id="orbit-telem" class="telem-mono">Propagating Keplerian track...</div></div>`;
     actions.innerHTML = `<button id="orb-transmit-btn" class="action-prompt is-cyan" type="button" hidden>📡 [SPACE] TRANSMIT SCIENCE (+50)</button>
-      <button id="orb-scan-btn" class="action-prompt is-cyan is-standby" type="button">🔍 [E] SCAN SCIENCE ZONE (FLY INTO RING)</button>
-      <button id="orb-safemode-btn" class="action-prompt" type="button" hidden>🛡️ [Q] CYCLE POWER / SAFE MODE</button>`;
+      <button id="orb-scan-btn" class="action-prompt is-cyan is-standby" type="button">🔍 [E] SCAN SCIENCE ZONE (FLY INTO RING)</button>`;
     return;
   }
   hud.innerHTML = ''; actions.innerHTML = '';
@@ -710,7 +709,6 @@ export function updateOrbitOverlay(t, objStatus = null) {
       ? '🏆 View Debrief'
       : `🔒 Debrief (${objStatus ? `${objStatus.completedCount}/${objStatus.totalCount}` : `${Math.min(t?.downlinkCount || 0, 1)}/1`})`;
   }
-  const sm = document.getElementById('orb-safemode-btn'); if (sm) sm.hidden = destroyed || !(t?.inEclipse || t?.stormActive) || Boolean(t?.safeModeActive);
   const db = document.getElementById('orbit-deploy-banner');
   if (db) {
     const active = Boolean(t?.deployActive && !t?.briefingPaused);
@@ -778,10 +776,10 @@ export function renderMissionBriefing(ev, stage, open) {
     <div class="brief-tip">💡 <strong>PRO TIP:</strong> ${esc(guide.proTip)}</div>
 
     <div class="brief-keybinds" aria-label="Orbital Controls">
-      <span><kbd>[SPACE]</kbd> Downlink Buffer at Ground Dish</span>
-      <span><kbd>[E]</kbd> Scan Science Zone</span>
-      <span><kbd>[1x–20x]</kbd> Time Warp</span>
-      <span><kbd>[Click / Hotkey]</kbd> Fix Hazards</span>
+      <span><kbd>[E]</kbd> Capture Science Scan (in Scan Gate)</span>
+      <span><kbd>[SPACE]</kbd> Transmit Downlink (in Station Lock)</span>
+      <span><kbd>[1] / [2] / [3]</kbd> Resolve Space Hazard Decision</span>
+      <span><kbd>[U]</kbd> Replay Array Unfold</span>
     </div>
 
     <div class="brief-actions">
