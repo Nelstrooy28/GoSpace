@@ -1,10 +1,10 @@
 import { CATALOG, SCENARIOS, createInitialState, evaluateMissionDesign, getOptimalLoadoutForMission, getOrbitObjectivesStatus } from './catalog.js';
 import { exportMissionVizJSON } from './missionVizPropagator.js';
 import { focusSubsystem, getMeshCount, mountCleanroom, resetCamera, setAutoRotate, setExploded, unmountCleanroom, updateSpacecraft } from './sceneCleanroom.js';
-import { mountLaunch, setLaunchCamera, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
+import { haltLaunchLoop, mountLaunch, setLaunchCamera, setLaunchSkipHandler, triggerIgnition, unmountLaunch } from './sceneLaunch.js';
 import { clearHoloSelection, focusCelestialBody, getHoloBodyScreenPos, getSensorCamMode, markOrbitPlayerAction, mountOrbit, mountShowcase, replayOrbitDeployment, resolveOrbitHazardChoice, returnToSatellite, scanAsteroid, seekOrbitToPass, setOrbitBriefingPaused, setOrbitCameraMode, setOrbitTimeWarp, setOrbitVictoryMode, setSensorCamEnabled, transmitScience, triggerTestHazard, unmountOrbit } from './sceneOrbit.js';
 import { getMusicDebugState, initMusic, isMusicMuted, setHazardTension, setMood, toggleMusicMuted } from './music.js';
-import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, toggleMute } from './sfx.js';
+import { isMuted, playEquip, playHover, playRepairSuccess, playVictoryFanfare, playWarning, stopRocketRumbling, toggleMute } from './sfx.js';
 import { isTutorialActive, notifyTutorialState, startInteractiveTutorial, stopTutorial } from './tutorial.js';
 import { SUB_TABS, computeMissionDebriefSummary, renderHoloScannerCard, renderHud, renderLoadoutDock, renderLossOfVehicleModal, renderMissionBriefing, renderOrbitObjectivesSidebar, renderResourcesList, renderSavedModal, renderStageHud, renderTitleOverlay, updateLaunchOverlay, updateOrbitOverlay } from './ui.js';
 
@@ -27,8 +27,10 @@ function createFreshRunSession(missionId) {
     deployCompleted: false,
     holoInspected: false,
     orbitObjectivesMet: false,
+    launched: false,
     launchCompleted: false,
     launchInserted: false,
+    maxUnlockedStage: 1,
     unlockedStage: 'hangar'
   };
 }
@@ -184,6 +186,21 @@ function setStage(nextStage, keepOrbit = false, forceUnlock = false) {
   if (activeScene === 'orbit' && keepOrbit) setOrbitBriefingPaused(briefingOpen);
   renderAll(!keepOrbit);
   return true;
+}
+
+function skipLaunchToOrbit() {
+  if (stage !== 'launch' || titleOpen) return false;
+  haltLaunchLoop();
+  stopRocketRumbling();
+  const ign = document.getElementById('lch-ignite-btn');
+  if (ign) ign.hidden = true;
+  runSession.launched = true;
+  runSession.launchCompleted = true;
+  runSession.launchInserted = true;
+  runSession.maxUnlockedStage = Math.max(runSession.maxUnlockedStage || 1, 3);
+  runSession.unlockedStage = 'orbit';
+  playEquip();
+  return setStage('orbit', false, true);
 }
 
 function openMissionBriefing() {
@@ -423,14 +440,15 @@ function renderAll(rebuildScene = true, focusTag = null) {
         launchTelemetry = t; updateLaunchOverlay(t);
         if (!runSession.launchInserted && t.progressPct >= 95) {
           runSession.launchInserted = true;
-          const skipBtn = document.getElementById('lch-skip-btn');
-          if (skipBtn) { skipBtn.disabled = false; skipBtn.title = 'Enter Orbit Stage'; }
         }
         if (window.__MISSION_DEBUG__) window.__MISSION_DEBUG__.launchTelemetry = t;
         notifyTutorialState();
       }, () => {
+        runSession.launched = true;
         runSession.launchCompleted = true;
         runSession.launchInserted = true;
+        runSession.maxUnlockedStage = Math.max(runSession.maxUnlockedStage || 1, 3);
+        runSession.unlockedStage = 'orbit';
         if (stage === 'launch') setStage('orbit', false, true);
       });
       activeScene = 'launch'; setLaunchCamera(launchCam);
@@ -702,10 +720,6 @@ function init() {
     else if (e.target.closest('#vp-explode-btn')) { exploded = !exploded; setExploded(exploded); renderStageHud(stage, missionState, lastEval, getStageHudOpts()); }
     else if (e.target.closest('#vp-reset-btn')) resetCamera();
     else if (e.target.closest('[data-lcam]')) { launchCam = e.target.closest('[data-lcam]').dataset.lcam; setLaunchCamera(launchCam); renderStageHud(stage, missionState, lastEval, getStageHudOpts()); }
-    else if (e.target.closest('#lch-skip-btn')) {
-      if (runSession.launchInserted || isTutorialActive()) setStage('orbit', false, true);
-      else { playWarning(); spawnPopup('🔒 Ignite and complete rocket launch to unlock Orbit!'); }
-    }
     else if (e.target.closest('[data-cam]')) {
       orbitCam = e.target.closest('[data-cam]').dataset.cam;
       focusedHoloId = null;
@@ -845,12 +859,26 @@ function init() {
     }
   });
 
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#lch-skip-btn, #btn-skip-launch, [data-action="skip-launch"], .skip-launch-btn');
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      skipLaunchToOrbit();
+    }
+  }, true);
+
   window.addEventListener('keydown', (e) => {
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
     const k = e.key.toLowerCase();
     if (briefingOpen && !titleOpen) {
       if (e.key === 'Escape') { e.preventDefault(); closeMissionBriefing(false); return; }
       if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); closeMissionBriefing(true); return; }
+    }
+    if (e.key === 'Escape' && stage === 'launch' && !titleOpen && !isTutorialActive()) {
+      e.preventDefault();
+      skipLaunchToOrbit();
+      return;
     }
     if (e.key === 'Escape' && stage === 'review' && !titleOpen) {
       e.preventDefault();
@@ -893,6 +921,7 @@ function init() {
     else if (d) { saved.splice(Number(d.dataset.delIdx), 1); writeJson(STORAGE_SAVED, saved); renderSavedModal(saved, lastEval); }
   });
   document.querySelectorAll('.close-modal').forEach((b) => b.addEventListener('click', () => document.getElementById(b.dataset.close).close()));
+  setLaunchSkipHandler(skipLaunchToOrbit);
   initMusic();
   renderAll(true);
 }

@@ -341,7 +341,7 @@ export function renderStageHud(stage, state, ev, opts) {
         <button class="btn-sci ${opts.launchCam === 'track' ? 'is-on' : ''}" data-lcam="track" type="button">🎥 Tower Track</button>
         <button class="btn-sci ${opts.launchCam === 'hull' ? 'is-on' : ''}" data-lcam="hull" type="button">🎥 Rocket Hull Cam</button>
         <button class="btn-sci ${opts.launchCam === 'free' ? 'is-on' : ''}" data-lcam="free" type="button">🎥 Free Cam</button>
-        <button id="lch-skip-btn" class="btn-sci active" type="button" ${opts.launchInserted ? '' : 'disabled title="Complete rocket ascent first to unlock Orbit"'}>Skip &gt;&gt;</button>
+        <button id="lch-skip-btn" class="btn-sci active skip-launch-btn" data-action="skip-launch" type="button" title="Skip Ascent &amp; Enter Orbit [ESC]">Skip &gt;&gt; [ESC]</button>
       </div></div>`;
     actions.innerHTML = `<button id="lch-ignite-btn" class="action-prompt" type="button">🔥 PRESS [SPACE] OR CLICK TO IGNITE</button>`;
     return;

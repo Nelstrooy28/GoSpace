@@ -13,7 +13,7 @@ let puffs = [], sparks = [], trenchLight = null;
 let camMode = 'trench', rocketSpec = null, lastRocketY = 0;
 let ignitedCmd = false, igniteElapsed = 0, lastBeep = -1, rumbleOn = false, padClock = 0;
 let becoDone = false, mecoDone = false, fairingDone = false, completed = false, lastHudMs = 0;
-let updateCb = null, completeCb = null;
+let updateCb = null, completeCb = null, skipHandler = null;
 
 const clock = new THREE.Clock();
 const launchTexCache = { ready: false, hullWhite: null, hullBlack: null, fairing: null, steam: null };
@@ -409,6 +409,7 @@ function updateCameras(dt, ry, prevRy, shakeAmt, elapsed = 0) {
 }
 
 function animate() {
+  if (completed || !renderer || !scene || !camera) return;
   rafId = requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   padClock += dt;
@@ -629,9 +630,32 @@ export function mountLaunch(container, missionState, onUpdate, onComplete) {
   animate();
 }
 
+export function setLaunchSkipHandler(fn) {
+  skipHandler = typeof fn === 'function' ? fn : null;
+}
+
+export function haltLaunchLoop() {
+  completed = true;
+  ignitedCmd = false;
+  rumbleOn = false;
+  updateCb = null;
+  completeCb = null;
+  stopRocketRumbling();
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+}
+
+export function skipLaunch() {
+  haltLaunchLoop();
+  if (skipHandler) skipHandler();
+}
+
+export const sceneLaunch = { skip: skipLaunch };
+
 export function unmountLaunch() {
-  stopRocketRumbling(); ignitedCmd = false; rumbleOn = false;
-  if (rafId) cancelAnimationFrame(rafId); rafId = 0;
+  haltLaunchLoop();
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
   if (controls) { controls.dispose(); controls = null; }
   if (bloomComp) { bloomComp.dispose(); bloomComp = null; }
